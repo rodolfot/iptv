@@ -1,0 +1,7 @@
+-keepattributes *Annotation*, InnerClasses
+-keepclassmembers class kotlinx.serialization.json.** { *; }
+-keep,allowobfuscation,allowshrinking class kotlin.reflect.jvm.internal.impl.builtins.BuiltInsLoaderImpl
+-keep class com.iptv.app.data.api.** { *; }
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**

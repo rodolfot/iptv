@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IPTV</string>
+    <string name="login_title">Conectar à sua lista IPTV</string>
+    <string name="login_host">URL do servidor (ex: http://bscx.one)</string>
+    <string name="login_user">Usuário</string>
+    <string name="login_pass">Senha</string>
+    <string name="login_button">Entrar</string>
+    <string name="login_invalid">Credenciais inválidas ou servidor inacessível</string>
+    <string name="tab_live">Ao Vivo</string>
+    <string name="tab_movies">Filmes</string>
+    <string name="tab_series">Séries</string>
+    <string name="tab_favorites">Favoritos</string>
+    <string name="tab_search">Buscar</string>
+    <string name="tab_settings">Config</string>
+    <string name="parental_title">Conteúdo restrito</string>
+    <string name="parental_message">Digite a senha para continuar</string>
+    <string name="parental_wrong">Senha incorreta</string>
+    <string name="parental_ok">OK</string>
+    <string name="parental_cancel">Cancelar</string>
+    <string name="sort_button">Ordenar</string>
+    <string name="favorite">Favoritar</string>
+    <string name="unfavorite">Remover dos favoritos</string>
+    <string name="settings_credentials">Credenciais</string>
+    <string name="settings_change_pin">Alterar senha parental</string>
+    <string name="settings_refresh">Atualizar catálogo</string>
+    <string name="settings_clear_cache">Limpar cache</string>
+    <string name="settings_reset_progress">Resetar progresso de séries</string>
+    <string name="settings_logout">Sair</string>
+    <string name="next_episode_in">Próximo episódio em %1$ds</string>
+    <string name="cancel_autoplay">Cancelar (Voltar)</string>
+    <string name="search_hint">Pesquisar...</string>
+    <string name="empty_list">Nada por aqui</string>
+    <string name="loading">Carregando...</string>
+</resources>
