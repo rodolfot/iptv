@@ -12,12 +12,19 @@ class Converters {
 }
 
 @Database(
-    entities = [FavoriteEntity::class, EpisodeProgressEntity::class],
-    version = 1,
+    entities = [
+        FavoriteEntity::class,
+        EpisodeProgressEntity::class,
+        MovieProgressEntity::class,
+        SeriesProgressEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun episodeProgressDao(): EpisodeProgressDao
+    abstract fun movieProgressDao(): MovieProgressDao
+    abstract fun seriesProgressDao(): SeriesProgressDao
 }

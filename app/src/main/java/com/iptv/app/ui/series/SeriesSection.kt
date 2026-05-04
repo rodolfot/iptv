@@ -162,7 +162,7 @@ fun SeriesSection(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun SeriesDetailScreen(
+fun SeriesDetailScreen(
     seriesId: Int,
     title: String,
     onBack: () -> Unit,

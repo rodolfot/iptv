@@ -116,7 +116,9 @@ fun MoviesSection(
                             kind = PlayerKind.MOVIE,
                             streamId = m.id,
                             title = m.name,
-                            containerExtension = m.containerExtension
+                            containerExtension = m.containerExtension,
+                            posterUrl = m.posterUrl,
+                            categoryId = m.categoryId
                         )
                         if (locked) pendingMovie = args
                         else onPlay(args)

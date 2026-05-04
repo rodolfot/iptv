@@ -65,4 +65,6 @@ object AppModule {
 
     @Provides fun provideFavoriteDao(db: AppDatabase) = db.favoriteDao()
     @Provides fun provideEpisodeProgressDao(db: AppDatabase) = db.episodeProgressDao()
+    @Provides fun provideMovieProgressDao(db: AppDatabase) = db.movieProgressDao()
+    @Provides fun provideSeriesProgressDao(db: AppDatabase) = db.seriesProgressDao()
 }

@@ -18,22 +18,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Tab
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.continueWatching.ContinueWatchingScreen
 import com.iptv.app.ui.favorites.FavoritesScreen
 import com.iptv.app.ui.live.LiveSection
 import com.iptv.app.ui.movies.MoviesSection
 import com.iptv.app.ui.parental.ParentalSession
 import com.iptv.app.ui.player.PlayerArgs
+import com.iptv.app.ui.search.SearchScreen
+import com.iptv.app.ui.series.SeriesDetailScreen
 import com.iptv.app.ui.series.SeriesSection
 import com.iptv.app.ui.settings.SettingsScreen
 
-private val tabs = listOf("Ao Vivo", "Filmes", "Séries", "Favoritos", "Config")
+private val tabs = listOf("Início", "Buscar", "Ao Vivo", "Filmes", "Séries", "Favoritos", "Config")
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -44,16 +46,32 @@ fun HomeScreen(
 ) {
     var selected by rememberSaveable { mutableStateOf(0) }
     val parental = remember { ParentalSession() }
+    var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopBar(selected, { selected = it })
-            when (selected) {
-                0 -> LiveSection(vm = vm, parental = parental, onPlay = onPlay)
-                1 -> MoviesSection(vm = vm, parental = parental, onPlay = onPlay)
-                2 -> SeriesSection(vm = vm, onPlay = onPlay)
-                3 -> FavoritesScreen(vm = vm, parental = parental, onPlay = onPlay)
-                4 -> SettingsScreen(vm = vm, onLogout = onLogout)
+            if (openSeries != null) {
+                val (id, title, _) = openSeries!!
+                SeriesDetailScreen(
+                    seriesId = id,
+                    title = title,
+                    onBack = { openSeries = null },
+                    onPlay = onPlay
+                )
+            } else {
+                when (selected) {
+                    0 -> ContinueWatchingScreen(onPlay = onPlay)
+                    1 -> SearchScreen(
+                        onPlay = onPlay,
+                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
+                    )
+                    2 -> LiveSection(vm = vm, parental = parental, onPlay = onPlay)
+                    3 -> MoviesSection(vm = vm, parental = parental, onPlay = onPlay)
+                    4 -> SeriesSection(vm = vm, onPlay = onPlay)
+                    5 -> FavoritesScreen(vm = vm, parental = parental, onPlay = onPlay)
+                    6 -> SettingsScreen(vm = vm, onLogout = onLogout)
+                }
             }
         }
     }

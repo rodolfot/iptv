@@ -34,6 +34,10 @@ import androidx.tv.material3.Text
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
+import com.iptv.app.data.db.MovieProgressDao
+import com.iptv.app.data.db.MovieProgressEntity
+import com.iptv.app.data.db.SeriesProgressDao
+import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.toModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,13 +60,21 @@ data class PlayableItem(
     val seriesId: Int = -1,
     val seasonNumber: Int = -1,
     val episodeNum: Int = -1,
-    val startPositionMs: Long = 0L
+    val startPositionMs: Long = 0L,
+    val movieId: Int = -1,
+    val moviePoster: String? = null,
+    val movieContainer: String? = null,
+    val movieCategory: String? = null,
+    val seriesTitle: String? = null,
+    val seriesCover: String? = null
 )
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repo: XtreamRepository,
-    private val progressDao: EpisodeProgressDao
+    private val progressDao: EpisodeProgressDao,
+    private val movieProgressDao: MovieProgressDao,
+    private val seriesProgressDao: SeriesProgressDao
 ) : ViewModel() {
     private val _state = MutableStateFlow(PlayerUiState())
     val state = _state.asStateFlow()
@@ -79,14 +91,28 @@ class PlayerViewModel @Inject constructor(
                 }
                 PlayerKind.MOVIE -> {
                     val url = repo.movieStreamUrl(args.streamId, args.containerExtension)
+                    val savedResume = movieProgressDao.getById(args.streamId)
+                        ?.takeIf { !it.watched }?.positionMs ?: 0L
+                    val resumeMs = if (args.startPositionMs > 0L) args.startPositionMs else savedResume
                     _state.value = PlayerUiState(
-                        items = listOf(PlayableItem(url, args.title, startPositionMs = args.startPositionMs)),
+                        items = listOf(
+                            PlayableItem(
+                                url = url,
+                                title = args.title,
+                                startPositionMs = resumeMs,
+                                movieId = args.streamId,
+                                moviePoster = args.posterUrl,
+                                movieContainer = args.containerExtension,
+                                movieCategory = args.categoryId
+                            )
+                        ),
                         title = args.title
                     )
                 }
                 PlayerKind.EPISODE -> {
                     runCatching { repo.seriesInfo(args.seriesId) }.onSuccess { info ->
-                        val seasons = info.seasons?.sortedBy { it.seasonNumber ?: 0 } ?: emptyList()
+                        val seriesTitle = info.info?.name ?: args.title
+                        val seriesCover = info.info?.cover ?: args.posterUrl
                         val orderedEpisodes = mutableListOf<Episode>()
                         val episodesMap = info.episodes ?: emptyMap()
                         val keys = episodesMap.keys.mapNotNull { it.toIntOrNull() }.sorted()
@@ -99,7 +125,17 @@ class PlayerViewModel @Inject constructor(
                             // fallback: single episode by id
                             val url = repo.episodeStreamUrl(args.episodeId, args.containerExtension)
                             _state.value = PlayerUiState(
-                                items = listOf(PlayableItem(url, args.title, episodeId = args.episodeId, seriesId = args.seriesId, startPositionMs = args.startPositionMs)),
+                                items = listOf(
+                                    PlayableItem(
+                                        url = url,
+                                        title = args.title,
+                                        episodeId = args.episodeId,
+                                        seriesId = args.seriesId,
+                                        startPositionMs = args.startPositionMs,
+                                        seriesTitle = seriesTitle,
+                                        seriesCover = seriesCover
+                                    )
+                                ),
                                 title = args.title
                             )
                             return@onSuccess
@@ -111,7 +147,9 @@ class PlayerViewModel @Inject constructor(
                                 episodeId = e.id,
                                 seriesId = e.seriesId,
                                 seasonNumber = e.seasonNumber,
-                                episodeNum = e.episodeNum
+                                episodeNum = e.episodeNum,
+                                seriesTitle = seriesTitle,
+                                seriesCover = seriesCover
                             )
                         }
                         val startIndex = items.indexOfFirst { it.episodeId == args.episodeId }.coerceAtLeast(0)
@@ -134,21 +172,53 @@ class PlayerViewModel @Inject constructor(
         _state.value = _state.value.copy(currentIndex = index, title = item.title)
     }
 
-    fun saveProgress(episodeId: String?, seriesId: Int, season: Int, episodeNum: Int, position: Long, duration: Long) {
-        if (episodeId.isNullOrBlank() || seriesId < 0) return
+    fun saveProgress(item: PlayableItem, position: Long, duration: Long) {
+        if (position <= 0L) return
+        val watched = duration > 0 && position >= duration - 30_000L
         viewModelScope.launch {
-            val watched = duration > 0 && position >= duration - 30_000L
-            progressDao.upsert(
-                EpisodeProgressEntity(
-                    episodeId = episodeId,
-                    seriesId = seriesId,
-                    seasonNumber = season,
-                    episodeNum = episodeNum,
-                    positionMs = position,
-                    durationMs = duration,
-                    watched = watched
-                )
-            )
+            when {
+                !item.episodeId.isNullOrBlank() && item.seriesId >= 0 -> {
+                    progressDao.upsert(
+                        EpisodeProgressEntity(
+                            episodeId = item.episodeId,
+                            seriesId = item.seriesId,
+                            seasonNumber = item.seasonNumber,
+                            episodeNum = item.episodeNum,
+                            positionMs = position,
+                            durationMs = duration,
+                            watched = watched
+                        )
+                    )
+                    seriesProgressDao.upsert(
+                        SeriesProgressEntity(
+                            seriesId = item.seriesId,
+                            title = item.seriesTitle ?: item.title,
+                            coverUrl = item.seriesCover,
+                            lastEpisodeId = item.episodeId,
+                            lastSeasonNumber = item.seasonNumber,
+                            lastEpisodeNum = item.episodeNum
+                        )
+                    )
+                }
+                item.movieId >= 0 -> {
+                    if (watched) {
+                        movieProgressDao.delete(item.movieId)
+                    } else {
+                        movieProgressDao.upsert(
+                            MovieProgressEntity(
+                                movieId = item.movieId,
+                                title = item.title,
+                                posterUrl = item.moviePoster,
+                                containerExtension = item.movieContainer,
+                                categoryId = item.movieCategory,
+                                positionMs = position,
+                                durationMs = duration,
+                                watched = false
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -180,24 +250,24 @@ fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(state.items.isNotEmpty()) {
+        if (state.items.isEmpty()) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(10_000L)
+            val item = state.items.getOrNull(exo.currentMediaItemIndex) ?: continue
+            val pos = exo.currentPosition
+            val dur = exo.duration.coerceAtLeast(0L)
+            if (exo.isPlaying && pos > 0L) {
+                vm.saveProgress(item, pos, dur)
+            }
+        }
+    }
+
     DisposableEffect(exo) {
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = exo.currentMediaItemIndex
                 vm.onTransition(idx)
-            }
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) {
-                    val item = state.items.getOrNull(exo.currentMediaItemIndex) ?: return
-                    vm.saveProgress(
-                        item.episodeId,
-                        item.seriesId,
-                        item.seasonNumber,
-                        item.episodeNum,
-                        exo.currentPosition,
-                        exo.duration.coerceAtLeast(0L)
-                    )
-                }
             }
         }
         exo.addListener(listener)
@@ -205,10 +275,7 @@ fun PlayerScreen(
             val item = state.items.getOrNull(exo.currentMediaItemIndex)
             if (item != null) {
                 vm.saveProgress(
-                    item.episodeId,
-                    item.seriesId,
-                    item.seasonNumber,
-                    item.episodeNum,
+                    item,
                     exo.currentPosition,
                     exo.duration.coerceAtLeast(0L)
                 )

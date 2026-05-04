@@ -42,3 +42,39 @@ interface EpisodeProgressDao {
     @Query("DELETE FROM episode_progress WHERE seriesId = :seriesId")
     suspend fun clearForSeries(seriesId: Int)
 }
+
+@Dao
+interface MovieProgressDao {
+    @Query("SELECT * FROM movie_progress WHERE movieId = :id LIMIT 1")
+    suspend fun getById(id: Int): MovieProgressEntity?
+
+    @Query("SELECT * FROM movie_progress WHERE watched = 0 ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeInProgress(limit: Int = 20): Flow<List<MovieProgressEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: MovieProgressEntity)
+
+    @Query("DELETE FROM movie_progress WHERE movieId = :id")
+    suspend fun delete(id: Int)
+
+    @Query("DELETE FROM movie_progress")
+    suspend fun clearAll()
+}
+
+@Dao
+interface SeriesProgressDao {
+    @Query("SELECT * FROM series_progress ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeRecent(limit: Int = 20): Flow<List<SeriesProgressEntity>>
+
+    @Query("SELECT * FROM series_progress WHERE seriesId = :id LIMIT 1")
+    suspend fun getById(id: Int): SeriesProgressEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: SeriesProgressEntity)
+
+    @Query("DELETE FROM series_progress WHERE seriesId = :id")
+    suspend fun delete(id: Int)
+
+    @Query("DELETE FROM series_progress")
+    suspend fun clearAll()
+}

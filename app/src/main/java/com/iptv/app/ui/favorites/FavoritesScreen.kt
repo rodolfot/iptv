@@ -91,7 +91,14 @@ fun FavoritesScreen(
                 ) {
                     val args = when (f.type) {
                         ContentType.LIVE -> PlayerArgs(PlayerKind.LIVE, f.itemId, f.name, null)
-                        ContentType.MOVIE -> PlayerArgs(PlayerKind.MOVIE, f.itemId, f.name, f.containerExtension)
+                        ContentType.MOVIE -> PlayerArgs(
+                            PlayerKind.MOVIE,
+                            f.itemId,
+                            f.name,
+                            f.containerExtension,
+                            posterUrl = f.logoUrl,
+                            categoryId = f.categoryId
+                        )
                         ContentType.SERIES -> null
                     }
                     if (args == null) {

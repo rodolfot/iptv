@@ -26,3 +26,27 @@ data class EpisodeProgressEntity(
     val watched: Boolean,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "movie_progress")
+data class MovieProgressEntity(
+    @PrimaryKey val movieId: Int,
+    val title: String,
+    val posterUrl: String?,
+    val containerExtension: String?,
+    val categoryId: String?,
+    val positionMs: Long,
+    val durationMs: Long,
+    val watched: Boolean,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "series_progress")
+data class SeriesProgressEntity(
+    @PrimaryKey val seriesId: Int,
+    val title: String,
+    val coverUrl: String?,
+    val lastEpisodeId: String,
+    val lastSeasonNumber: Int,
+    val lastEpisodeNum: Int,
+    val updatedAt: Long = System.currentTimeMillis()
+)
