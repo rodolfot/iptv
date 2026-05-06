@@ -24,7 +24,8 @@ fun LiveChannelCacheEntity.toDomain(): LiveChannel = LiveChannel(
     logoUrl = logoUrl,
     categoryId = categoryId,
     epgChannelId = epgChannelId,
-    addedTimestamp = addedTimestamp
+    addedTimestamp = addedTimestamp,
+    tvArchive = tvArchive
 )
 
 fun MovieCacheEntity.toDomain(): Movie = Movie(

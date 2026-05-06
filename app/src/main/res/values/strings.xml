@@ -53,6 +53,9 @@
     <string name="movie_play">Assistir</string>
     <string name="movie_resume">Continuar de %1$s</string>
     <string name="movie_restart">Começar do início</string>
+    <string name="series_resume">Continuar T%1$dE%2$d</string>
+    <string name="series_play_next">Assistir T%1$dE%2$d</string>
+    <string name="watched_mark">Assistido</string>
     <string name="movie_director">Direção: %1$s</string>
     <string name="movie_cast">Elenco: %1$s</string>
     <string name="movie_genre">Gênero: %1$s</string>
@@ -67,6 +70,8 @@
     <string name="channel_upcoming">A seguir</string>
     <string name="channel_no_epg">Programação não disponível para este canal.</string>
     <string name="channel_play">Assistir</string>
+    <string name="channel_timeshift">Voltar %1$dh</string>
+    <string name="channel_timeshift_30">Voltar 30 min</string>
 
     <!-- Player tracks -->
     <string name="player_tracks">Faixas</string>
@@ -81,6 +86,7 @@
     <!-- Search -->
     <string name="search_hint">Buscar canais, filmes ou séries…</string>
     <string name="search_min_chars">Digite pelo menos 2 letras para buscar.</string>
+    <string name="search_in_category">Filtrar nesta categoria</string>
     <string name="filter_all">Tudo</string>
     <string name="filter_channels">Canais</string>
     <string name="filter_movies">Filmes</string>
@@ -126,6 +132,11 @@
     <string name="settings_reset_progress">Resetar progresso de séries</string>
     <string name="settings_session">Sessão</string>
     <string name="settings_logout">Sair</string>
+    <string name="settings_change_server">Trocar servidor</string>
+    <string name="settings_test_connection">Testar conexão</string>
+    <string name="settings_save_credentials">Salvar e reconectar</string>
+    <string name="settings_connection_ok">Conexão validada</string>
+    <string name="settings_connection_failed">Falha: %1$s</string>
     <string name="settings_about">Sobre</string>
     <string name="settings_open_about">Sobre o TartaTV</string>
 

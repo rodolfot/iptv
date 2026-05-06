@@ -25,9 +25,10 @@ class Converters {
         LiveFtsEntity::class,
         MovieFtsEntity::class,
         SeriesFtsEntity::class,
-        EpgProgrammeEntity::class
+        EpgProgrammeEntity::class,
+        DetailCacheEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -42,4 +43,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun movieCacheDao(): MovieCacheDao
     abstract fun seriesCacheDao(): SeriesCacheDao
     abstract fun epgDao(): EpgDao
+    abstract fun detailCacheDao(): DetailCacheDao
 }

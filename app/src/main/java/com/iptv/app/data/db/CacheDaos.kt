@@ -123,6 +123,18 @@ interface MovieCacheDao {
 }
 
 @Dao
+interface DetailCacheDao {
+    @Query("SELECT * FROM detail_cache WHERE kind = :kind AND id = :id LIMIT 1")
+    suspend fun get(kind: String, id: Int): DetailCacheEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: DetailCacheEntity)
+
+    @Query("DELETE FROM detail_cache WHERE updatedAt < :before")
+    suspend fun deleteExpired(before: Long)
+}
+
+@Dao
 interface SeriesCacheDao {
     @Query("SELECT * FROM series_cache WHERE :categoryId IS NULL OR categoryId = :categoryId ORDER BY lastModifiedTimestamp DESC")
     fun observe(categoryId: String?): Flow<List<SeriesCacheEntity>>
