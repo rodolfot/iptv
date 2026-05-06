@@ -20,7 +20,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.iptv.app.R
 import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
@@ -61,16 +63,16 @@ fun FavoritesScreen(
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
-            Text("Favoritos", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.tab_favorites), style = MaterialTheme.typography.headlineSmall)
             Row(modifier = Modifier.padding(start = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { filter = null }) { Text("Todos") }
-                Button(onClick = { filter = ContentType.LIVE }) { Text("Canais") }
-                Button(onClick = { filter = ContentType.MOVIE }) { Text("Filmes") }
-                Button(onClick = { filter = ContentType.SERIES }) { Text("Séries") }
+                Button(onClick = { filter = null }) { Text(stringResource(R.string.filter_all)) }
+                Button(onClick = { filter = ContentType.LIVE }) { Text(stringResource(R.string.filter_channels)) }
+                Button(onClick = { filter = ContentType.MOVIE }) { Text(stringResource(R.string.filter_movies)) }
+                Button(onClick = { filter = ContentType.SERIES }) { Text(stringResource(R.string.filter_series)) }
             }
         }
         if (items.isEmpty()) {
-            Text("Nada por aqui ainda.", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.favorites_empty), style = MaterialTheme.typography.bodyLarge)
             return
         }
         LazyVerticalGrid(
@@ -121,7 +123,8 @@ fun FavoritesScreen(
                 pendingPlay = null
                 onPlay(args)
             },
-            onCancel = { pendingPlay = null }
+            onCancel = { pendingPlay = null },
+            onPinCreated = { vm.setParentalPin(it) }
         )
     }
 }
