@@ -98,6 +98,8 @@ fun ChannelCard(
     number: Int?,
     logoUrl: String?,
     locked: Boolean = false,
+    nowPlaying: String? = null,
+    nowProgress: Float? = null,
     onClick: () -> Unit
 ) {
     Card(
@@ -144,9 +146,34 @@ fun ChannelCard(
                     Text(
                         title,
                         style = MaterialTheme.typography.titleSmall,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (!nowPlaying.isNullOrBlank()) {
+                        Text(
+                            nowPlaying,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (nowProgress != null && nowProgress in 0f..1f) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp)
+                                    .height(2.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(nowProgress)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .height(2.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
