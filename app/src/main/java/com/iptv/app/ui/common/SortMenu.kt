@@ -19,8 +19,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.iptv.app.R
 import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
@@ -55,7 +57,7 @@ fun SortMenuButton(
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Ordenar por", style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.sort_title), style = MaterialTheme.typography.titleLarge)
                     options.forEach { opt ->
                         Button(
                             onClick = {

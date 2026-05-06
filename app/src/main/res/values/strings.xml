@@ -1,35 +1,165 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">IPTV</string>
-    <string name="login_title">Conectar à sua lista IPTV</string>
+    <string name="app_name">TartaTV</string>
+
+    <!-- Login -->
+    <string name="login_title">Conectar à sua lista</string>
+    <string name="login_brand">TartaTV</string>
     <string name="login_host">URL do servidor (ex: http://bscx.one)</string>
     <string name="login_user">Usuário</string>
     <string name="login_pass">Senha</string>
     <string name="login_button">Entrar</string>
+    <string name="login_connecting">Conectando…</string>
     <string name="login_invalid">Credenciais inválidas ou servidor inacessível</string>
+    <string name="login_fields_required">Preencha todos os campos</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">Início</string>
+    <string name="tab_search">Buscar</string>
     <string name="tab_live">Ao Vivo</string>
     <string name="tab_movies">Filmes</string>
     <string name="tab_series">Séries</string>
     <string name="tab_favorites">Favoritos</string>
-    <string name="tab_search">Buscar</string>
     <string name="tab_settings">Config</string>
-    <string name="parental_title">Conteúdo restrito</string>
-    <string name="parental_message">Digite a senha para continuar</string>
-    <string name="parental_wrong">Senha incorreta</string>
-    <string name="parental_ok">OK</string>
-    <string name="parental_cancel">Cancelar</string>
+
+    <!-- Common UI -->
+    <string name="loading">Carregando…</string>
+    <string name="loading_catalog">Carregando catálogo…</string>
+    <string name="empty_list">Nada por aqui</string>
+    <string name="nothing_found">Nada encontrado.</string>
+    <string name="back">← Voltar</string>
+    <string name="retry">Tentar novamente</string>
+    <string name="error_prefix">Erro: %1$s</string>
+    <string name="cancel">Cancelar</string>
+    <string name="ok">OK</string>
+    <string name="save">Salvar</string>
+    <string name="close">Fechar</string>
+
+    <!-- Sections -->
+    <string name="section_categories">Categorias</string>
+    <string name="section_movie_categories">Categorias de filmes</string>
+    <string name="section_series_categories">Categorias de séries</string>
+    <string name="section_live_default">Canais</string>
+    <string name="section_movies_default">Filmes</string>
+    <string name="section_series_default">Séries</string>
+    <string name="section_seasons">Temporadas</string>
+
+    <!-- Continue watching / home -->
+    <string name="continue_empty">Nada em andamento ainda. Comece a assistir um filme ou episódio para vê-lo aqui.</string>
+    <string name="continue_series">Continuar séries</string>
+    <string name="continue_movies">Continuar filmes</string>
+
+    <!-- Movie detail -->
+    <string name="movie_play">Assistir</string>
+    <string name="movie_resume">Continuar de %1$s</string>
+    <string name="movie_restart">Começar do início</string>
+    <string name="movie_director">Direção: %1$s</string>
+    <string name="movie_cast">Elenco: %1$s</string>
+    <string name="movie_genre">Gênero: %1$s</string>
+    <string name="movie_release">Lançamento: %1$s</string>
+    <string name="movie_rating">Avaliação: %1$s</string>
+    <string name="movie_duration">Duração: %1$s</string>
+    <string name="add_favorite">Favoritar</string>
+    <string name="remove_favorite">Remover dos favoritos</string>
+
+    <!-- Channel detail / EPG -->
+    <string name="channel_now">Agora</string>
+    <string name="channel_upcoming">A seguir</string>
+    <string name="channel_no_epg">Programação não disponível para este canal.</string>
+    <string name="channel_play">Assistir</string>
+
+    <!-- Player tracks -->
+    <string name="player_tracks">Faixas</string>
+    <string name="player_audio">Áudio</string>
+    <string name="player_subtitle">Legenda</string>
+    <string name="player_video">Qualidade</string>
+    <string name="player_track_off">Desligado</string>
+    <string name="player_track_auto">Automático</string>
+    <string name="next_episode_in">Próximo episódio em %1$ds</string>
+    <string name="cancel_autoplay">Cancelar (Voltar)</string>
+
+    <!-- Search -->
+    <string name="search_hint">Buscar canais, filmes ou séries…</string>
+    <string name="search_min_chars">Digite pelo menos 2 letras para buscar.</string>
+    <string name="filter_all">Tudo</string>
+    <string name="filter_channels">Canais</string>
+    <string name="filter_movies">Filmes</string>
+    <string name="filter_series">Séries</string>
+
+    <!-- Sort -->
+    <string name="sort_title">Ordenar por</string>
     <string name="sort_button">Ordenar</string>
+
+    <!-- Favorites -->
     <string name="favorite">Favoritar</string>
     <string name="unfavorite">Remover dos favoritos</string>
-    <string name="settings_credentials">Credenciais</string>
-    <string name="settings_change_pin">Alterar senha parental</string>
+    <string name="favorites_empty">Nada por aqui ainda.</string>
+
+    <!-- Parental -->
+    <string name="parental_title">Conteúdo restrito</string>
+    <string name="parental_message">Digite a senha para continuar</string>
+    <string name="parental_pass_label">Senha</string>
+    <string name="parental_wrong">Senha incorreta</string>
+    <string name="parental_setup_title">Crie sua senha parental</string>
+    <string name="parental_setup_message">Para acessar conteúdo adulto, crie uma senha numérica de 4 a 8 dígitos. Ela será exigida sempre que conteúdo restrito for aberto.</string>
+    <string name="parental_new_pass">Nova senha</string>
+    <string name="parental_confirm_pass">Confirmar senha</string>
+    <string name="parental_create">Criar</string>
+    <string name="parental_min_length">A senha precisa ter pelo menos 4 dígitos</string>
+    <string name="parental_mismatch">As senhas não coincidem</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Configurações</string>
+    <string name="settings_server">Servidor</string>
+    <string name="settings_host">Host: %1$s</string>
+    <string name="settings_user">Usuário: %1$s</string>
+    <string name="settings_parental_title">Senha parental</string>
+    <string name="settings_pin_set">PIN configurado.</string>
+    <string name="settings_pin_unset">Nenhum PIN definido. Crie um para liberar conteúdo adulto.</string>
+    <string name="settings_pin_label_set">Alterar PIN</string>
+    <string name="settings_pin_label_unset">Definir PIN</string>
+    <string name="settings_pin_save_set">Salvar PIN</string>
+    <string name="settings_pin_save_unset">Definir PIN</string>
+    <string name="settings_catalog">Catálogo</string>
     <string name="settings_refresh">Atualizar catálogo</string>
     <string name="settings_clear_cache">Limpar cache</string>
     <string name="settings_reset_progress">Resetar progresso de séries</string>
+    <string name="settings_session">Sessão</string>
     <string name="settings_logout">Sair</string>
-    <string name="next_episode_in">Próximo episódio em %1$ds</string>
-    <string name="cancel_autoplay">Cancelar (Voltar)</string>
-    <string name="search_hint">Pesquisar...</string>
-    <string name="empty_list">Nada por aqui</string>
-    <string name="loading">Carregando...</string>
+    <string name="settings_about">Sobre</string>
+    <string name="settings_open_about">Sobre o TartaTV</string>
+
+    <!-- Player -->
+    <string name="player_unsupported_title">Não foi possível reproduzir</string>
+    <string name="player_unsupported_4k">Este conteúdo está em formato 4K/HDR (HEVC) que não é suportado por este dispositivo. Tente uma versão SD/HD ou rode no aparelho de TV.</string>
+    <string name="player_unsupported_format">Formato de vídeo não suportado por este dispositivo.</string>
+    <string name="player_network_failed">Falha de conexão com o servidor. Verifique a internet.</string>
+    <string name="player_http_failed">O servidor recusou a transmissão (HTTP). Pode ser limite de conexões ou conteúdo indisponível.</string>
+    <string name="player_generic_error">Erro ao reproduzir: %1$s.</string>
+
+    <!-- About / Legal -->
+    <string name="about_title">Sobre o TartaTV</string>
+    <string name="about_version">Versão %1$s</string>
+    <string name="about_intro">TartaTV é um cliente de TV que reproduz listas no padrão Xtream Codes fornecidas pelo usuário. Ele não distribui, hospeda nem comercializa conteúdo — toda a exibição depende exclusivamente da lista que você inseriu.</string>
+    <string name="about_terms">Termos de Uso</string>
+    <string name="about_privacy">Política de Privacidade</string>
+    <string name="about_open_source">Bibliotecas open source</string>
+    <string name="about_crash_log">Diagnóstico (logs locais)</string>
+    <string name="crash_log_title">Diagnóstico</string>
+    <string name="crash_log_empty">Nenhum erro registrado.</string>
+    <string name="crash_log_clear">Limpar logs</string>
+
+    <!-- Onboarding / acceptance -->
+    <string name="onboarding_title">Bem-vindo ao TartaTV</string>
+    <string name="onboarding_message">Para usar o aplicativo, você precisa concordar com os Termos de Uso e a Política de Privacidade.</string>
+    <string name="onboarding_read_terms">Ler Termos de Uso</string>
+    <string name="onboarding_read_privacy">Ler Política de Privacidade</string>
+    <string name="onboarding_accept">Concordo e quero continuar</string>
+    <string name="onboarding_decline">Não concordo</string>
+
+    <!-- Update -->
+    <string name="update_title">Nova versão disponível</string>
+    <string name="update_message">Versão %1$s está disponível. Você está usando %2$s.</string>
+    <string name="update_open">Abrir página de download</string>
+    <string name="update_later">Mais tarde</string>
 </resources>

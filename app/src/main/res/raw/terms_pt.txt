@@ -1,0 +1,49 @@
+TERMOS DE USO — TartaTV
+
+Última atualização: 5 de maio de 2026.
+
+Estes Termos regem o uso do aplicativo TartaTV ("o Aplicativo"). Ao instalar, abrir ou usar o Aplicativo, você concorda integralmente com estes Termos. Se você não concorda, não use o Aplicativo.
+
+1. NATUREZA DO APLICATIVO
+1.1 O TartaTV é um reprodutor (player) de listas no padrão Xtream Codes. Ele apenas conecta-se a um servidor cuja URL, usuário e senha são fornecidos pelo próprio usuário, e reproduz o conteúdo retornado por esse servidor.
+1.2 O TartaTV NÃO distribui, hospeda, transmite, comercializa, indexa nem agrega conteúdo de terceiros. Não há "lista pronta" embarcada no Aplicativo.
+1.3 O TartaTV é fornecido como software, não como serviço de mídia. Não há catálogo, biblioteca ou conteúdo próprio.
+
+2. RESPONSABILIDADE DO USUÁRIO PELA LISTA
+2.1 É responsabilidade exclusiva do usuário obter, contratar e operar uma lista (servidor Xtream Codes) que respeite os direitos autorais e a legislação aplicável.
+2.2 O usuário declara, ao inserir credenciais no Aplicativo, que possui o direito legítimo de acessar o conteúdo associado àquelas credenciais.
+2.3 O fornecedor da lista é o responsável legal pelo conteúdo que ele oferece. O Aplicativo apenas exibe o que o servidor retorna.
+2.4 O uso do Aplicativo para acessar conteúdo cuja exibição não esteja autorizada é uma violação destes Termos e pode constituir infração civil ou criminal sob a legislação aplicável.
+
+3. USO PESSOAL E NÃO COMERCIAL
+3.1 O Aplicativo destina-se a uso pessoal, doméstico e não comercial.
+3.2 É proibido redistribuir, revender, modificar para terceiros, ofertar como serviço, ou empacotar com listas o Aplicativo, salvo autorização escrita do titular.
+
+4. CONTEÚDO ADULTO E CONTROLE PARENTAL
+4.1 Algumas listas podem conter material adulto. O Aplicativo oferece um mecanismo de PIN parental que pode ser configurado pelo usuário responsável.
+4.2 É responsabilidade do usuário responsável configurar e proteger o PIN, bem como decidir se permite o uso do Aplicativo por menores de idade.
+4.3 O Aplicativo não verifica idade do usuário. A decisão sobre adequação do conteúdo é do usuário.
+
+5. SEM GARANTIAS
+5.1 O Aplicativo é fornecido "como está" e "conforme disponível", sem garantias de qualquer tipo, expressas ou implícitas, incluindo garantias de comerciabilidade, adequação a um fim específico, disponibilidade contínua, ausência de bugs, ou compatibilidade com qualquer servidor ou conteúdo específico.
+5.2 Codecs, qualidade de imagem e som, latência, e estabilidade dependem do dispositivo, da rede do usuário, do servidor da lista e do formato do conteúdo. Nada disso é controlado pelo Aplicativo.
+
+6. LIMITAÇÃO DE RESPONSABILIDADE
+6.1 Na máxima extensão permitida pela legislação aplicável, o titular do TartaTV não responderá por danos diretos, indiretos, lucros cessantes, perda de dados, ou qualquer outro dano decorrente do uso ou da impossibilidade de uso do Aplicativo.
+6.2 O risco quanto à legalidade, adequação e qualidade do conteúdo acessado pelas listas inseridas pelo usuário é exclusivamente do usuário.
+
+7. ATUALIZAÇÕES E DESCONTINUAÇÃO
+7.1 O titular pode atualizar o Aplicativo para corrigir falhas, adicionar funcionalidades, ou cumprir requisitos legais, sem aviso prévio.
+7.2 O titular pode descontinuar o Aplicativo a qualquer momento, sem que isso gere obrigação de indenizar o usuário.
+
+8. PROPRIEDADE INTELECTUAL
+8.1 O Aplicativo, sua interface, código-fonte (quando aplicável), nome e marca "TartaTV" são protegidos por leis de propriedade intelectual e pertencem ao seu titular.
+8.2 Bibliotecas de terceiros utilizadas no Aplicativo permanecem sob suas próprias licenças, listadas em "Sobre".
+
+9. ALTERAÇÕES DESTES TERMOS
+9.1 O titular pode atualizar estes Termos. A versão vigente será sempre a apresentada dentro do Aplicativo. O uso continuado após a atualização implica aceitação da nova versão.
+
+10. LEGISLAÇÃO APLICÁVEL
+10.1 Estes Termos são regidos pelas leis da República Federativa do Brasil. Foro de eleição: comarca do domicílio do usuário, para fins de relação de consumo, ou comarca do domicílio do titular, nos demais casos.
+
+Em caso de dúvida sobre estes Termos, deixe de usar o Aplicativo até que ela seja sanada.

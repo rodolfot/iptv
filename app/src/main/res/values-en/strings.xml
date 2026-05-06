@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TartaTV</string>
+
+    <!-- Login -->
+    <string name="login_title">Connect to your list</string>
+    <string name="login_brand">TartaTV</string>
+    <string name="login_host">Server URL (e.g. http://bscx.one)</string>
+    <string name="login_user">Username</string>
+    <string name="login_pass">Password</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_connecting">Connecting…</string>
+    <string name="login_invalid">Invalid credentials or unreachable server</string>
+    <string name="login_fields_required">Please fill in all fields</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_live">Live</string>
+    <string name="tab_movies">Movies</string>
+    <string name="tab_series">Series</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Common UI -->
+    <string name="loading">Loading…</string>
+    <string name="loading_catalog">Loading catalog…</string>
+    <string name="empty_list">Nothing here</string>
+    <string name="nothing_found">Nothing found.</string>
+    <string name="back">← Back</string>
+    <string name="retry">Try again</string>
+    <string name="error_prefix">Error: %1$s</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="save">Save</string>
+    <string name="close">Close</string>
+
+    <!-- Sections -->
+    <string name="section_categories">Categories</string>
+    <string name="section_movie_categories">Movie categories</string>
+    <string name="section_series_categories">Series categories</string>
+    <string name="section_live_default">Channels</string>
+    <string name="section_movies_default">Movies</string>
+    <string name="section_series_default">Series</string>
+    <string name="section_seasons">Seasons</string>
+
+    <!-- Continue watching / home -->
+    <string name="continue_empty">Nothing in progress yet. Start watching a movie or episode to see it here.</string>
+    <string name="continue_series">Resume series</string>
+    <string name="continue_movies">Resume movies</string>
+
+    <!-- Movie detail -->
+    <string name="movie_play">Watch</string>
+    <string name="movie_resume">Resume at %1$s</string>
+    <string name="movie_restart">Start over</string>
+    <string name="movie_director">Director: %1$s</string>
+    <string name="movie_cast">Cast: %1$s</string>
+    <string name="movie_genre">Genre: %1$s</string>
+    <string name="movie_release">Released: %1$s</string>
+    <string name="movie_rating">Rating: %1$s</string>
+    <string name="movie_duration">Duration: %1$s</string>
+    <string name="add_favorite">Favorite</string>
+    <string name="remove_favorite">Remove from favorites</string>
+
+    <!-- Channel detail / EPG -->
+    <string name="channel_now">Now</string>
+    <string name="channel_upcoming">Up next</string>
+    <string name="channel_no_epg">No schedule available for this channel.</string>
+    <string name="channel_play">Watch</string>
+
+    <!-- Player tracks -->
+    <string name="player_tracks">Tracks</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_subtitle">Subtitle</string>
+    <string name="player_video">Quality</string>
+    <string name="player_track_off">Off</string>
+    <string name="player_track_auto">Auto</string>
+    <string name="next_episode_in">Next episode in %1$ds</string>
+    <string name="cancel_autoplay">Cancel (Back)</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search channels, movies, or series…</string>
+    <string name="search_min_chars">Type at least 2 letters to search.</string>
+    <string name="filter_all">All</string>
+    <string name="filter_channels">Channels</string>
+    <string name="filter_movies">Movies</string>
+    <string name="filter_series">Series</string>
+
+    <!-- Sort -->
+    <string name="sort_title">Sort by</string>
+    <string name="sort_button">Sort</string>
+
+    <!-- Favorites -->
+    <string name="favorite">Favorite</string>
+    <string name="unfavorite">Remove from favorites</string>
+    <string name="favorites_empty">Nothing here yet.</string>
+
+    <!-- Parental -->
+    <string name="parental_title">Restricted content</string>
+    <string name="parental_message">Enter your PIN to continue</string>
+    <string name="parental_pass_label">PIN</string>
+    <string name="parental_wrong">Wrong PIN</string>
+    <string name="parental_setup_title">Create your parental PIN</string>
+    <string name="parental_setup_message">To access adult content, create a 4–8 digit numeric PIN. It will be required whenever restricted content is opened.</string>
+    <string name="parental_new_pass">New PIN</string>
+    <string name="parental_confirm_pass">Confirm PIN</string>
+    <string name="parental_create">Create</string>
+    <string name="parental_min_length">PIN must have at least 4 digits</string>
+    <string name="parental_mismatch">PINs do not match</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_host">Host: %1$s</string>
+    <string name="settings_user">User: %1$s</string>
+    <string name="settings_parental_title">Parental PIN</string>
+    <string name="settings_pin_set">PIN configured.</string>
+    <string name="settings_pin_unset">No PIN set. Create one to unlock adult content.</string>
+    <string name="settings_pin_label_set">Change PIN</string>
+    <string name="settings_pin_label_unset">Set PIN</string>
+    <string name="settings_pin_save_set">Save PIN</string>
+    <string name="settings_pin_save_unset">Set PIN</string>
+    <string name="settings_catalog">Catalog</string>
+    <string name="settings_refresh">Refresh catalog</string>
+    <string name="settings_clear_cache">Clear cache</string>
+    <string name="settings_reset_progress">Reset series progress</string>
+    <string name="settings_session">Session</string>
+    <string name="settings_logout">Sign out</string>
+    <string name="settings_about">About</string>
+    <string name="settings_open_about">About TartaTV</string>
+
+    <!-- Player -->
+    <string name="player_unsupported_title">Cannot play</string>
+    <string name="player_unsupported_4k">This content is in 4K/HDR (HEVC) format and is not supported by this device. Try an SD/HD version or run on a TV.</string>
+    <string name="player_unsupported_format">Video format not supported by this device.</string>
+    <string name="player_network_failed">Network failure. Check your internet connection.</string>
+    <string name="player_http_failed">The server refused the stream (HTTP). It may be a connection limit or the content is unavailable.</string>
+    <string name="player_generic_error">Playback error: %1$s.</string>
+
+    <!-- About / Legal -->
+    <string name="about_title">About TartaTV</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_intro">TartaTV is a TV client that plays Xtream Codes lists provided by the user. It does not distribute, host, or sell any content — playback depends entirely on the list you supply.</string>
+    <string name="about_terms">Terms of Use</string>
+    <string name="about_privacy">Privacy Policy</string>
+    <string name="about_open_source">Open source libraries</string>
+    <string name="about_crash_log">Diagnostics (local logs)</string>
+    <string name="crash_log_title">Diagnostics</string>
+    <string name="crash_log_empty">No errors logged.</string>
+    <string name="crash_log_clear">Clear logs</string>
+
+    <!-- Onboarding / acceptance -->
+    <string name="onboarding_title">Welcome to TartaTV</string>
+    <string name="onboarding_message">To use the app, you need to agree to the Terms of Use and Privacy Policy.</string>
+    <string name="onboarding_read_terms">Read Terms of Use</string>
+    <string name="onboarding_read_privacy">Read Privacy Policy</string>
+    <string name="onboarding_accept">I agree and want to continue</string>
+    <string name="onboarding_decline">I do not agree</string>
+
+    <!-- Update -->
+    <string name="update_title">New version available</string>
+    <string name="update_message">Version %1$s is available. You are running %2$s.</string>
+    <string name="update_open">Open download page</string>
+    <string name="update_later">Later</string>
+</resources>

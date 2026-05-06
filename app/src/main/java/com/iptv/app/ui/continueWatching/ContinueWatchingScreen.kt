@@ -22,7 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.iptv.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -69,7 +71,7 @@ fun ContinueWatchingScreen(
     ) {
         if (movies.isEmpty() && series.isEmpty()) {
             Text(
-                "Nada em andamento ainda. Comece a assistir um filme ou episódio para vê-lo aqui.",
+                stringResource(R.string.continue_empty),
                 style = MaterialTheme.typography.bodyLarge
             )
             return
@@ -77,7 +79,7 @@ fun ContinueWatchingScreen(
 
         if (series.isNotEmpty()) {
             Text(
-                "Continuar séries",
+                stringResource(R.string.continue_series),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
@@ -88,7 +90,7 @@ fun ContinueWatchingScreen(
 
         if (movies.isNotEmpty()) {
             Text(
-                "Continuar filmes",
+                stringResource(R.string.continue_movies),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
             )
