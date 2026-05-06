@@ -81,7 +81,8 @@ class CatalogCacheRepository @Inject constructor(
                 logoUrl = it.streamIcon,
                 categoryId = it.categoryId,
                 epgChannelId = it.epgChannelId,
-                addedTimestamp = it.added?.toLongOrNull() ?: 0L
+                addedTimestamp = it.added?.toLongOrNull() ?: 0L,
+                tvArchive = (it.tvArchive ?: 0) > 0
             )
         }
         live.replaceAll(items)

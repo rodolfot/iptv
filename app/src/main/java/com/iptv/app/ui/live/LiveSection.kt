@@ -34,6 +34,7 @@ import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ChannelCard
 import com.iptv.app.ui.common.ErrorState
+import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.TvDim
 import com.iptv.app.ui.home.HomeViewModel
@@ -57,6 +58,7 @@ fun LiveSection(
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingChannel by remember { mutableStateOf<PlayerArgs?>(null) }
+    var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadLiveCategories()
@@ -104,12 +106,20 @@ fun LiveSection(
             }
             if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
             channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
+            LocalFilterField(
+                value = localFilter,
+                onValueChange = { localFilter = it },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val needle = localFilter.trim().lowercase()
+            val filteredChannels = if (needle.isBlank()) channels.items
+                else channels.items.filter { it.name.lowercase().contains(needle) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(TvDim.ChannelGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
                 verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
             ) {
-                items(channels.items) { ch ->
+                items(filteredChannels) { ch ->
                     val cat = cats.items.firstOrNull { it.id == selectedCat }
                     val locked = (cat?.isAdult == true) && !parental.isUnlocked()
                     val now = ch.epgChannelId?.let { epgNow[it] }

@@ -163,4 +163,27 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
-val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+/**
+ * 5 → 6: detail metadata cache for offline access (vodInfo, seriesInfo as JSON blobs).
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS detail_cache (
+                kind TEXT NOT NULL,
+                id INTEGER NOT NULL,
+                payload TEXT NOT NULL,
+                updatedAt INTEGER NOT NULL,
+                PRIMARY KEY(kind, id)
+            )
+            """.trimIndent()
+        )
+        // Track tv_archive flag on cached channels for time-shift support.
+        db.execSQL("ALTER TABLE live_cache ADD COLUMN tvArchive INTEGER NOT NULL DEFAULT 0")
+        // Force re-fetch so the field gets populated with real values.
+        db.execSQL("DELETE FROM cache_meta WHERE scope = 'live_streams'")
+    }
+}
+
+val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)

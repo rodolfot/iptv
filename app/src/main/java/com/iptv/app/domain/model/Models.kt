@@ -24,7 +24,8 @@ data class LiveChannel(
     val logoUrl: String?,
     val categoryId: String?,
     val epgChannelId: String?,
-    val addedTimestamp: Long
+    val addedTimestamp: Long,
+    val tvArchive: Boolean = false
 )
 
 data class Movie(
@@ -91,7 +92,8 @@ fun LiveStreamDto.toModel(): LiveChannel = LiveChannel(
     logoUrl = streamIcon,
     categoryId = categoryId,
     epgChannelId = epgChannelId,
-    addedTimestamp = added?.toLongOrNull() ?: 0L
+    addedTimestamp = added?.toLongOrNull() ?: 0L,
+    tvArchive = (tvArchive ?: 0) > 0
 )
 
 fun VodStreamDto.toModel(): Movie = Movie(

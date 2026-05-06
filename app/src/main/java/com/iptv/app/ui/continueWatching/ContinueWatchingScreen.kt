@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +32,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.MovieProgressDao
 import com.iptv.app.data.db.MovieProgressEntity
 import com.iptv.app.data.db.SeriesProgressDao
@@ -47,12 +49,19 @@ import javax.inject.Inject
 @HiltViewModel
 class ContinueWatchingViewModel @Inject constructor(
     movieProgressDao: MovieProgressDao,
-    private val seriesProgressDao: SeriesProgressDao
+    private val seriesProgressDao: SeriesProgressDao,
+    private val episodeProgressDao: EpisodeProgressDao
 ) : ViewModel() {
     val movies = movieProgressDao.observeInProgress()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val series = seriesProgressDao.observeRecent()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    suspend fun episodePercent(episodeId: String): Int {
+        val ep = episodeProgressDao.getById(episodeId) ?: return 0
+        if (ep.durationMs <= 0L || ep.watched) return 0
+        return ((ep.positionMs * 100L) / ep.durationMs).toInt().coerceIn(0, 100)
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -84,7 +93,7 @@ fun ContinueWatchingScreen(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)) {
-                items(series) { s -> SeriesContinueCard(s, onPlay) }
+                items(series) { s -> SeriesContinueCard(s, vm, onPlay) }
             }
         }
 
@@ -131,7 +140,17 @@ private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) ->
 }
 
 @Composable
-private fun SeriesContinueCard(item: SeriesProgressEntity, onPlay: (PlayerArgs) -> Unit) {
+private fun SeriesContinueCard(
+    item: SeriesProgressEntity,
+    vm: ContinueWatchingViewModel,
+    onPlay: (PlayerArgs) -> Unit
+) {
+    var percent by androidx.compose.runtime.remember(item.lastEpisodeId) {
+        androidx.compose.runtime.mutableStateOf(0)
+    }
+    androidx.compose.runtime.LaunchedEffect(item.lastEpisodeId) {
+        percent = vm.episodePercent(item.lastEpisodeId)
+    }
     Column {
         PosterCard(
             title = "${item.title}\nT${item.lastSeasonNumber}E${item.lastEpisodeNum}",
@@ -151,6 +170,7 @@ private fun SeriesContinueCard(item: SeriesProgressEntity, onPlay: (PlayerArgs) 
                 )
             )
         }
+        ProgressStripe(percent)
     }
 }
 

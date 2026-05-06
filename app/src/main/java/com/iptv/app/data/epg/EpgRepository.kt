@@ -36,6 +36,9 @@ class EpgRepository @Inject constructor(
             .mapNotNull { it.epgChannelId }
             .filter { it.isNotBlank() }
             .toSet()
+        // If we don't know any channel yet (first run before catalog refresh) bail
+        // gracefully — the next worker cycle will retry once the live cache is populated.
+        if (knownIds.isEmpty()) return@runCatching 0
 
         val url = xtream.epgUrl()
         val req = Request.Builder().url(url).build()

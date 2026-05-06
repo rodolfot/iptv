@@ -99,7 +99,8 @@ fun HomeScreen(
                     0 -> ContinueWatchingScreen(onPlay = onPlay)
                     1 -> SearchScreen(
                         onPlay = handlePlay,
-                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
+                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) },
+                        onOpenChannel = { ch -> openChannel = ch }
                     )
                     2 -> LiveSection(
                         vm = vm,

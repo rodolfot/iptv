@@ -15,10 +15,13 @@ data class PlayerArgs(
     val episodeId: String = "",
     val startPositionMs: Long = 0L,
     val posterUrl: String? = null,
-    val categoryId: String? = null
+    val categoryId: String? = null,
+    /** When > 0 and kind == LIVE, request a tv_archive timeshift from this absolute UTC time. */
+    val timeshiftStartMs: Long = 0L,
+    val timeshiftDurationMin: Int = 240
 ) {
     companion object {
-        const val ROUTE = "player/{kind}/{streamId}/{title}/{ext}/{series}/{season}/{episode}/{pos}/{poster}/{cat}"
+        const val ROUTE = "player/{kind}/{streamId}/{title}/{ext}/{series}/{season}/{episode}/{pos}/{poster}/{cat}/{tsStart}/{tsDur}"
         private const val EMPTY = "_"
 
         private fun enc(value: String?): String {
@@ -37,7 +40,7 @@ data class PlayerArgs(
             val episode = enc(args.episodeId)
             val poster = enc(args.posterUrl)
             val cat = enc(args.categoryId)
-            return "player/${args.kind.name}/${args.streamId}/$title/$ext/${args.seriesId}/${args.seasonNumber}/$episode/${args.startPositionMs}/$poster/$cat"
+            return "player/${args.kind.name}/${args.streamId}/$title/$ext/${args.seriesId}/${args.seasonNumber}/$episode/${args.startPositionMs}/$poster/$cat/${args.timeshiftStartMs}/${args.timeshiftDurationMin}"
         }
 
         fun fromBackStack(entry: NavBackStackEntry): PlayerArgs {
@@ -52,7 +55,9 @@ data class PlayerArgs(
                 episodeId = dec(a.getString("episode")),
                 startPositionMs = a.getString("pos")!!.toLong(),
                 posterUrl = dec(a.getString("poster")).takeIf { it.isNotBlank() },
-                categoryId = dec(a.getString("cat")).takeIf { it.isNotBlank() }
+                categoryId = dec(a.getString("cat")).takeIf { it.isNotBlank() },
+                timeshiftStartMs = a.getString("tsStart")?.toLongOrNull() ?: 0L,
+                timeshiftDurationMin = a.getString("tsDur")?.toIntOrNull() ?: 240
             )
         }
     }

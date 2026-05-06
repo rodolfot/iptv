@@ -29,21 +29,64 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.R
+import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.ui.common.TvDim
 import com.iptv.app.ui.home.HomeViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+data class CredentialsTest(val ok: Boolean, val message: String)
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
-    private val progressDao: EpisodeProgressDao
+    private val progressDao: EpisodeProgressDao,
+    private val repo: XtreamRepository
 ) : ViewModel() {
+    private val _testing = MutableStateFlow(false)
+    val testing = _testing.asStateFlow()
+    private val _testResult = MutableStateFlow<CredentialsTest?>(null)
+    val testResult = _testResult.asStateFlow()
+
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
     fun resetProgress() { viewModelScope.launch { progressDao.clearAll() } }
+
+    fun testCredentials(host: String, user: String, pass: String) {
+        viewModelScope.launch {
+            _testing.value = true
+            _testResult.value = null
+            val cleanHost = host.trim().let {
+                if (it.startsWith("http://") || it.startsWith("https://")) it else "http://$it"
+            }.trimEnd('/')
+            runCatching { repo.login(cleanHost, user.trim(), pass.trim()) }
+                .onSuccess { resp ->
+                    val ok = resp.userInfo?.auth == 1 || resp.userInfo?.username != null
+                    _testResult.value = CredentialsTest(
+                        ok = ok,
+                        message = resp.userInfo?.message ?: ""
+                    )
+                }
+                .onFailure { _testResult.value = CredentialsTest(false, it.message ?: "?") }
+            _testing.value = false
+        }
+    }
+
+    fun saveCredentials(host: String, user: String, pass: String, onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val cleanHost = host.trim().let {
+                if (it.startsWith("http://") || it.startsWith("https://")) it else "http://$it"
+            }.trimEnd('/')
+            settings.saveCredentials(cleanHost, user.trim(), pass.trim())
+            onSaved()
+        }
+    }
+
+    fun clearTestResult() { _testResult.value = null }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -54,10 +97,21 @@ fun SettingsScreen(
     settingsVm: SettingsViewModel = hiltViewModel()
 ) {
     val s by vm.settingsFlow.collectAsState()
+    val testing by settingsVm.testing.collectAsState()
+    val testResult by settingsVm.testResult.collectAsState()
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
+    var editingServer by remember { mutableStateOf(false) }
+    var editHost by remember { mutableStateOf(s.host) }
+    var editUser by remember { mutableStateOf(s.username) }
+    var editPass by remember { mutableStateOf(s.password) }
 
     LaunchedEffect(s.parentalPin) { pin = s.parentalPin.orEmpty() }
+    LaunchedEffect(s.host, s.username, s.password) {
+        if (!editingServer) {
+            editHost = s.host; editUser = s.username; editPass = s.password
+        }
+    }
 
     if (aboutOpen) {
         AboutScreen(onClose = { aboutOpen = false })
@@ -73,8 +127,72 @@ fun SettingsScreen(
     ) {
         Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
-        Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
+        if (!editingServer) {
+            Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = { editingServer = true }) {
+                Text(stringResource(R.string.settings_change_server))
+            }
+        } else {
+            OutlinedTextField(
+                value = editHost,
+                onValueChange = { editHost = it },
+                label = { Text(stringResource(R.string.login_host)) },
+                singleLine = true,
+                modifier = Modifier.width(560.dp)
+            )
+            OutlinedTextField(
+                value = editUser,
+                onValueChange = { editUser = it },
+                label = { Text(stringResource(R.string.login_user)) },
+                singleLine = true,
+                modifier = Modifier.width(360.dp)
+            )
+            OutlinedTextField(
+                value = editPass,
+                onValueChange = { editPass = it },
+                label = { Text(stringResource(R.string.login_pass)) },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.width(360.dp)
+            )
+            testResult?.let { r ->
+                if (r.ok) {
+                    Text(
+                        stringResource(R.string.settings_connection_ok),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Text(
+                        stringResource(R.string.settings_connection_failed, r.message),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    enabled = !testing && editHost.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank(),
+                    onClick = { settingsVm.testCredentials(editHost, editUser, editPass) }
+                ) { Text(stringResource(R.string.settings_test_connection)) }
+                Button(
+                    enabled = testResult?.ok == true,
+                    onClick = {
+                        settingsVm.saveCredentials(editHost, editUser, editPass) {
+                            editingServer = false
+                            settingsVm.clearTestResult()
+                            vm.refreshAll()
+                        }
+                    }
+                ) { Text(stringResource(R.string.settings_save_credentials)) }
+                Button(onClick = {
+                    editingServer = false
+                    editHost = s.host; editUser = s.username; editPass = s.password
+                    settingsVm.clearTestResult()
+                }) { Text(stringResource(R.string.cancel)) }
+            }
+        }
 
         Text(stringResource(R.string.settings_parental_title), style = MaterialTheme.typography.titleMedium)
         Text(

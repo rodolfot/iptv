@@ -30,7 +30,8 @@ data class LiveChannelCacheEntity(
     val logoUrl: String?,
     val categoryId: String?,
     val epgChannelId: String?,
-    val addedTimestamp: Long
+    val addedTimestamp: Long,
+    val tvArchive: Boolean = false
 )
 
 @Entity(tableName = "movie_cache")
@@ -61,6 +62,14 @@ data class SeriesCacheEntity(
 
 /* ----------------- FTS virtual tables (search) ----------------- */
 /* rowid is mapped to streamId/seriesId so we can join back to the cache rows. */
+
+@Entity(tableName = "detail_cache", primaryKeys = ["kind", "id"])
+data class DetailCacheEntity(
+    val kind: String,
+    val id: Int,
+    val payload: String,
+    val updatedAt: Long
+)
 
 @Fts4
 @Entity(tableName = "live_fts")

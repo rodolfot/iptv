@@ -87,7 +87,15 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             when (args.kind) {
                 PlayerKind.LIVE -> {
-                    val url = repo.liveStreamUrl(args.streamId, hls = false)
+                    val url = if (args.timeshiftStartMs > 0L) {
+                        repo.timeshiftUrl(
+                            streamId = args.streamId,
+                            startMs = args.timeshiftStartMs,
+                            durationMin = args.timeshiftDurationMin
+                        )
+                    } else {
+                        repo.liveStreamUrl(args.streamId, hls = false)
+                    }
                     _state.value = PlayerUiState(
                         items = listOf(PlayableItem(url, args.title)),
                         title = args.title
@@ -241,6 +249,14 @@ fun PlayerScreen(
     var trackPickerOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(args) { vm.load(args) }
+
+    // Enable PiP for this screen, restore previous state on dispose.
+    DisposableEffect(Unit) {
+        val activity = context as? com.iptv.app.MainActivity
+        val previous = activity?.pipEnabled
+        activity?.pipEnabled = true
+        onDispose { activity?.pipEnabled = previous ?: false }
+    }
 
     val exo = remember {
         ExoPlayer.Builder(context).build().apply {

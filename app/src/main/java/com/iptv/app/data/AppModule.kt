@@ -79,4 +79,5 @@ object AppModule {
     @Provides fun provideMovieCacheDao(db: AppDatabase) = db.movieCacheDao()
     @Provides fun provideSeriesCacheDao(db: AppDatabase) = db.seriesCacheDao()
     @Provides fun provideEpgDao(db: AppDatabase) = db.epgDao()
+    @Provides fun provideDetailCacheDao(db: AppDatabase) = db.detailCacheDao()
 }
