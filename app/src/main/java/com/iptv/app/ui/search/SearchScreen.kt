@@ -143,6 +143,7 @@ class SearchViewModel @Inject constructor(
 fun SearchScreen(
     onPlay: (PlayerArgs) -> Unit,
     onOpenSeries: (id: Int, title: String, cover: String?) -> Unit,
+    onOpenChannel: (LiveChannel) -> Unit = { },
     vm: SearchViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
@@ -181,7 +182,7 @@ fun SearchScreen(
                 stringResource(R.string.search_min_chars),
                 style = MaterialTheme.typography.bodyLarge
             )
-            else -> ResultsContent(state.results, onPlay, onOpenSeries)
+            else -> ResultsContent(state.results, onPlay, onOpenSeries, onOpenChannel)
         }
     }
 }
@@ -239,7 +240,8 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun ResultsContent(
     results: SearchResults,
     onPlay: (PlayerArgs) -> Unit,
-    onOpenSeries: (Int, String, String?) -> Unit
+    onOpenSeries: (Int, String, String?) -> Unit,
+    onOpenChannel: (LiveChannel) -> Unit
 ) {
     val empty = results.channels.isEmpty() && results.movies.isEmpty() && results.series.isEmpty()
     if (empty) {
@@ -257,14 +259,7 @@ private fun ResultsContent(
                             number = ch.num,
                             logoUrl = ch.logoUrl
                         ) {
-                            onPlay(
-                                PlayerArgs(
-                                    kind = PlayerKind.LIVE,
-                                    streamId = ch.id,
-                                    title = ch.name,
-                                    containerExtension = null
-                                )
-                            )
+                            onOpenChannel(ch)
                         }
                     }
                 }

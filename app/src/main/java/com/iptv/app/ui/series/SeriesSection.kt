@@ -32,6 +32,10 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.data.api.XtreamRepository
+import com.iptv.app.data.db.EpisodeProgressDao
+import com.iptv.app.data.db.EpisodeProgressEntity
+import com.iptv.app.data.db.SeriesProgressDao
+import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.Season
@@ -39,6 +43,7 @@ import com.iptv.app.domain.model.toModel
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ErrorState
+import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.TvDim
@@ -55,12 +60,23 @@ data class SeriesDetail(
     val seriesId: Int,
     val title: String,
     val seasons: List<Season>,
-    val episodesBySeason: Map<Int, List<Episode>>
+    val episodesBySeason: Map<Int, List<Episode>>,
+    val resume: SeriesResume? = null,
+    val watchedEpisodes: Set<String> = emptySet(),
+    val episodePercents: Map<String, Int> = emptyMap()
+)
+
+data class SeriesResume(
+    val episode: Episode,
+    val positionMs: Long,
+    val percent: Int
 )
 
 @HiltViewModel
 class SeriesDetailViewModel @Inject constructor(
-    private val repo: XtreamRepository
+    private val repo: XtreamRepository,
+    private val episodeProgressDao: EpisodeProgressDao,
+    private val seriesProgressDao: SeriesProgressDao
 ) : ViewModel() {
     private val _state = MutableStateFlow<SeriesDetail?>(null)
     val state = _state.asStateFlow()
@@ -79,9 +95,73 @@ class SeriesDetailViewModel @Inject constructor(
                             Season(sn, "Temporada $sn", null, episodesMap[sn]?.size ?: 0)
                         }
                     } else seasons.sortedBy { it.seasonNumber }
-                    _state.value = SeriesDetail(id, title, mergedSeasons, episodesMap)
+
+                    val progressBySeries = episodeProgressDao.getBySeries(id)
+                    val watched = progressBySeries.filter { it.watched }.map { it.episodeId }.toSet()
+                    val percents = progressBySeries
+                        .filter { !it.watched && it.durationMs > 0 }
+                        .associate { it.episodeId to ((it.positionMs * 100L) / it.durationMs).toInt().coerceIn(0, 100) }
+
+                    val resume = buildResume(id, episodesMap, progressBySeries)
+
+                    _state.value = SeriesDetail(
+                        seriesId = id,
+                        title = title,
+                        seasons = mergedSeasons,
+                        episodesBySeason = episodesMap,
+                        resume = resume,
+                        watchedEpisodes = watched,
+                        episodePercents = percents
+                    )
                 }
         }
+    }
+
+    private suspend fun buildResume(
+        seriesId: Int,
+        episodesMap: Map<Int, List<Episode>>,
+        progress: List<EpisodeProgressEntity>
+    ): SeriesResume? {
+        // Priority: in-progress episode (latest by updatedAt). Otherwise, next unwatched
+        // episode after the last one the user watched (from SeriesProgress).
+        val inProgress = progress
+            .filter { !it.watched && it.positionMs > 0 }
+            .maxByOrNull { it.updatedAt }
+        if (inProgress != null) {
+            val ep = findEpisode(episodesMap, inProgress.episodeId)
+            if (ep != null) {
+                val pct = if (inProgress.durationMs > 0)
+                    ((inProgress.positionMs * 100L) / inProgress.durationMs).toInt().coerceIn(0, 100)
+                else 0
+                return SeriesResume(ep, inProgress.positionMs, pct)
+            }
+        }
+        val seriesLast: SeriesProgressEntity? = seriesProgressDao.getById(seriesId)
+        if (seriesLast != null) {
+            val nextAfter = nextEpisodeAfter(
+                episodesMap,
+                seriesLast.lastSeasonNumber,
+                seriesLast.lastEpisodeNum
+            )
+            if (nextAfter != null) return SeriesResume(nextAfter, 0L, 0)
+        }
+        return null
+    }
+
+    private fun findEpisode(map: Map<Int, List<Episode>>, episodeId: String): Episode? =
+        map.values.flatten().firstOrNull { it.id == episodeId }
+
+    private fun nextEpisodeAfter(
+        map: Map<Int, List<Episode>>,
+        season: Int,
+        episodeNum: Int
+    ): Episode? {
+        val flat = map.entries
+            .sortedBy { it.key }
+            .flatMap { (s, list) -> list.sortedBy { it.episodeNum }.map { s to it } }
+        val idx = flat.indexOfFirst { it.first == season && it.second.episodeNum == episodeNum }
+        if (idx < 0) return null
+        return flat.getOrNull(idx + 1)?.second
     }
 }
 
@@ -96,6 +176,7 @@ fun SeriesSection(
     val settings by vm.settingsFlow.collectAsState()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var openSeries by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadSeriesCategories()
@@ -145,12 +226,20 @@ fun SeriesSection(
             }
             if (series.loading && series.items.isEmpty()) Text(stringResource(R.string.loading))
             series.error?.let { ErrorState(message = it, onRetry = { vm.loadSeries(selectedCat, forceRefresh = true) }) }
+            LocalFilterField(
+                value = localFilter,
+                onValueChange = { localFilter = it },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val needle = localFilter.trim().lowercase()
+            val filteredSeries = if (needle.isBlank()) series.items
+                else series.items.filter { it.name.lowercase().contains(needle) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(TvDim.SeriesGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
                 verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
             ) {
-                items(series.items) { s ->
+                items(filteredSeries) { s ->
                     PosterCard(
                         title = s.name,
                         imageUrl = s.coverUrl,
@@ -182,8 +271,28 @@ fun SeriesDetailScreen(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
             Button(onClick = {
                 if (selectedSeason != null) selectedSeason = null else onBack()
-            }) { Text("← Voltar") }
+            }) { Text(stringResource(R.string.back)) }
             Text("  $title", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 16.dp))
+            Box(modifier = Modifier.weight(1f))
+            state?.resume?.let { resume ->
+                val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
+                Button(onClick = {
+                    onPlay(
+                        PlayerArgs(
+                            kind = PlayerKind.EPISODE,
+                            streamId = resume.episode.id.toIntOrNull() ?: 0,
+                            title = resume.episode.title,
+                            containerExtension = resume.episode.containerExtension,
+                            seriesId = resume.episode.seriesId,
+                            seasonNumber = resume.episode.seasonNumber,
+                            episodeId = resume.episode.id,
+                            startPositionMs = resume.positionMs
+                        )
+                    )
+                }) {
+                    Text(stringResource(labelRes, resume.episode.seasonNumber, resume.episode.episodeNum))
+                }
+            }
         }
         val detail = state
         if (detail == null) {
@@ -218,8 +327,12 @@ fun SeriesDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
             ) {
                 items(episodes) { e ->
+                    val isWatched = e.id in detail.watchedEpisodes
+                    val pct = detail.episodePercents[e.id] ?: 0
+                    val titlePrefix = if (isWatched) "✓ " else ""
                     PosterCard(
-                        title = "T${e.seasonNumber}E${e.episodeNum} • ${e.title}",
+                        title = "${titlePrefix}T${e.seasonNumber}E${e.episodeNum} • ${e.title}" +
+                            (if (pct in 1..99) "  (${pct}%)" else ""),
                         imageUrl = e.poster,
                         fallbackIcon = Icons.Filled.Tv
                     ) {
