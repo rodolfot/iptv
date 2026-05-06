@@ -8,6 +8,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.iptv.app.domain.sort.SortOption
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,8 +20,10 @@ data class AppSettings(
     val host: String = "",
     val username: String = "",
     val password: String = "",
-    val parentalPin: String = "3258",
+    val parentalPin: String? = null,
+    val isPinSet: Boolean = false,
     val isLoggedIn: Boolean = false,
+    val termsAccepted: Boolean = false,
     val liveSort: SortOption = SortOption.NAME_ASC,
     val moviesSort: SortOption = SortOption.ADDED_DATE_DESC,
     val seriesSort: SortOption = SortOption.ADDED_DATE_DESC,
@@ -29,14 +33,19 @@ data class AppSettings(
 
 @Singleton
 class SettingsStore @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val secure: SecureStore
 ) {
     private object Keys {
-        val HOST = stringPreferencesKey("host")
-        val USER = stringPreferencesKey("user")
-        val PASS = stringPreferencesKey("pass")
-        val PIN = stringPreferencesKey("pin")
-        val LOGGED = booleanPreferencesKey("logged")
+        // Legacy plaintext keys (kept for one-shot migration only)
+        val LEGACY_HOST = stringPreferencesKey("host")
+        val LEGACY_USER = stringPreferencesKey("user")
+        val LEGACY_PASS = stringPreferencesKey("pass")
+        val LEGACY_PIN = stringPreferencesKey("pin")
+        val LEGACY_LOGGED = booleanPreferencesKey("logged")
+
+        val MIGRATED = booleanPreferencesKey("secure_migrated_v1")
+        val TERMS_ACCEPTED = booleanPreferencesKey("terms_accepted_v1")
         val LIVE_SORT = stringPreferencesKey("live_sort")
         val MOVIES_SORT = stringPreferencesKey("movies_sort")
         val SERIES_SORT = stringPreferencesKey("series_sort")
@@ -44,38 +53,74 @@ class SettingsStore @Inject constructor(
         val EXTRA_ADULT = stringPreferencesKey("extra_adult")
     }
 
-    val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
+    // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
+    private val secureRevision = MutableStateFlow(0L)
+
+    val flow: Flow<AppSettings> = combine(
+        context.dataStore.data,
+        secureRevision
+    ) { p, _ ->
+        migrateIfNeeded(p)
         AppSettings(
-            host = p[Keys.HOST] ?: "",
-            username = p[Keys.USER] ?: "",
-            password = p[Keys.PASS] ?: "",
-            parentalPin = p[Keys.PIN] ?: "3258",
-            isLoggedIn = p[Keys.LOGGED] ?: false,
+            host = secure.getHost(),
+            username = secure.getUser(),
+            password = secure.getPass(),
+            parentalPin = secure.getPin(),
+            isPinSet = secure.isPinSet(),
+            isLoggedIn = secure.isLoggedIn() && secure.getHost().isNotBlank(),
+            termsAccepted = p[Keys.TERMS_ACCEPTED] == true,
             liveSort = SortOption.fromName(p[Keys.LIVE_SORT]) ?: SortOption.NAME_ASC,
             moviesSort = SortOption.fromName(p[Keys.MOVIES_SORT]) ?: SortOption.ADDED_DATE_DESC,
             seriesSort = SortOption.fromName(p[Keys.SERIES_SORT]) ?: SortOption.ADDED_DATE_DESC,
             favoritesSort = SortOption.fromName(p[Keys.FAV_SORT]) ?: SortOption.NAME_ASC,
-            extraAdultCategoryIds = (p[Keys.EXTRA_ADULT] ?: "").split(",").filter { it.isNotBlank() }.toSet()
+            extraAdultCategoryIds = (p[Keys.EXTRA_ADULT] ?: "")
+                .split(",").filter { it.isNotBlank() }.toSet()
         )
     }
 
-    suspend fun saveCredentials(host: String, user: String, pass: String) {
-        context.dataStore.edit {
-            it[Keys.HOST] = host
-            it[Keys.USER] = user
-            it[Keys.PASS] = pass
-            it[Keys.LOGGED] = true
+    private suspend fun migrateIfNeeded(snapshot: androidx.datastore.preferences.core.Preferences) {
+        if (snapshot[Keys.MIGRATED] == true) return
+        val legacyHost = snapshot[Keys.LEGACY_HOST]
+        val legacyUser = snapshot[Keys.LEGACY_USER]
+        val legacyPass = snapshot[Keys.LEGACY_PASS]
+        val legacyPin = snapshot[Keys.LEGACY_PIN]
+        val legacyLogged = snapshot[Keys.LEGACY_LOGGED] == true
+        if (!legacyHost.isNullOrBlank() && !legacyUser.isNullOrBlank() && !legacyPass.isNullOrBlank()) {
+            secure.saveCredentials(legacyHost, legacyUser, legacyPass)
+            if (!legacyLogged) secure.setLoggedOut()
         }
+        // Only persist a PIN if user had explicitly set one (legacy default was "3258"
+        // which we no longer treat as a real PIN).
+        if (!legacyPin.isNullOrBlank() && legacyPin != "3258") {
+            secure.setPin(legacyPin)
+        }
+        context.dataStore.edit { p ->
+            p.remove(Keys.LEGACY_HOST)
+            p.remove(Keys.LEGACY_USER)
+            p.remove(Keys.LEGACY_PASS)
+            p.remove(Keys.LEGACY_PIN)
+            p.remove(Keys.LEGACY_LOGGED)
+            p[Keys.MIGRATED] = true
+        }
+    }
+
+    suspend fun saveCredentials(host: String, user: String, pass: String) {
+        secure.saveCredentials(host, user, pass)
+        bumpSecure()
     }
 
     suspend fun setLoggedOut() {
-        context.dataStore.edit {
-            it[Keys.LOGGED] = false
-        }
+        secure.setLoggedOut()
+        bumpSecure()
     }
 
     suspend fun setPin(pin: String) {
-        context.dataStore.edit { it[Keys.PIN] = pin }
+        secure.setPin(pin)
+        bumpSecure()
+    }
+
+    suspend fun acceptTerms() {
+        context.dataStore.edit { it[Keys.TERMS_ACCEPTED] = true }
     }
 
     suspend fun setSort(scope: SortScope, option: SortOption) {
@@ -96,6 +141,10 @@ class SettingsStore @Inject constructor(
             if (adult) current.add(categoryId) else current.remove(categoryId)
             p[Keys.EXTRA_ADULT] = current.joinToString(",")
         }
+    }
+
+    private fun bumpSecure() {
+        secureRevision.value = secureRevision.value + 1
     }
 }
 

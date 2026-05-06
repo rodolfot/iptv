@@ -1,0 +1,55 @@
+POLÍTICA DE PRIVACIDADE — TartaTV
+
+Última atualização: 5 de maio de 2026.
+
+Esta Política descreve como o aplicativo TartaTV ("o Aplicativo") trata dados ao ser usado por você. Leia com atenção.
+
+1. RESUMO RÁPIDO
+- O TartaTV não tem servidor próprio. Não enviamos seus dados para nós nem para terceiros.
+- O Aplicativo armazena suas credenciais (URL, usuário e senha do Xtream) e seu PIN parental localmente, no próprio dispositivo, em armazenamento criptografado.
+- Suas requisições vão diretamente do seu dispositivo para o servidor de IPTV cuja URL você cadastrou. Nós não vemos esse tráfego.
+- O Aplicativo não usa anúncios, não rastreia você, não coleta analytics e não vende dados.
+
+2. DADOS QUE O APLICATIVO ARMAZENA NO SEU DISPOSITIVO
+2.1 Credenciais Xtream: URL do servidor, nome de usuário e senha. Armazenadas em EncryptedSharedPreferences (criptografia AES-256), em uma área privada do Aplicativo.
+2.2 PIN parental: armazenado da mesma forma, criptografado.
+2.3 Cache do catálogo: lista de canais, filmes e séries retornada pelo seu servidor, salva em banco local Room para acelerar a navegação. O cache é renovado periodicamente.
+2.4 Progresso de exibição: posição em filmes e episódios, último episódio assistido por série, lista de favoritos. Armazenado localmente em banco Room.
+2.5 Preferências de uso: ordenação escolhida, categorias marcadas como adultas, idioma do sistema.
+
+3. DADOS QUE O APLICATIVO NÃO COLETA
+- O Aplicativo não envia dados de uso, telemetria ou analytics para o desenvolvedor.
+- O Aplicativo não solicita acesso a contatos, agenda, localização, microfone, câmera, contas, SMS ou outras informações pessoais.
+- O Aplicativo não cria conta, não pede e-mail e não exige cadastro.
+
+4. COMUNICAÇÃO DE REDE
+4.1 Para reproduzir conteúdo, o Aplicativo precisa fazer requisições HTTP ao servidor cuja URL você forneceu. Essas requisições saem do seu dispositivo diretamente para esse servidor.
+4.2 As credenciais que você inseriu são enviadas a esse servidor para autenticação, conforme exige o protocolo Xtream Codes. Nós não temos visibilidade dessas requisições.
+4.3 O servidor IPTV escolhido por você possui sua própria política de privacidade, sob a qual coleta logs, IPs, e outros dados conforme entender. Avalie essa política antes de cadastrar uma lista.
+
+5. BACKUP E TRANSFERÊNCIA
+5.1 O Aplicativo desabilita o backup automático em nuvem do Android. Suas credenciais não são copiadas para Google Drive nem para o sistema de transferência entre dispositivos.
+5.2 Para reinstalar em outro dispositivo, você precisará logar de novo manualmente.
+
+6. PERMISSÕES SOLICITADAS
+- INTERNET: para se conectar ao servidor IPTV.
+- ACCESS_NETWORK_STATE: para detectar se o dispositivo está online antes de tentar carregar conteúdo.
+- WAKE_LOCK e FOREGROUND_SERVICE: para manter a reprodução estável.
+- Não solicitamos nenhuma outra permissão sensível.
+
+7. CRIANÇAS
+O Aplicativo não é direcionado a crianças. Caso ele seja usado por menores de idade, isso é decisão e responsabilidade do adulto que configurou o dispositivo, que pode usar o PIN parental para restringir conteúdo adulto.
+
+8. RETENÇÃO DE DADOS
+8.1 Todos os dados ficam armazenados apenas enquanto o Aplicativo estiver instalado.
+8.2 Sair (logout) limpa o estado de sessão e descarta credenciais ativas. Desinstalar remove tudo.
+8.3 Você pode limpar manualmente o cache do catálogo a qualquer momento em Configurações.
+
+9. SEUS DIREITOS (LGPD)
+Como o Aplicativo não envia dados para nós, não há base de dados nossa contendo informações suas. Os direitos da LGPD (acesso, retificação, exclusão, portabilidade) sobre dados que ficam no seu próprio dispositivo são exercidos por você diretamente: limpar cache, fazer logout, ou desinstalar o Aplicativo.
+
+10. MUDANÇAS NESTA POLÍTICA
+A política vigente será sempre a versão exibida dentro do Aplicativo. Mudanças significativas serão sinalizadas com nova solicitação de aceite ao abrir o Aplicativo.
+
+11. CONTATO
+Para qualquer dúvida sobre esta Política, abra uma issue no repositório oficial do TartaTV ou utilize o canal de contato indicado na loja onde o aplicativo foi obtido.

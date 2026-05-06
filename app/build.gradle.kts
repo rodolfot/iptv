@@ -1,3 +1,5 @@
+import java.util.concurrent.TimeUnit
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,16 +8,55 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+fun runGit(vararg args: String): String? = try {
+    val proc = ProcessBuilder(listOf("git") + args)
+        .directory(rootDir)
+        .redirectErrorStream(true)
+        .start()
+    proc.waitFor(5L, TimeUnit.SECONDS)
+    proc.inputStream.bufferedReader().readText().trim().takeIf { it.isNotEmpty() }
+} catch (_: Exception) {
+    null
+}
+
+val gitCommitCount: Int = runGit("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+val gitDescribe: String = runGit("describe", "--tags", "--always", "--dirty")?.removePrefix("v") ?: "1.0.0"
+
 android {
     namespace = "com.iptv.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.iptv.app"
         minSdk = 23
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: gitCommitCount
+        versionName = (project.findProperty("VERSION_NAME") as String?) ?: gitDescribe
+
+        // Auto-update endpoint. Override with -PUPDATE_REPO_OWNER=... in CI/local.
+        buildConfigField(
+            "String", "UPDATE_REPO_OWNER",
+            "\"${(project.findProperty("UPDATE_REPO_OWNER") as String?) ?: ""}\""
+        )
+        buildConfigField(
+            "String", "UPDATE_REPO_NAME",
+            "\"${(project.findProperty("UPDATE_REPO_NAME") as String?) ?: ""}\""
+        )
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = project.findProperty("RELEASE_KEYSTORE_FILE") as String?
+            val keystorePassword = project.findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
+            val keyAliasProp = project.findProperty("RELEASE_KEY_ALIAS") as String?
+            val keyPasswordProp = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                keyAlias = keyAliasProp
+                keyPassword = keyPasswordProp
+            }
+        }
     }
 
     buildTypes {
@@ -23,9 +64,16 @@ android {
             isMinifyEnabled = false
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the release keystore when its properties are provided; otherwise
+            // fall back to the debug keystore so unsigned local builds still work.
+            signingConfig = if (project.hasProperty("RELEASE_KEYSTORE_FILE")) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -43,6 +91,10 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources.excludes += setOf(
             "/META-INF/{AL2.0,LGPL2.1}",
@@ -103,8 +155,14 @@ dependencies {
     implementation("androidx.room:room-ktx:$room")
     ksp("androidx.room:room-compiler:$room")
 
+    // Splash screen
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Encrypted storage (Tink-backed)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // WorkManager for EPG refresh
     implementation("androidx.work:work-runtime-ktx:2.9.1")
@@ -121,4 +179,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
 }

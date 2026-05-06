@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,7 +18,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -26,6 +35,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.prefs.SettingsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,9 +58,9 @@ class LoginViewModel @Inject constructor(
     private val _state = MutableStateFlow(LoginUiState())
     val state = _state.asStateFlow()
 
-    fun login(host: String, user: String, pass: String) {
+    fun login(host: String, user: String, pass: String, errorFieldsRequired: String) {
         if (host.isBlank() || user.isBlank() || pass.isBlank()) {
-            _state.value = LoginUiState(error = "Preencha todos os campos")
+            _state.value = LoginUiState(error = errorFieldsRequired)
             return
         }
         val normalizedHost = host.trim().let {
@@ -85,8 +95,19 @@ fun LoginScreen(
     var pass by remember { mutableStateOf("") }
     val state by vm.state.collectAsState()
 
+    val hostFocus = remember { FocusRequester() }
+    val userFocus = remember { FocusRequester() }
+    val passFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val fieldsRequired = stringResource(R.string.login_fields_required)
+
+    LaunchedEffect(Unit) {
+        hostFocus.requestFocus()
+        keyboard?.show()
+    }
+
     if (state.success) {
-        androidx.compose.runtime.LaunchedEffect(Unit) { onLogged() }
+        LaunchedEffect(Unit) { onLogged() }
     }
 
     Box(
@@ -97,38 +118,53 @@ fun LoginScreen(
             modifier = Modifier.width(640.dp).padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text("IPTV", style = MaterialTheme.typography.displayMedium)
-            Text("Conectar à sua lista", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.login_brand), style = MaterialTheme.typography.displayMedium)
+            Text(stringResource(R.string.login_title), style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = host,
                 onValueChange = { host = it },
-                label = { Text("URL do servidor (ex: http://bscx.one)") },
+                label = { Text(stringResource(R.string.login_host)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(hostFocus)
             )
             OutlinedTextField(
                 value = user,
                 onValueChange = { user = it },
-                label = { Text("Usuário") },
+                label = { Text(stringResource(R.string.login_user)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(userFocus)
             )
             OutlinedTextField(
                 value = pass,
                 onValueChange = { pass = it },
-                label = { Text("Senha") },
+                label = { Text(stringResource(R.string.login_pass)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = {
+                    keyboard?.hide()
+                    vm.login(host, user, pass, fieldsRequired)
+                }),
+                modifier = Modifier.fillMaxWidth().focusRequester(passFocus)
             )
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
             Button(
-                onClick = { vm.login(host, user, pass) },
+                onClick = { vm.login(host, user, pass, fieldsRequired) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (state.loading) "Conectando..." else "Entrar")
+                Text(stringResource(if (state.loading) R.string.login_connecting else R.string.login_button))
             }
         }
     }

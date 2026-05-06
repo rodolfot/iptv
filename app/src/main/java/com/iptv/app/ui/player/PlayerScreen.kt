@@ -25,15 +25,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
+import com.iptv.app.data.db.MovieProgressDao
+import com.iptv.app.data.db.MovieProgressEntity
+import com.iptv.app.data.db.SeriesProgressDao
+import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.toModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,13 +64,21 @@ data class PlayableItem(
     val seriesId: Int = -1,
     val seasonNumber: Int = -1,
     val episodeNum: Int = -1,
-    val startPositionMs: Long = 0L
+    val startPositionMs: Long = 0L,
+    val movieId: Int = -1,
+    val moviePoster: String? = null,
+    val movieContainer: String? = null,
+    val movieCategory: String? = null,
+    val seriesTitle: String? = null,
+    val seriesCover: String? = null
 )
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val repo: XtreamRepository,
-    private val progressDao: EpisodeProgressDao
+    private val progressDao: EpisodeProgressDao,
+    private val movieProgressDao: MovieProgressDao,
+    private val seriesProgressDao: SeriesProgressDao
 ) : ViewModel() {
     private val _state = MutableStateFlow(PlayerUiState())
     val state = _state.asStateFlow()
@@ -79,14 +95,28 @@ class PlayerViewModel @Inject constructor(
                 }
                 PlayerKind.MOVIE -> {
                     val url = repo.movieStreamUrl(args.streamId, args.containerExtension)
+                    val savedResume = movieProgressDao.getById(args.streamId)
+                        ?.takeIf { !it.watched }?.positionMs ?: 0L
+                    val resumeMs = if (args.startPositionMs > 0L) args.startPositionMs else savedResume
                     _state.value = PlayerUiState(
-                        items = listOf(PlayableItem(url, args.title, startPositionMs = args.startPositionMs)),
+                        items = listOf(
+                            PlayableItem(
+                                url = url,
+                                title = args.title,
+                                startPositionMs = resumeMs,
+                                movieId = args.streamId,
+                                moviePoster = args.posterUrl,
+                                movieContainer = args.containerExtension,
+                                movieCategory = args.categoryId
+                            )
+                        ),
                         title = args.title
                     )
                 }
                 PlayerKind.EPISODE -> {
                     runCatching { repo.seriesInfo(args.seriesId) }.onSuccess { info ->
-                        val seasons = info.seasons?.sortedBy { it.seasonNumber ?: 0 } ?: emptyList()
+                        val seriesTitle = info.info?.name ?: args.title
+                        val seriesCover = info.info?.cover ?: args.posterUrl
                         val orderedEpisodes = mutableListOf<Episode>()
                         val episodesMap = info.episodes ?: emptyMap()
                         val keys = episodesMap.keys.mapNotNull { it.toIntOrNull() }.sorted()
@@ -99,7 +129,17 @@ class PlayerViewModel @Inject constructor(
                             // fallback: single episode by id
                             val url = repo.episodeStreamUrl(args.episodeId, args.containerExtension)
                             _state.value = PlayerUiState(
-                                items = listOf(PlayableItem(url, args.title, episodeId = args.episodeId, seriesId = args.seriesId, startPositionMs = args.startPositionMs)),
+                                items = listOf(
+                                    PlayableItem(
+                                        url = url,
+                                        title = args.title,
+                                        episodeId = args.episodeId,
+                                        seriesId = args.seriesId,
+                                        startPositionMs = args.startPositionMs,
+                                        seriesTitle = seriesTitle,
+                                        seriesCover = seriesCover
+                                    )
+                                ),
                                 title = args.title
                             )
                             return@onSuccess
@@ -111,7 +151,9 @@ class PlayerViewModel @Inject constructor(
                                 episodeId = e.id,
                                 seriesId = e.seriesId,
                                 seasonNumber = e.seasonNumber,
-                                episodeNum = e.episodeNum
+                                episodeNum = e.episodeNum,
+                                seriesTitle = seriesTitle,
+                                seriesCover = seriesCover
                             )
                         }
                         val startIndex = items.indexOfFirst { it.episodeId == args.episodeId }.coerceAtLeast(0)
@@ -134,21 +176,53 @@ class PlayerViewModel @Inject constructor(
         _state.value = _state.value.copy(currentIndex = index, title = item.title)
     }
 
-    fun saveProgress(episodeId: String?, seriesId: Int, season: Int, episodeNum: Int, position: Long, duration: Long) {
-        if (episodeId.isNullOrBlank() || seriesId < 0) return
+    fun saveProgress(item: PlayableItem, position: Long, duration: Long) {
+        if (position <= 0L) return
+        val watched = duration > 0 && position >= duration - 30_000L
         viewModelScope.launch {
-            val watched = duration > 0 && position >= duration - 30_000L
-            progressDao.upsert(
-                EpisodeProgressEntity(
-                    episodeId = episodeId,
-                    seriesId = seriesId,
-                    seasonNumber = season,
-                    episodeNum = episodeNum,
-                    positionMs = position,
-                    durationMs = duration,
-                    watched = watched
-                )
-            )
+            when {
+                !item.episodeId.isNullOrBlank() && item.seriesId >= 0 -> {
+                    progressDao.upsert(
+                        EpisodeProgressEntity(
+                            episodeId = item.episodeId,
+                            seriesId = item.seriesId,
+                            seasonNumber = item.seasonNumber,
+                            episodeNum = item.episodeNum,
+                            positionMs = position,
+                            durationMs = duration,
+                            watched = watched
+                        )
+                    )
+                    seriesProgressDao.upsert(
+                        SeriesProgressEntity(
+                            seriesId = item.seriesId,
+                            title = item.seriesTitle ?: item.title,
+                            coverUrl = item.seriesCover,
+                            lastEpisodeId = item.episodeId,
+                            lastSeasonNumber = item.seasonNumber,
+                            lastEpisodeNum = item.episodeNum
+                        )
+                    )
+                }
+                item.movieId >= 0 -> {
+                    if (watched) {
+                        movieProgressDao.delete(item.movieId)
+                    } else {
+                        movieProgressDao.upsert(
+                            MovieProgressEntity(
+                                movieId = item.movieId,
+                                title = item.title,
+                                posterUrl = item.moviePoster,
+                                containerExtension = item.movieContainer,
+                                categoryId = item.movieCategory,
+                                positionMs = position,
+                                durationMs = duration,
+                                watched = false
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -162,6 +236,9 @@ fun PlayerScreen(
 ) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
+    var playbackError by remember { mutableStateOf<String?>(null) }
+    var currentTracks by remember { mutableStateOf<Tracks?>(null) }
+    var trackPickerOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(args) { vm.load(args) }
 
@@ -180,24 +257,33 @@ fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(state.items.isNotEmpty()) {
+        if (state.items.isEmpty()) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(10_000L)
+            val item = state.items.getOrNull(exo.currentMediaItemIndex) ?: continue
+            val pos = exo.currentPosition
+            val dur = exo.duration.coerceAtLeast(0L)
+            if (exo.isPlaying && pos > 0L) {
+                vm.saveProgress(item, pos, dur)
+            }
+        }
+    }
+
     DisposableEffect(exo) {
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = exo.currentMediaItemIndex
                 vm.onTransition(idx)
+                playbackError = null
             }
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) {
-                    val item = state.items.getOrNull(exo.currentMediaItemIndex) ?: return
-                    vm.saveProgress(
-                        item.episodeId,
-                        item.seriesId,
-                        item.seasonNumber,
-                        item.episodeNum,
-                        exo.currentPosition,
-                        exo.duration.coerceAtLeast(0L)
-                    )
-                }
+
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = friendlyPlaybackError(error)
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                currentTracks = tracks
             }
         }
         exo.addListener(listener)
@@ -205,10 +291,7 @@ fun PlayerScreen(
             val item = state.items.getOrNull(exo.currentMediaItemIndex)
             if (item != null) {
                 vm.saveProgress(
-                    item.episodeId,
-                    item.seriesId,
-                    item.seasonNumber,
-                    item.episodeNum,
+                    item,
                     exo.currentPosition,
                     exo.duration.coerceAtLeast(0L)
                 )
@@ -238,5 +321,66 @@ fun PlayerScreen(
         Column(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
             Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
         }
+        if (currentTracks != null) {
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)) {
+                Button(onClick = { trackPickerOpen = true }) {
+                    Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_tracks))
+                }
+            }
+        }
+        if (trackPickerOpen) {
+            currentTracks?.let { tracks ->
+                TrackPickerDialog(
+                    player = exo,
+                    tracks = tracks,
+                    onDismiss = { trackPickerOpen = false }
+                )
+            }
+        }
+        playbackError?.let { msg ->
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier.padding(48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Não foi possível reproduzir",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White
+                    )
+                    Text(
+                        msg,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
+                    )
+                    Button(onClick = onClose) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back)) }
+                }
+            }
+        }
+    }
+}
+
+private fun friendlyPlaybackError(error: PlaybackException): String {
+    val cause = error.cause
+    val msg = (cause?.message ?: error.message ?: "").lowercase()
+    return when (error.errorCode) {
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED -> {
+            if ("hevc" in msg || "exceeds capabilities" in msg || "no_exceeds_capabilities" in msg) {
+                "Este conteúdo está em formato 4K/HDR (HEVC) que não é suportado por este dispositivo. Tente uma versão SD/HD ou rode no aparelho de TV."
+            } else {
+                "Formato de vídeo não suportado por este dispositivo."
+            }
+        }
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> "Falha de conexão com o servidor. Verifique a internet."
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "O servidor recusou a transmissão (HTTP). Pode ser limite de conexões ou conteúdo indisponível."
+        else -> "Erro ao reproduzir: ${error.errorCodeName}."
     }
 }

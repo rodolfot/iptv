@@ -21,7 +21,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.iptv.app.R
 import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
@@ -30,6 +32,7 @@ import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
+import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.TvDim
@@ -59,9 +62,9 @@ fun MoviesSection(
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
         if (selectedCat == null) {
-            Text("Categorias de filmes", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-            if (cats.loading) Text("Carregando...")
-            cats.error?.let { Text("Erro: $it", color = MaterialTheme.colorScheme.error) }
+            Text(stringResource(R.string.section_movie_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+            if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
+            cats.error?.let { ErrorState(message = it, onRetry = { vm.loadMovieCategories(forceRefresh = true) }) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
@@ -84,9 +87,10 @@ fun MoviesSection(
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Button(onClick = { selectedCat = null }) { Text("← Voltar") }
+                Button(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                val moviesDefault = stringResource(R.string.section_movies_default)
                 Text(
-                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: "Filmes"}",
+                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: moviesDefault}",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(start = 16.dp)
                 )
@@ -96,8 +100,8 @@ fun MoviesSection(
                     options = SortOption.MOVIE_OPTIONS
                 ) { vm.setSort(SortScope.MOVIES, it) }
             }
-            if (movies.loading) Text("Carregando...")
-            movies.error?.let { Text("Erro: $it", color = MaterialTheme.colorScheme.error) }
+            if (movies.loading && movies.items.isEmpty()) Text(stringResource(R.string.loading))
+            movies.error?.let { ErrorState(message = it, onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) }) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(TvDim.MoviesGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
@@ -116,7 +120,9 @@ fun MoviesSection(
                             kind = PlayerKind.MOVIE,
                             streamId = m.id,
                             title = m.name,
-                            containerExtension = m.containerExtension
+                            containerExtension = m.containerExtension,
+                            posterUrl = m.posterUrl,
+                            categoryId = m.categoryId
                         )
                         if (locked) pendingMovie = args
                         else onPlay(args)
@@ -135,7 +141,8 @@ fun MoviesSection(
                 selectedCat = cat.id
                 vm.loadMovies(cat.id)
             },
-            onCancel = { pendingCategory = null }
+            onCancel = { pendingCategory = null },
+            onPinCreated = { vm.setParentalPin(it) }
         )
     }
     pendingMovie?.let { args ->
@@ -146,7 +153,8 @@ fun MoviesSection(
                 pendingMovie = null
                 onPlay(args)
             },
-            onCancel = { pendingMovie = null }
+            onCancel = { pendingMovie = null },
+            onPinCreated = { vm.setParentalPin(it) }
         )
     }
 }

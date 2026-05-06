@@ -31,6 +31,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Strip Windows-only JBR override
+        run: sed -i '/^org.gradle.java.home=/d' gradle.properties
+
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 

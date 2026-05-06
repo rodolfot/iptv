@@ -3,7 +3,7 @@ package com.iptv.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -20,6 +20,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.ui.home.HomeScreen
+import com.iptv.app.ui.legal.OnboardingScreen
 import com.iptv.app.ui.login.LoginScreen
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerScreen
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             IptvTheme {
@@ -51,21 +53,34 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+data class RootState(val termsAccepted: Boolean = false, val loggedIn: Boolean = false)
+
 @HiltViewModel
 class RootViewModel @Inject constructor(
     settings: SettingsStore
 ) : ViewModel() {
-    val isLoggedIn = settings.flow
-        .map { it.isLoggedIn && it.host.isNotBlank() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val state = settings.flow
+        .map { RootState(termsAccepted = it.termsAccepted, loggedIn = it.isLoggedIn && it.host.isNotBlank()) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, RootState())
 }
 
 @Composable
 fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
     val nav = rememberNavController()
-    val logged by vm.isLoggedIn.collectAsState()
-    val start = if (logged) "home" else "login"
+    val state by vm.state.collectAsState()
+    val start = when {
+        !state.termsAccepted -> "onboarding"
+        state.loggedIn -> "home"
+        else -> "login"
+    }
     NavHost(navController = nav, startDestination = start) {
+        composable("onboarding") {
+            OnboardingScreen(onAccepted = {
+                nav.navigate(if (state.loggedIn) "home" else "login") {
+                    popUpTo("onboarding") { inclusive = true }
+                }
+            })
+        }
         composable("login") {
             LoginScreen(onLogged = {
                 nav.navigate("home") {

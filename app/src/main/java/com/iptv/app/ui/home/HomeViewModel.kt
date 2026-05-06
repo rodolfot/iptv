@@ -2,9 +2,16 @@ package com.iptv.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.iptv.app.data.api.XtreamRepository
+import com.iptv.app.data.cache.CatalogCacheRepository
+import com.iptv.app.data.cache.toDomain
+import com.iptv.app.data.db.EpgProgrammeEntity
+import com.iptv.app.data.epg.EpgRepository
+import com.iptv.app.data.db.CategoryCacheDao
 import com.iptv.app.data.db.FavoriteDao
 import com.iptv.app.data.db.FavoriteEntity
+import com.iptv.app.data.db.LiveCacheDao
+import com.iptv.app.data.db.MovieCacheDao
+import com.iptv.app.data.db.SeriesCacheDao
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
@@ -12,16 +19,17 @@ import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.model.LiveChannel
 import com.iptv.app.domain.model.Movie
 import com.iptv.app.domain.model.Series
-import com.iptv.app.domain.model.toModel
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.domain.sort.sorted
 import com.iptv.app.domain.sort.sortedMovies
 import com.iptv.app.domain.sort.sortedSeries
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -53,10 +61,18 @@ data class SeriesState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repo: XtreamRepository,
+    private val cache: CatalogCacheRepository,
+    private val epg: EpgRepository,
+    private val categoryDao: CategoryCacheDao,
+    private val liveDao: LiveCacheDao,
+    private val movieDao: MovieCacheDao,
+    private val seriesDao: SeriesCacheDao,
     private val favoriteDao: FavoriteDao,
     private val settings: SettingsStore
 ) : ViewModel() {
+
+    private val _epgNow = MutableStateFlow<Map<String, EpgProgrammeEntity>>(emptyMap())
+    val epgNow = _epgNow.asStateFlow()
 
     val settingsFlow: StateFlow<com.iptv.app.data.prefs.AppSettings> =
         settings.flow.stateIn(viewModelScope, SharingStarted.Eagerly, com.iptv.app.data.prefs.AppSettings())
@@ -82,84 +98,186 @@ class HomeViewModel @Inject constructor(
     val favorites = favoriteDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    fun loadLiveCategories() {
+    fun loadLiveCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _liveCategories.value = _liveCategories.value.copy(loading = true, error = null)
-            runCatching { repo.liveCategories() }
-                .onSuccess { dto ->
-                    val extra = settingsFlow.value.extraAdultCategoryIds
-                    val cats = dto.map { it.toModel(ContentType.LIVE, extra) }
-                        .sortedBy { it.name.lowercase() }
-                    _liveCategories.value = CategoryListState(items = cats)
-                }
-                .onFailure { _liveCategories.value = CategoryListState(error = it.message) }
+            val cached = categoryDao.get(ContentType.LIVE).map { it.toDomain() }
+            if (cached.isNotEmpty()) {
+                _liveCategories.value = CategoryListState(items = cached)
+            }
+            val needsFetch = cached.isEmpty() || forceRefresh || cache.isStale(CatalogCacheRepository.Scope.LIVE_CATEGORIES)
+            if (needsFetch) {
+                cache.refreshLiveCategories()
+                    .onSuccess {
+                        _liveCategories.value = CategoryListState(
+                            items = categoryDao.get(ContentType.LIVE).map { it.toDomain() }
+                        )
+                    }
+                    .onFailure { e ->
+                        _liveCategories.value = _liveCategories.value.copy(
+                            loading = false,
+                            error = if (cached.isEmpty()) e.message else null
+                        )
+                    }
+            } else {
+                _liveCategories.value = _liveCategories.value.copy(loading = false)
+            }
         }
     }
 
-    fun loadMovieCategories() {
+    fun loadMovieCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _movieCategories.value = _movieCategories.value.copy(loading = true, error = null)
-            runCatching { repo.vodCategories() }
-                .onSuccess { dto ->
-                    val extra = settingsFlow.value.extraAdultCategoryIds
-                    val cats = dto.map { it.toModel(ContentType.MOVIE, extra) }
-                        .sortedBy { it.name.lowercase() }
-                    _movieCategories.value = CategoryListState(items = cats)
-                }
-                .onFailure { _movieCategories.value = CategoryListState(error = it.message) }
+            val cached = categoryDao.get(ContentType.MOVIE).map { it.toDomain() }
+            if (cached.isNotEmpty()) {
+                _movieCategories.value = CategoryListState(items = cached)
+            }
+            val needsFetch = cached.isEmpty() || forceRefresh || cache.isStale(CatalogCacheRepository.Scope.MOVIE_CATEGORIES)
+            if (needsFetch) {
+                cache.refreshMovieCategories()
+                    .onSuccess {
+                        _movieCategories.value = CategoryListState(
+                            items = categoryDao.get(ContentType.MOVIE).map { it.toDomain() }
+                        )
+                    }
+                    .onFailure { e ->
+                        _movieCategories.value = _movieCategories.value.copy(
+                            loading = false,
+                            error = if (cached.isEmpty()) e.message else null
+                        )
+                    }
+            } else {
+                _movieCategories.value = _movieCategories.value.copy(loading = false)
+            }
         }
     }
 
-    fun loadSeriesCategories() {
+    fun loadSeriesCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _seriesCategories.value = _seriesCategories.value.copy(loading = true, error = null)
-            runCatching { repo.seriesCategories() }
-                .onSuccess { dto ->
-                    val extra = settingsFlow.value.extraAdultCategoryIds
-                    val cats = dto.map { it.toModel(ContentType.SERIES, extra) }
-                        .sortedBy { it.name.lowercase() }
-                    _seriesCategories.value = CategoryListState(items = cats)
-                }
-                .onFailure { _seriesCategories.value = CategoryListState(error = it.message) }
+            val cached = categoryDao.get(ContentType.SERIES).map { it.toDomain() }
+            if (cached.isNotEmpty()) {
+                _seriesCategories.value = CategoryListState(items = cached)
+            }
+            val needsFetch = cached.isEmpty() || forceRefresh || cache.isStale(CatalogCacheRepository.Scope.SERIES_CATEGORIES)
+            if (needsFetch) {
+                cache.refreshSeriesCategories()
+                    .onSuccess {
+                        _seriesCategories.value = CategoryListState(
+                            items = categoryDao.get(ContentType.SERIES).map { it.toDomain() }
+                        )
+                    }
+                    .onFailure { e ->
+                        _seriesCategories.value = _seriesCategories.value.copy(
+                            loading = false,
+                            error = if (cached.isEmpty()) e.message else null
+                        )
+                    }
+            } else {
+                _seriesCategories.value = _seriesCategories.value.copy(loading = false)
+            }
         }
     }
 
-    fun loadChannels(categoryId: String?) {
+    fun loadChannels(categoryId: String?, forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _channels.value = ChannelsState(loading = true)
-            runCatching { repo.liveStreams(categoryId) }
-                .onSuccess { dto ->
-                    val sort = settingsFlow.value.liveSort
-                    val items = dto.map { it.toModel() }.sorted(sort)
-                    _channels.value = ChannelsState(items = items)
-                }
-                .onFailure { _channels.value = ChannelsState(error = it.message) }
+            val sort = settingsFlow.value.liveSort
+            val applyFilter: (List<com.iptv.app.data.db.LiveChannelCacheEntity>) -> List<LiveChannel> = { all ->
+                all.asSequence()
+                    .filter { categoryId == null || it.categoryId == categoryId }
+                    .map { it.toDomain() }
+                    .toList()
+                    .sorted(sort)
+            }
+            val cached = applyFilter(liveDao.observeAll().firstOrEmpty())
+            if (cached.isNotEmpty()) {
+                _channels.value = ChannelsState(items = cached)
+                refreshEpgNowFor(cached)
+            }
+            val needsFetch = cached.isEmpty() || forceRefresh || cache.isStale(CatalogCacheRepository.Scope.LIVE_STREAMS)
+            if (needsFetch) {
+                cache.refreshLiveStreams()
+                    .onSuccess {
+                        val items = applyFilter(liveDao.observeAll().firstOrEmpty())
+                        _channels.value = ChannelsState(items = items)
+                        refreshEpgNowFor(items)
+                    }
+                    .onFailure { e ->
+                        _channels.value = _channels.value.copy(
+                            loading = false,
+                            error = if (cached.isEmpty()) e.message else null
+                        )
+                    }
+            } else {
+                _channels.value = _channels.value.copy(loading = false)
+            }
         }
     }
 
-    fun loadMovies(categoryId: String?) {
+    fun loadMovies(categoryId: String?, forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _movies.value = MoviesState(loading = true)
-            runCatching { repo.vodStreams(categoryId) }
-                .onSuccess { dto ->
-                    val sort = settingsFlow.value.moviesSort
-                    val items = dto.map { it.toModel() }.sortedMovies(sort)
-                    _movies.value = MoviesState(items = items)
-                }
-                .onFailure { _movies.value = MoviesState(error = it.message) }
+            val sort = settingsFlow.value.moviesSort
+            val applyFilter: (List<com.iptv.app.data.db.MovieCacheEntity>) -> List<Movie> = { all ->
+                all.asSequence()
+                    .filter { categoryId == null || it.categoryId == categoryId }
+                    .map { it.toDomain() }
+                    .toList()
+                    .sortedMovies(sort)
+            }
+            val cached = applyFilter(movieDao.observeAll().firstOrEmpty())
+            if (cached.isNotEmpty()) {
+                _movies.value = MoviesState(items = cached)
+            }
+            val needsFetch = cached.isEmpty() || forceRefresh || cache.isStale(CatalogCacheRepository.Scope.MOVIE_STREAMS)
+            if (needsFetch) {
+                cache.refreshMovieStreams()
+                    .onSuccess {
+                        _movies.value = MoviesState(items = applyFilter(movieDao.observeAll().firstOrEmpty()))
+                    }
+                    .onFailure { e ->
+                        _movies.value = _movies.value.copy(
+                            loading = false,
+                            error = if (cached.isEmpty()) e.message else null
+                        )
+                    }
+            } else {
+                _movies.value = _movies.value.copy(loading = false)
+            }
         }
     }
 
-    fun loadSeries(categoryId: String?) {
+    fun loadSeries(categoryId: String?, forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _series.value = SeriesState(loading = true)
-            runCatching { repo.series(categoryId) }
-                .onSuccess { dto ->
-                    val sort = settingsFlow.value.seriesSort
-                    val items = dto.map { it.toModel() }.sortedSeries(sort)
-                    _series.value = SeriesState(items = items)
-                }
-                .onFailure { _series.value = SeriesState(error = it.message) }
+            val sort = settingsFlow.value.seriesSort
+            val applyFilter: (List<com.iptv.app.data.db.SeriesCacheEntity>) -> List<Series> = { all ->
+                all.asSequence()
+                    .filter { categoryId == null || it.categoryId == categoryId }
+                    .map { it.toDomain() }
+                    .toList()
+                    .sortedSeries(sort)
+            }
+            val cached = applyFilter(seriesDao.observeAll().firstOrEmpty())
+            if (cached.isNotEmpty()) {
+                _series.value = SeriesState(items = cached)
+            }
+            val needsFetch = cached.isEmpty() || forceRefresh || cache.isStale(CatalogCacheRepository.Scope.SERIES_LIST)
+            if (needsFetch) {
+                cache.refreshSeriesList()
+                    .onSuccess {
+                        _series.value = SeriesState(items = applyFilter(seriesDao.observeAll().firstOrEmpty()))
+                    }
+                    .onFailure { e ->
+                        _series.value = _series.value.copy(
+                            loading = false,
+                            error = if (cached.isEmpty()) e.message else null
+                        )
+                    }
+            } else {
+                _series.value = _series.value.copy(loading = false)
+            }
         }
     }
 
@@ -186,7 +304,33 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { settings.setLoggedOut() }
     }
 
+    fun setParentalPin(pin: String) {
+        viewModelScope.launch { settings.setPin(pin) }
+    }
+
     fun refreshAll() {
-        loadLiveCategories(); loadMovieCategories(); loadSeriesCategories()
+        loadLiveCategories(forceRefresh = true)
+        loadMovieCategories(forceRefresh = true)
+        loadSeriesCategories(forceRefresh = true)
+    }
+
+    private fun refreshEpgNowFor(items: List<LiveChannel>) {
+        val ids = items.mapNotNull { it.epgChannelId }.filter { it.isNotBlank() }.distinct()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            if (epg.isStale()) {
+                runCatching { epg.refresh() }
+            }
+            val now = epg.currentForChannels(ids)
+            if (now.isNotEmpty()) _epgNow.value = _epgNow.value + now
+        }
     }
 }
+
+// Helper used above to grab the current snapshot of a Flow without subscribing.
+private suspend fun <T> Flow<List<T>>.firstOrEmpty(): List<T> =
+    try {
+        this.first()
+    } catch (_: Throwable) {
+        emptyList()
+    }
