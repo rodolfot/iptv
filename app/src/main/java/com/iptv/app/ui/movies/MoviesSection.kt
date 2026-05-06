@@ -33,6 +33,7 @@ import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ErrorState
+import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.TvDim
@@ -55,6 +56,7 @@ fun MoviesSection(
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingMovie by remember { mutableStateOf<PlayerArgs?>(null) }
+    var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadMovieCategories()
@@ -102,12 +104,20 @@ fun MoviesSection(
             }
             if (movies.loading && movies.items.isEmpty()) Text(stringResource(R.string.loading))
             movies.error?.let { ErrorState(message = it, onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) }) }
+            LocalFilterField(
+                value = localFilter,
+                onValueChange = { localFilter = it },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val needle = localFilter.trim().lowercase()
+            val filteredMovies = if (needle.isBlank()) movies.items
+                else movies.items.filter { it.name.lowercase().contains(needle) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(TvDim.MoviesGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
                 verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
             ) {
-                items(movies.items) { m ->
+                items(filteredMovies) { m ->
                     val cat = cats.items.firstOrNull { it.id == selectedCat }
                     val locked = (cat?.isAdult == true) && !parental.isUnlocked()
                     PosterCard(
