@@ -31,8 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import com.iptv.app.R
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -42,12 +44,13 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import com.iptv.app.data.api.XtreamRepository
+import com.iptv.app.data.cache.CatalogCacheRepository
+import com.iptv.app.data.cache.toDomain
 import com.iptv.app.domain.model.LiveChannel
 import com.iptv.app.domain.model.Movie
 import com.iptv.app.domain.model.Series
-import com.iptv.app.domain.model.toModel
 import com.iptv.app.ui.common.ChannelCard
+import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.TvDim
 import com.iptv.app.ui.player.PlayerArgs
@@ -77,15 +80,11 @@ enum class SearchFilter { ALL, LIVE, MOVIE, SERIES }
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val repo: XtreamRepository
+    private val cache: CatalogCacheRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state = _state.asStateFlow()
-
-    private var allChannels: List<LiveChannel> = emptyList()
-    private var allMovies: List<Movie> = emptyList()
-    private var allSeries: List<Series> = emptyList()
 
     private var queryJob: Job? = null
 
@@ -93,20 +92,25 @@ class SearchViewModel @Inject constructor(
         if (_state.value.catalogReady || _state.value.loadingCatalog) return
         _state.value = _state.value.copy(loadingCatalog = true, error = null)
         viewModelScope.launch {
-            runCatching {
-                val live = repo.liveStreams(null).map { it.toModel() }
-                val movies = repo.vodStreams(null).map { it.toModel() }
-                val series = repo.series(null).map { it.toModel() }
-                Triple(live, movies, series)
-            }.onSuccess { (live, movies, series) ->
-                allChannels = live
-                allMovies = movies
-                allSeries = series
-                _state.value = _state.value.copy(loadingCatalog = false, catalogReady = true)
-            }.onFailure { e ->
-                _state.value = _state.value.copy(loadingCatalog = false, error = e.message)
-            }
+            val errors = mutableListOf<Throwable>()
+            val needsLive = cache.isStale(CatalogCacheRepository.Scope.LIVE_STREAMS)
+            val needsMovies = cache.isStale(CatalogCacheRepository.Scope.MOVIE_STREAMS)
+            val needsSeries = cache.isStale(CatalogCacheRepository.Scope.SERIES_LIST)
+            if (needsLive) cache.refreshLiveStreams().exceptionOrNull()?.let(errors::add)
+            if (needsMovies) cache.refreshMovieStreams().exceptionOrNull()?.let(errors::add)
+            if (needsSeries) cache.refreshSeriesList().exceptionOrNull()?.let(errors::add)
+            // Even with errors, if there is cached data we let search proceed.
+            _state.value = _state.value.copy(
+                loadingCatalog = false,
+                catalogReady = true,
+                error = errors.firstOrNull()?.message
+            )
         }
+    }
+
+    fun retry() {
+        _state.value = SearchUiState()
+        loadCatalog()
     }
 
     fun onQueryChanged(raw: String, filter: SearchFilter) {
@@ -118,15 +122,14 @@ class SearchViewModel @Inject constructor(
         }
         queryJob = viewModelScope.launch {
             delay(200)
-            val needle = q.lowercase()
             val channels = if (filter == SearchFilter.ALL || filter == SearchFilter.LIVE)
-                allChannels.asSequence().filter { it.name.lowercase().contains(needle) }.take(80).toList()
+                cache.searchLive(q).map { it.toDomain() }
             else emptyList()
             val movies = if (filter == SearchFilter.ALL || filter == SearchFilter.MOVIE)
-                allMovies.asSequence().filter { it.name.lowercase().contains(needle) }.take(80).toList()
+                cache.searchMovies(q).map { it.toDomain() }
             else emptyList()
             val series = if (filter == SearchFilter.ALL || filter == SearchFilter.SERIES)
-                allSeries.asSequence().filter { it.name.lowercase().contains(needle) }.take(80).toList()
+                cache.searchSeries(q).map { it.toDomain() }
             else emptyList()
             _state.value = _state.value.copy(
                 results = SearchResults(channels, movies, series)
@@ -164,17 +167,18 @@ fun SearchScreen(
             modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterChip("Tudo", filter == SearchFilter.ALL) { filter = SearchFilter.ALL }
-            FilterChip("Canais", filter == SearchFilter.LIVE) { filter = SearchFilter.LIVE }
-            FilterChip("Filmes", filter == SearchFilter.MOVIE) { filter = SearchFilter.MOVIE }
-            FilterChip("Séries", filter == SearchFilter.SERIES) { filter = SearchFilter.SERIES }
+            FilterChip(stringResource(R.string.filter_all), filter == SearchFilter.ALL) { filter = SearchFilter.ALL }
+            FilterChip(stringResource(R.string.filter_channels), filter == SearchFilter.LIVE) { filter = SearchFilter.LIVE }
+            FilterChip(stringResource(R.string.filter_movies), filter == SearchFilter.MOVIE) { filter = SearchFilter.MOVIE }
+            FilterChip(stringResource(R.string.filter_series), filter == SearchFilter.SERIES) { filter = SearchFilter.SERIES }
         }
 
         when {
-            state.loadingCatalog -> Text("Carregando catálogo...")
-            state.error != null -> Text("Erro: ${state.error}", color = MaterialTheme.colorScheme.error)
+            state.loadingCatalog -> Text(stringResource(R.string.loading_catalog))
+            state.error != null && !state.catalogReady ->
+                ErrorState(message = state.error!!, onRetry = { vm.retry() })
             query.trim().length < 2 -> Text(
-                "Digite pelo menos 2 letras para buscar.",
+                stringResource(R.string.search_min_chars),
                 style = MaterialTheme.typography.bodyLarge
             )
             else -> ResultsContent(state.results, onPlay, onOpenSeries)
@@ -208,8 +212,7 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: B
             decorationBox = { inner ->
                 if (query.isEmpty()) {
                     Text(
-                        if (enabled) "Buscar canais, filmes ou séries..."
-                        else "Carregando catálogo...",
+                        stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog),
                         color = Color(0x99FFFFFF),
                         style = MaterialTheme.typography.titleMedium
                     )
@@ -240,7 +243,7 @@ private fun ResultsContent(
 ) {
     val empty = results.channels.isEmpty() && results.movies.isEmpty() && results.series.isEmpty()
     if (empty) {
-        Text("Nada encontrado.", style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.nothing_found), style = MaterialTheme.typography.bodyLarge)
         return
     }
 

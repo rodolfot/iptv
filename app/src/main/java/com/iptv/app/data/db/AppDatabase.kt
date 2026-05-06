@@ -16,9 +16,18 @@ class Converters {
         FavoriteEntity::class,
         EpisodeProgressEntity::class,
         MovieProgressEntity::class,
-        SeriesProgressEntity::class
+        SeriesProgressEntity::class,
+        CacheMetaEntity::class,
+        CategoryCacheEntity::class,
+        LiveChannelCacheEntity::class,
+        MovieCacheEntity::class,
+        SeriesCacheEntity::class,
+        LiveFtsEntity::class,
+        MovieFtsEntity::class,
+        SeriesFtsEntity::class,
+        EpgProgrammeEntity::class
     ],
-    version = 2,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -27,4 +36,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun episodeProgressDao(): EpisodeProgressDao
     abstract fun movieProgressDao(): MovieProgressDao
     abstract fun seriesProgressDao(): SeriesProgressDao
+    abstract fun cacheMetaDao(): CacheMetaDao
+    abstract fun categoryCacheDao(): CategoryCacheDao
+    abstract fun liveCacheDao(): LiveCacheDao
+    abstract fun movieCacheDao(): MovieCacheDao
+    abstract fun seriesCacheDao(): SeriesCacheDao
+    abstract fun epgDao(): EpgDao
 }

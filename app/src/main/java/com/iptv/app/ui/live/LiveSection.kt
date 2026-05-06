@@ -19,7 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.iptv.app.R
 import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
@@ -31,6 +33,7 @@ import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ChannelCard
+import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.TvDim
 import com.iptv.app.ui.home.HomeViewModel
@@ -44,10 +47,12 @@ import com.iptv.app.ui.player.PlayerKind
 fun LiveSection(
     vm: HomeViewModel,
     parental: ParentalSession,
-    onPlay: (PlayerArgs) -> Unit
+    onPlay: (PlayerArgs) -> Unit,
+    onOpenChannel: (com.iptv.app.domain.model.LiveChannel) -> Unit = {}
 ) {
     val cats by vm.liveCategories.collectAsState()
     val channels by vm.channels.collectAsState()
+    val epgNow by vm.epgNow.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
@@ -59,9 +64,9 @@ fun LiveSection(
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
         if (selectedCat == null) {
-            Text("Categorias", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-            if (cats.loading) Text("Carregando...")
-            cats.error?.let { Text("Erro: $it", color = MaterialTheme.colorScheme.error) }
+            Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+            if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
+            cats.error?.let { ErrorState(message = it, onRetry = { vm.loadLiveCategories(forceRefresh = true) }) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
@@ -84,9 +89,10 @@ fun LiveSection(
             }
         } else {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Button(onClick = { selectedCat = null }) { Text("← Voltar") }
+                Button(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                val sectionDefault = stringResource(R.string.section_live_default)
                 Text(
-                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: "Canais"}",
+                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: sectionDefault}",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(start = 16.dp)
                 )
@@ -96,8 +102,8 @@ fun LiveSection(
                     options = SortOption.LIVE_OPTIONS
                 ) { vm.setSort(SortScope.LIVE, it) }
             }
-            if (channels.loading) Text("Carregando...")
-            channels.error?.let { Text("Erro: $it", color = MaterialTheme.colorScheme.error) }
+            if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
+            channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(TvDim.ChannelGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
@@ -106,20 +112,30 @@ fun LiveSection(
                 items(channels.items) { ch ->
                     val cat = cats.items.firstOrNull { it.id == selectedCat }
                     val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                    val now = ch.epgChannelId?.let { epgNow[it] }
+                    val nowProgress = now?.let {
+                        val span = (it.stopMs - it.startMs).coerceAtLeast(1)
+                        ((System.currentTimeMillis() - it.startMs).toFloat() / span)
+                            .coerceIn(0f, 1f)
+                    }
                     ChannelCard(
                         title = ch.name,
                         number = ch.num,
                         logoUrl = ch.logoUrl,
-                        locked = locked
+                        locked = locked,
+                        nowPlaying = now?.title,
+                        nowProgress = nowProgress
                     ) {
-                        val args = PlayerArgs(
-                            kind = PlayerKind.LIVE,
-                            streamId = ch.id,
-                            title = ch.name,
-                            containerExtension = null
-                        )
-                        if (locked) pendingChannel = args
-                        else onPlay(args)
+                        if (locked) {
+                            pendingChannel = PlayerArgs(
+                                kind = PlayerKind.LIVE,
+                                streamId = ch.id,
+                                title = ch.name,
+                                containerExtension = null
+                            )
+                        } else {
+                            onOpenChannel(ch)
+                        }
                     }
                 }
             }
@@ -135,7 +151,8 @@ fun LiveSection(
                 selectedCat = cat.id
                 vm.loadChannels(cat.id)
             },
-            onCancel = { pendingCategory = null }
+            onCancel = { pendingCategory = null },
+            onPinCreated = { vm.setParentalPin(it) }
         )
     }
     pendingChannel?.let { args ->
@@ -146,7 +163,8 @@ fun LiveSection(
                 pendingChannel = null
                 onPlay(args)
             },
-            onCancel = { pendingChannel = null }
+            onCancel = { pendingChannel = null },
+            onPinCreated = { vm.setParentalPin(it) }
         )
     }
 }

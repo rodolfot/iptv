@@ -21,7 +21,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.iptv.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -36,6 +38,7 @@ import com.iptv.app.domain.model.Season
 import com.iptv.app.domain.model.toModel
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
+import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.TvDim
@@ -110,9 +113,9 @@ fun SeriesSection(
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
         if (selectedCat == null) {
-            Text("Categorias de séries", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-            if (cats.loading) Text("Carregando...")
-            cats.error?.let { Text("Erro: $it", color = MaterialTheme.colorScheme.error) }
+            Text(stringResource(R.string.section_series_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+            if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
+            cats.error?.let { ErrorState(message = it, onRetry = { vm.loadSeriesCategories(forceRefresh = true) }) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
@@ -127,9 +130,10 @@ fun SeriesSection(
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Button(onClick = { selectedCat = null }) { Text("← Voltar") }
+                Button(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                val seriesDefault = stringResource(R.string.section_series_default)
                 Text(
-                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: "Séries"}",
+                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: seriesDefault}",
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(start = 16.dp)
                 )
@@ -139,8 +143,8 @@ fun SeriesSection(
                     options = SortOption.SERIES_OPTIONS
                 ) { vm.setSort(SortScope.SERIES, it) }
             }
-            if (series.loading) Text("Carregando...")
-            series.error?.let { Text("Erro: $it", color = MaterialTheme.colorScheme.error) }
+            if (series.loading && series.items.isEmpty()) Text(stringResource(R.string.loading))
+            series.error?.let { ErrorState(message = it, onRetry = { vm.loadSeries(selectedCat, forceRefresh = true) }) }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(TvDim.SeriesGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
@@ -183,11 +187,11 @@ fun SeriesDetailScreen(
         }
         val detail = state
         if (detail == null) {
-            Text("Carregando...")
+            Text(stringResource(R.string.loading))
             return
         }
         if (selectedSeason == null) {
-            Text("Temporadas", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
+            Text(stringResource(R.string.section_seasons), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
                 horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
