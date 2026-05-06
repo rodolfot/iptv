@@ -19,13 +19,24 @@ data class PlayerArgs(
 ) {
     companion object {
         const val ROUTE = "player/{kind}/{streamId}/{title}/{ext}/{series}/{season}/{episode}/{pos}/{poster}/{cat}"
+        private const val EMPTY = "_"
+
+        private fun enc(value: String?): String {
+            val v = value.orEmpty()
+            return if (v.isEmpty()) EMPTY else Uri.encode(v)
+        }
+
+        private fun dec(value: String?): String {
+            val v = value.orEmpty()
+            return if (v == EMPTY) "" else Uri.decode(v)
+        }
 
         fun toRoute(args: PlayerArgs): String {
-            val title = Uri.encode(args.title)
-            val ext = Uri.encode(args.containerExtension ?: "")
-            val episode = Uri.encode(args.episodeId)
-            val poster = Uri.encode(args.posterUrl ?: "")
-            val cat = Uri.encode(args.categoryId ?: "")
+            val title = enc(args.title)
+            val ext = enc(args.containerExtension)
+            val episode = enc(args.episodeId)
+            val poster = enc(args.posterUrl)
+            val cat = enc(args.categoryId)
             return "player/${args.kind.name}/${args.streamId}/$title/$ext/${args.seriesId}/${args.seasonNumber}/$episode/${args.startPositionMs}/$poster/$cat"
         }
 
@@ -34,14 +45,14 @@ data class PlayerArgs(
             return PlayerArgs(
                 kind = PlayerKind.valueOf(a.getString("kind")!!),
                 streamId = a.getString("streamId")!!.toInt(),
-                title = Uri.decode(a.getString("title") ?: ""),
-                containerExtension = Uri.decode(a.getString("ext") ?: "").takeIf { it.isNotBlank() },
+                title = dec(a.getString("title")),
+                containerExtension = dec(a.getString("ext")).takeIf { it.isNotBlank() },
                 seriesId = a.getString("series")!!.toInt(),
                 seasonNumber = a.getString("season")!!.toInt(),
-                episodeId = Uri.decode(a.getString("episode") ?: ""),
+                episodeId = dec(a.getString("episode")),
                 startPositionMs = a.getString("pos")!!.toLong(),
-                posterUrl = Uri.decode(a.getString("poster") ?: "").takeIf { it.isNotBlank() },
-                categoryId = Uri.decode(a.getString("cat") ?: "").takeIf { it.isNotBlank() }
+                posterUrl = dec(a.getString("poster")).takeIf { it.isNotBlank() },
+                categoryId = dec(a.getString("cat")).takeIf { it.isNotBlank() }
             )
         }
     }

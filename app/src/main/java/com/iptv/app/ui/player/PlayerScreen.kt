@@ -25,9 +25,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -232,6 +236,9 @@ fun PlayerScreen(
 ) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
+    var playbackError by remember { mutableStateOf<String?>(null) }
+    var currentTracks by remember { mutableStateOf<Tracks?>(null) }
+    var trackPickerOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(args) { vm.load(args) }
 
@@ -268,6 +275,15 @@ fun PlayerScreen(
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 val idx = exo.currentMediaItemIndex
                 vm.onTransition(idx)
+                playbackError = null
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                playbackError = friendlyPlaybackError(error)
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                currentTracks = tracks
             }
         }
         exo.addListener(listener)
@@ -305,5 +321,66 @@ fun PlayerScreen(
         Column(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
             Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
         }
+        if (currentTracks != null) {
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)) {
+                Button(onClick = { trackPickerOpen = true }) {
+                    Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_tracks))
+                }
+            }
+        }
+        if (trackPickerOpen) {
+            currentTracks?.let { tracks ->
+                TrackPickerDialog(
+                    player = exo,
+                    tracks = tracks,
+                    onDismiss = { trackPickerOpen = false }
+                )
+            }
+        }
+        playbackError?.let { msg ->
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier.padding(48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Não foi possível reproduzir",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White
+                    )
+                    Text(
+                        msg,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
+                    )
+                    Button(onClick = onClose) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back)) }
+                }
+            }
+        }
+    }
+}
+
+private fun friendlyPlaybackError(error: PlaybackException): String {
+    val cause = error.cause
+    val msg = (cause?.message ?: error.message ?: "").lowercase()
+    return when (error.errorCode) {
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED -> {
+            if ("hevc" in msg || "exceeds capabilities" in msg || "no_exceeds_capabilities" in msg) {
+                "Este conteúdo está em formato 4K/HDR (HEVC) que não é suportado por este dispositivo. Tente uma versão SD/HD ou rode no aparelho de TV."
+            } else {
+                "Formato de vídeo não suportado por este dispositivo."
+            }
+        }
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+        PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> "Falha de conexão com o servidor. Verifique a internet."
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "O servidor recusou a transmissão (HTTP). Pode ser limite de conexões ou conteúdo indisponível."
+        else -> "Erro ao reproduzir: ${error.errorCodeName}."
     }
 }
