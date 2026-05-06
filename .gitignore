@@ -11,3 +11,10 @@ captures/
 *.aab
 *.keystore
 !gradle-wrapper.jar
+
+# Editor / tooling local state
+.vscode/
+.claude/
+
+# Local prototypes / scratch
+mock/

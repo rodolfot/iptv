@@ -3,9 +3,10 @@
 App Android TV (instalável via APK) para listas IPTV no padrão **Xtream Codes**: canais ao vivo, filmes (VOD) e séries, com favoritos, bloqueio parental por PIN, autoplay do próximo episódio e ordenação configurável. UI calibrada para TV 55".
 
 ## Requisitos
-- JDK 17
-- Android SDK (compileSdk 34, minSdk 23)
-- Android Studio (Hedgehog ou superior) — recomendado
+- JDK 17 (para o build via Gradle) — Android Studio Ladybug+ já vem com JDK 21 embutido para rodar o próprio IDE
+- Android SDK (compileSdk 35, minSdk 23)
+- Android Studio Ladybug (2024.2) ou superior — recomendado
+- AGP 8.7.3 · Gradle 8.9 · Kotlin 1.9.24 · Compose Compiler 1.5.14
 
 ## Build local
 
