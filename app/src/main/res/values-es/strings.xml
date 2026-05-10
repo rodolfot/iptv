@@ -188,4 +188,44 @@
     <string name="update_message">La versión %1$s está disponible. Estás usando la %2$s.</string>
     <string name="update_open">Abrir página de descarga</string>
     <string name="update_later">Más tarde</string>
+
+    <!-- Profiles -->
+    <string name="profiles_title">Perfiles</string>
+    <string name="profiles_empty">No hay perfiles guardados todavía. Agrega el primero abajo.</string>
+    <string name="profiles_active_badge">activo</string>
+    <string name="profiles_active_label">Perfil activo: %1$s</string>
+    <string name="profiles_has_pin">Protegido con PIN</string>
+    <string name="profiles_use">Usar</string>
+    <string name="profiles_edit">Editar</string>
+    <string name="profiles_delete">Eliminar</string>
+    <string name="profiles_add">Añadir perfil</string>
+    <string name="profiles_new">Nuevo perfil</string>
+    <string name="profiles_save">Guardar</string>
+    <string name="profiles_name_label">Nombre del perfil (ej. Familia)</string>
+    <string name="profiles_pin_optional">PIN parental (opcional, 4–8 dígitos)</string>
+    <string name="settings_profiles_button">Gestionar perfiles</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_new_episodes">Nuevos episodios</string>
+    <string name="notif_channel_catalog">Actualización del catálogo</string>
+    <string name="notif_channel_resume">Continuar viendo</string>
+    <string name="notif_channel_errors">Errores del servidor</string>
+    <string name="notif_new_episodes_title">Nuevos episodios disponibles</string>
+    <string name="notif_new_episodes_text">%1$d serie(s) con episodios nuevos.</string>
+    <string name="notif_catalog_title">Catálogo actualizado</string>
+    <string name="notif_catalog_text">Sincronización completa.</string>
+    <string name="notif_resume_title">Continúa donde lo dejaste</string>
+    <string name="notif_resume_text">Tienes títulos sin terminar esperándote.</string>
+    <string name="notif_error_title">Servidor no disponible</string>
+    <string name="notif_error_text">No se pudo actualizar el catálogo. Revisa tu conexión o credenciales.</string>
+    <string name="settings_notifications_title">Notificaciones</string>
+    <string name="settings_notifications_perm">Conceder permiso de notificaciones</string>
+    <string name="settings_notifications_perm_granted">Permiso concedido.</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_locked">Contenido bloqueado</string>
+    <string name="a11y_favorite">Añadir a favoritos</string>
+    <string name="a11y_unfavorite">Quitar de favoritos</string>
+    <string name="a11y_play">Reproducir</string>
+    <string name="a11y_close">Cerrar</string>
 </resources>

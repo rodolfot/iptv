@@ -188,4 +188,44 @@
     <string name="update_message">Version %1$s is available. You are running %2$s.</string>
     <string name="update_open">Open download page</string>
     <string name="update_later">Later</string>
+
+    <!-- Profiles -->
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_empty">No profiles saved yet. Add your first below.</string>
+    <string name="profiles_active_badge">active</string>
+    <string name="profiles_active_label">Active profile: %1$s</string>
+    <string name="profiles_has_pin">PIN-protected</string>
+    <string name="profiles_use">Use</string>
+    <string name="profiles_edit">Edit</string>
+    <string name="profiles_delete">Delete</string>
+    <string name="profiles_add">Add profile</string>
+    <string name="profiles_new">New profile</string>
+    <string name="profiles_save">Save</string>
+    <string name="profiles_name_label">Profile name (e.g. Family)</string>
+    <string name="profiles_pin_optional">Parental PIN (optional, 4–8 digits)</string>
+    <string name="settings_profiles_button">Manage profiles</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_new_episodes">New episodes</string>
+    <string name="notif_channel_catalog">Catalog refresh</string>
+    <string name="notif_channel_resume">Continue watching</string>
+    <string name="notif_channel_errors">Server errors</string>
+    <string name="notif_new_episodes_title">New episodes available</string>
+    <string name="notif_new_episodes_text">%1$d series have new episodes.</string>
+    <string name="notif_catalog_title">Catalog updated</string>
+    <string name="notif_catalog_text">Sync complete.</string>
+    <string name="notif_resume_title">Pick up where you left off</string>
+    <string name="notif_resume_text">You have unfinished titles waiting for you.</string>
+    <string name="notif_error_title">Server unreachable</string>
+    <string name="notif_error_text">Couldn\'t refresh the catalog. Check your connection or credentials.</string>
+    <string name="settings_notifications_title">Notifications</string>
+    <string name="settings_notifications_perm">Grant notification permission</string>
+    <string name="settings_notifications_perm_granted">Permission granted.</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_locked">Locked content</string>
+    <string name="a11y_favorite">Add to favorites</string>
+    <string name="a11y_unfavorite">Remove from favorites</string>
+    <string name="a11y_play">Play</string>
+    <string name="a11y_close">Close</string>
 </resources>

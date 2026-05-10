@@ -246,7 +246,11 @@ fun CategoryCard(
                 }
             }
             if (locked) {
-                Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.align(Alignment.TopEnd))
+                Icon(
+                    Icons.Filled.Lock,
+                    contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.a11y_locked),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                )
             }
         }
     }

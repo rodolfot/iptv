@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -336,13 +338,16 @@ fun PlayerScreen(
             runCatching { focusRequester.requestFocus() }
         }
     }
-    val playerView = remember {
+    val dim = com.iptv.app.ui.common.rememberTvDim()
+    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+    val playerView = remember(isPhone) {
         PlayerView(context).apply {
             player = exo
             useController = true
             controllerAutoShow = true
-            controllerHideOnTouch = false
-            controllerShowTimeoutMs = 4000
+            // Phones expect tap to toggle controls; TV keeps them visible until D-pad fades them.
+            controllerHideOnTouch = isPhone
+            controllerShowTimeoutMs = if (isPhone) 3000 else 4000
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             isFocusable = true
             isFocusableInTouchMode = true
@@ -401,6 +406,40 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { playerView }
         )
+        if (isPhone) {
+            // Double-tap left/right thirds to seek ±10s like YouTube/Netflix mobile players.
+            androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
+                                    playerView.showController()
+                                }
+                            )
+                        }
+                )
+                Box(modifier = Modifier.weight(1f).fillMaxSize())
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    val target = exo.currentPosition + seekStepMs
+                                    val dur = exo.duration
+                                    exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
+                                    playerView.showController()
+                                }
+                            )
+                        }
+                )
+            }
+        }
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)

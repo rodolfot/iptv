@@ -45,6 +45,13 @@
     <string name="settings_profiles_button">Gerenciar perfis</string>
     <string name="profiles_active_label">Perfil ativo: %1$s</string>
 
+    <!-- Accessibility -->
+    <string name="a11y_locked">Conteúdo bloqueado</string>
+    <string name="a11y_favorite">Favoritar</string>
+    <string name="a11y_unfavorite">Remover dos favoritos</string>
+    <string name="a11y_play">Reproduzir</string>
+    <string name="a11y_close">Fechar</string>
+
     <!-- Notifications -->
     <string name="notif_channel_new_episodes">Novos episódios</string>
     <string name="notif_channel_catalog">Atualização do catálogo</string>
