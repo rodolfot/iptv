@@ -38,10 +38,16 @@ class CatalogCacheRepository @Inject constructor(
         SERIES_LIST("series_list")
     }
 
-    suspend fun isStale(scope: Scope, ttlMs: Long = DEFAULT_TTL_MS): Boolean {
+    suspend fun isStale(scope: Scope, ttlMs: Long? = null): Boolean {
         val ts = meta.getUpdatedAt(scope.key) ?: return true
-        return System.currentTimeMillis() - ts > ttlMs
+        val effective = ttlMs ?: settings.flow.first().refreshInterval.ttlMs
+        return System.currentTimeMillis() - ts > effective
     }
+
+    /** Latest update timestamp across all scopes, or null if never refreshed. */
+    suspend fun lastUpdatedAt(): Long? = Scope.values()
+        .mapNotNull { meta.getUpdatedAt(it.key) }
+        .maxOrNull()
 
     private suspend fun touch(scope: Scope) {
         meta.upsert(CacheMetaEntity(scope.key, System.currentTimeMillis()))
@@ -165,9 +171,6 @@ class CatalogCacheRepository @Inject constructor(
         return if (q.isBlank()) emptyList() else series.search(q, limit)
     }
 
-    companion object {
-        const val DEFAULT_TTL_MS = 6L * 60 * 60 * 1000 // 6 hours
-    }
 }
 
 private fun com.iptv.app.data.api.CategoryDto.toCacheEntity(

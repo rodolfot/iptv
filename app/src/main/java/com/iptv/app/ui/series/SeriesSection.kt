@@ -27,10 +27,11 @@ import com.iptv.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.iptv.app.data.api.SeriesInfoDetail
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
@@ -46,7 +47,7 @@ import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.SortMenuButton
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
@@ -63,7 +64,8 @@ data class SeriesDetail(
     val episodesBySeason: Map<Int, List<Episode>>,
     val resume: SeriesResume? = null,
     val watchedEpisodes: Set<String> = emptySet(),
-    val episodePercents: Map<String, Int> = emptyMap()
+    val episodePercents: Map<String, Int> = emptyMap(),
+    val info: SeriesInfoDetail? = null
 )
 
 data class SeriesResume(
@@ -111,7 +113,8 @@ class SeriesDetailViewModel @Inject constructor(
                         episodesBySeason = episodesMap,
                         resume = resume,
                         watchedEpisodes = watched,
-                        episodePercents = percents
+                        episodePercents = percents,
+                        info = resp.info
                     )
                 }
         }
@@ -174,6 +177,7 @@ fun SeriesSection(
     val cats by vm.seriesCategories.collectAsState()
     val series by vm.series.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
+    val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var openSeries by remember { mutableStateOf<Pair<Int, String>?>(null) }
     var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
@@ -192,15 +196,20 @@ fun SeriesSection(
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
+        val catCols = when (dim.formFactor) {
+            com.iptv.app.ui.common.FormFactor.Phone -> 2
+            com.iptv.app.ui.common.FormFactor.Tablet -> 3
+            com.iptv.app.ui.common.FormFactor.Tv -> 3
+        }
         if (selectedCat == null) {
             Text(stringResource(R.string.section_series_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadSeriesCategories(forceRefresh = true) }) }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(catCols),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(cats.items) { cat ->
                     CategoryCard(title = cat.name, count = null, locked = false) {
@@ -211,7 +220,7 @@ fun SeriesSection(
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Button(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
                 val seriesDefault = stringResource(R.string.section_series_default)
                 Text(
                     "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: seriesDefault}",
@@ -235,9 +244,9 @@ fun SeriesSection(
             val filteredSeries = if (needle.isBlank()) series.items
                 else series.items.filter { it.name.lowercase().contains(needle) }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(TvDim.SeriesGridColumns),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(dim.SeriesGridColumns),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(filteredSeries) { s ->
                     PosterCard(
@@ -263,20 +272,32 @@ fun SeriesDetailScreen(
     vm: SeriesDetailViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
+    val dim = rememberTvDim()
     var selectedSeason by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(seriesId) { vm.load(seriesId, title) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
+    val seasonCols = when (dim.formFactor) {
+        com.iptv.app.ui.common.FormFactor.Phone -> 2
+        com.iptv.app.ui.common.FormFactor.Tablet -> 3
+        com.iptv.app.ui.common.FormFactor.Tv -> 4
+    }
+    val episodeCols = when (dim.formFactor) {
+        com.iptv.app.ui.common.FormFactor.Phone -> 2
+        com.iptv.app.ui.common.FormFactor.Tablet -> 3
+        com.iptv.app.ui.common.FormFactor.Tv -> 4
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-            Button(onClick = {
+            TouchableButton(onClick = {
                 if (selectedSeason != null) selectedSeason = null else onBack()
             }) { Text(stringResource(R.string.back)) }
             Text("  $title", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 16.dp))
             Box(modifier = Modifier.weight(1f))
             state?.resume?.let { resume ->
                 val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
-                Button(onClick = {
+                TouchableButton(onClick = {
                     onPlay(
                         PlayerArgs(
                             kind = PlayerKind.EPISODE,
@@ -300,11 +321,23 @@ fun SeriesDetailScreen(
             return
         }
         if (selectedSeason == null) {
+            detail.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                Text(
+                    stringResource(R.string.synopsis),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                Text(
+                    plot,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
             Text(stringResource(R.string.section_seasons), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
             LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(seasonCols),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(detail.seasons) { s ->
                     CategoryCard(
@@ -322,9 +355,9 @@ fun SeriesDetailScreen(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(episodeCols),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(episodes) { e ->
                     val isWatched = e.id in detail.watchedEpisodes

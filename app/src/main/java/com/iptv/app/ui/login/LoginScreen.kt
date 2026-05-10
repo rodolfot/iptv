@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,10 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.prefs.SettingsStore
@@ -79,18 +79,27 @@ class LoginViewModel @Inject constructor(
                         _state.value = LoginUiState(error = "Credenciais inválidas: ${resp.userInfo?.message ?: "auth=0"}")
                     }
                 }
-                .onFailure { _state.value = LoginUiState(error = it.message ?: "Erro de conexão") }
+                .onFailure {
+                    val msg = it.message.orEmpty()
+                    val friendly = when {
+                        msg.contains("404") -> "Servidor respondeu 404. Verifique se o host inclui a porta correta (ex.: http://seu-servidor.com:8080)."
+                        msg.contains("401") || msg.contains("403") -> "Credenciais recusadas pelo servidor."
+                        msg.contains("UnknownHost", ignoreCase = true) -> "Host não encontrado. Confira o endereço."
+                        msg.contains("timeout", ignoreCase = true) -> "Tempo esgotado conectando ao servidor."
+                        else -> msg.ifBlank { "Erro de conexão" }
+                    }
+                    _state.value = LoginUiState(error = friendly)
+                }
         }
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onLogged: () -> Unit,
     vm: LoginViewModel = hiltViewModel()
 ) {
-    var host by remember { mutableStateOf("http://bscx.one") }
+    var host by remember { mutableStateOf("") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     val state by vm.state.collectAsState()
@@ -111,7 +120,10 @@ fun LoginScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(

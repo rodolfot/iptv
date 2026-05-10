@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -43,7 +43,7 @@ import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.db.MovieProgressDao
 import com.iptv.app.data.db.MovieProgressEntity
 import com.iptv.app.domain.model.ContentType
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -127,23 +127,29 @@ fun MovieDetailScreen(
     vm: MovieDetailViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
+    val dim = rememberTvDim()
     LaunchedEffect(args.streamId) { vm.load(args.streamId) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Button(onClick = onBack) { Text(stringResource(R.string.back)) }
+        TouchableButton(onClick = onBack) { Text(stringResource(R.string.back)) }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        val (posterW, posterH) = when (dim.formFactor) {
+            com.iptv.app.ui.common.FormFactor.Phone -> 140.dp to 210.dp
+            com.iptv.app.ui.common.FormFactor.Tablet -> 200.dp to 300.dp
+            com.iptv.app.ui.common.FormFactor.Tv -> 280.dp to 420.dp
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(if (dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone) 12.dp else 24.dp)) {
             Box(
                 modifier = Modifier
-                    .width(280.dp)
-                    .height(420.dp)
+                    .width(posterW)
+                    .height(posterH)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
@@ -178,9 +184,6 @@ fun MovieDetailScreen(
                     info.cast?.takeIf { it.isNotBlank() }?.let {
                         Text(stringResource(R.string.movie_cast, it), style = MaterialTheme.typography.bodyMedium)
                     }
-                    info.plot?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
-                    }
                 }
                 state.error?.let {
                     Text(stringResource(R.string.error_prefix, it), color = MaterialTheme.colorScheme.error)
@@ -188,23 +191,33 @@ fun MovieDetailScreen(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
                     if (state.resumeMs > 0L) {
-                        Button(onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) }) {
+                        TouchableButton(onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) }) {
                             Text(stringResource(R.string.movie_resume, formatTime(state.resumeMs)))
                         }
-                        Button(onClick = { onPlay(args.copy(startPositionMs = 0L)) }) {
+                        TouchableButton(onClick = { onPlay(args.copy(startPositionMs = 0L)) }) {
                             Text(stringResource(R.string.movie_restart))
                         }
                     } else {
-                        Button(onClick = { onPlay(args) }) {
+                        TouchableButton(onClick = { onPlay(args) }) {
                             Text(stringResource(R.string.movie_play))
                         }
                     }
-                    Button(onClick = { vm.toggleFavorite(args) }) {
+                    TouchableButton(onClick = { vm.toggleFavorite(args) }) {
                         Text(stringResource(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
                     }
                 }
+            }
+        }
+
+        state.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(R.string.synopsis),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(plot, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }

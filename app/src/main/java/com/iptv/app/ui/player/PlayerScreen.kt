@@ -1,8 +1,10 @@
 package com.iptv.app.ui.player
 
+import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +19,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -31,7 +41,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -319,27 +329,83 @@ fun PlayerScreen(
 
     BackHandler { onClose() }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exo
-                    useController = true
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(state.items.isNotEmpty()) {
+        if (state.items.isNotEmpty()) {
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
+    val playerView = remember {
+        PlayerView(context).apply {
+            player = exo
+            useController = true
+            controllerAutoShow = true
+            controllerHideOnTouch = false
+            controllerShowTimeoutMs = 4000
+            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            isFocusable = true
+            isFocusableInTouchMode = true
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+    }
+    val seekStepMs = 10_000L
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPreviewKeyEvent { evt ->
+                if (evt.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (evt.key) {
+                    Key.DirectionLeft, Key.MediaRewind -> {
+                        playerView.showController()
+                        exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
+                        true
+                    }
+                    Key.DirectionRight, Key.MediaFastForward -> {
+                        playerView.showController()
+                        val target = exo.currentPosition + seekStepMs
+                        val dur = exo.duration
+                        exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
+                        true
+                    }
+                    Key.DirectionCenter, Key.Enter, Key.Spacebar, Key.MediaPlayPause -> {
+                        playerView.showController()
+                        if (exo.isPlaying) exo.pause() else exo.play()
+                        true
+                    }
+                    else -> when (evt.key.nativeKeyCode) {
+                        KeyEvent.KEYCODE_DPAD_LEFT -> {
+                            playerView.showController()
+                            exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
+                            true
+                        }
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            playerView.showController()
+                            val target = exo.currentPosition + seekStepMs
+                            val dur = exo.duration
+                            exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
+                            true
+                        }
+                        else -> false
+                    }
                 }
             }
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { playerView }
         )
         Column(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
             Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
         }
         if (currentTracks != null) {
             Box(modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)) {
-                Button(onClick = { trackPickerOpen = true }) {
+                TouchableButton(onClick = { trackPickerOpen = true }) {
                     Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_tracks))
                 }
             }
@@ -373,7 +439,7 @@ fun PlayerScreen(
                         color = Color.White,
                         modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
                     )
-                    Button(onClick = onClose) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back)) }
+                    TouchableButton(onClick = onClose) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back)) }
                 }
             }
         }

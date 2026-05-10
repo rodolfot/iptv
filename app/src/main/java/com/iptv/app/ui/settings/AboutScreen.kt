@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -17,12 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.R
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.legal.LegalDoc
 import com.iptv.app.ui.legal.LegalViewerScreen
 
@@ -35,6 +36,7 @@ fun AboutScreen(onClose: () -> Unit) {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
         }.getOrNull() ?: "—"
     }
+    val dim = rememberTvDim()
     var viewing by remember { mutableStateOf<LegalDoc?>(null) }
     var crashOpen by remember { mutableStateOf(false) }
 
@@ -51,7 +53,8 @@ fun AboutScreen(onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 24.dp)
+            .safeDrawingPadding()
+            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -63,17 +66,17 @@ fun AboutScreen(onClose: () -> Unit) {
         Text(stringResource(R.string.about_intro), style = MaterialTheme.typography.bodyMedium)
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = { viewing = LegalDoc.TERMS }) {
+            TouchableButton(onClick = { viewing = LegalDoc.TERMS }) {
                 Text(stringResource(R.string.about_terms))
             }
-            Button(onClick = { viewing = LegalDoc.PRIVACY }) {
+            TouchableButton(onClick = { viewing = LegalDoc.PRIVACY }) {
                 Text(stringResource(R.string.about_privacy))
             }
-            Button(onClick = { crashOpen = true }) {
+            TouchableButton(onClick = { crashOpen = true }) {
                 Text(stringResource(R.string.about_crash_log))
             }
         }
 
-        Button(onClick = onClose) { Text(stringResource(R.string.back)) }
+        TouchableButton(onClick = onClose) { Text(stringResource(R.string.back)) }
     }
 }

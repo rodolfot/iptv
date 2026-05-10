@@ -72,8 +72,9 @@ interface LiveCacheDao {
     suspend fun replaceAll(items: List<LiveChannelCacheEntity>) {
         clear()
         clearFts()
-        insertAll(items)
-        items.forEach { insertFts(it.streamId, it.name) }
+        val deduped = items.associateBy { it.streamId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { insertFts(it.streamId, it.name) }
     }
 }
 
@@ -111,8 +112,9 @@ interface MovieCacheDao {
     suspend fun replaceAll(items: List<MovieCacheEntity>) {
         clear()
         clearFts()
-        insertAll(items)
-        items.forEach { m ->
+        val deduped = items.associateBy { it.streamId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { m ->
             insertFts(
                 streamId = m.streamId,
                 name = m.name,
@@ -168,8 +170,9 @@ interface SeriesCacheDao {
     suspend fun replaceAll(items: List<SeriesCacheEntity>) {
         clear()
         clearFts()
-        insertAll(items)
-        items.forEach { s ->
+        val deduped = items.associateBy { it.seriesId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { s ->
             insertFts(
                 seriesId = s.seriesId,
                 name = s.name,

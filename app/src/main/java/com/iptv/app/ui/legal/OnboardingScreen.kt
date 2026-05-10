@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -57,7 +58,10 @@ fun OnboardingScreen(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -73,18 +77,18 @@ fun OnboardingScreen(
                 style = MaterialTheme.typography.bodyLarge
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { viewing = LegalDoc.TERMS }) {
+                TouchableButton(onClick = { viewing = LegalDoc.TERMS }) {
                     Text(stringResource(R.string.onboarding_read_terms))
                 }
-                Button(onClick = { viewing = LegalDoc.PRIVACY }) {
+                TouchableButton(onClick = { viewing = LegalDoc.PRIVACY }) {
                     Text(stringResource(R.string.onboarding_read_privacy))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { vm.accept(onAccepted) }) {
+                TouchableButton(onClick = { vm.accept(onAccepted) }) {
                     Text(stringResource(R.string.onboarding_accept))
                 }
-                Button(onClick = { exitProcess(0) }) {
+                TouchableButton(onClick = { exitProcess(0) }) {
                     Text(stringResource(R.string.onboarding_decline))
                 }
             }

@@ -62,6 +62,7 @@
     <string name="movie_release">Lançamento: %1$s</string>
     <string name="movie_rating">Avaliação: %1$s</string>
     <string name="movie_duration">Duração: %1$s</string>
+    <string name="synopsis">Sinopse</string>
     <string name="add_favorite">Favoritar</string>
     <string name="remove_favorite">Remover dos favoritos</string>
 
@@ -128,6 +129,20 @@
     <string name="settings_pin_save_unset">Definir PIN</string>
     <string name="settings_catalog">Catálogo</string>
     <string name="settings_refresh">Atualizar catálogo</string>
+    <string name="settings_refresh_now">Atualizar agora</string>
+    <string name="settings_refresh_interval">Intervalo de atualização</string>
+    <string name="settings_refresh_last">Última atualização: %1$s</string>
+    <string name="settings_refresh_never">Nunca atualizado</string>
+    <string name="refresh_interval_1h">A cada 1 hora</string>
+    <string name="refresh_interval_4h">A cada 4 horas</string>
+    <string name="refresh_interval_12h">A cada 12 horas</string>
+    <string name="refresh_interval_1d">A cada 1 dia</string>
+    <string name="refresh_interval_4d">A cada 4 dias</string>
+    <string name="refresh_interval_7d">A cada 7 dias</string>
+    <string name="refresh_interval_30d">A cada 30 dias</string>
+    <string name="catalog_loading_title">Atualizando catálogo</string>
+    <string name="catalog_loading_subtitle">Baixando categorias, filmes e séries…</string>
+    <string name="catalog_loading_seconds">%1$d s</string>
     <string name="settings_clear_cache">Limpar cache</string>
     <string name="settings_reset_progress">Resetar progresso de séries</string>
     <string name="settings_session">Sessão</string>

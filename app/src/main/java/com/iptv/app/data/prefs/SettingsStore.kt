@@ -3,6 +3,7 @@ package com.iptv.app.data.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.iptv.app.domain.sort.SortOption
@@ -28,8 +29,24 @@ data class AppSettings(
     val moviesSort: SortOption = SortOption.ADDED_DATE_DESC,
     val seriesSort: SortOption = SortOption.ADDED_DATE_DESC,
     val favoritesSort: SortOption = SortOption.NAME_ASC,
-    val extraAdultCategoryIds: Set<String> = emptySet()
+    val extraAdultCategoryIds: Set<String> = emptySet(),
+    val refreshInterval: RefreshInterval = RefreshInterval.HOURS_12
 )
+
+enum class RefreshInterval(val ttlMs: Long, val labelRes: Int) {
+    HOURS_1(1L * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_1h),
+    HOURS_4(4L * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_4h),
+    HOURS_12(12L * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_12h),
+    DAYS_1(24L * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_1d),
+    DAYS_4(4L * 24 * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_4d),
+    DAYS_7(7L * 24 * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_7d),
+    DAYS_30(30L * 24 * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_30d);
+
+    companion object {
+        fun fromName(value: String?): RefreshInterval? =
+            value?.let { runCatching { valueOf(it) }.getOrNull() }
+    }
+}
 
 @Singleton
 class SettingsStore @Inject constructor(
@@ -51,6 +68,7 @@ class SettingsStore @Inject constructor(
         val SERIES_SORT = stringPreferencesKey("series_sort")
         val FAV_SORT = stringPreferencesKey("fav_sort")
         val EXTRA_ADULT = stringPreferencesKey("extra_adult")
+        val REFRESH_INTERVAL = stringPreferencesKey("refresh_interval")
     }
 
     // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
@@ -74,7 +92,8 @@ class SettingsStore @Inject constructor(
             seriesSort = SortOption.fromName(p[Keys.SERIES_SORT]) ?: SortOption.ADDED_DATE_DESC,
             favoritesSort = SortOption.fromName(p[Keys.FAV_SORT]) ?: SortOption.NAME_ASC,
             extraAdultCategoryIds = (p[Keys.EXTRA_ADULT] ?: "")
-                .split(",").filter { it.isNotBlank() }.toSet()
+                .split(",").filter { it.isNotBlank() }.toSet(),
+            refreshInterval = RefreshInterval.fromName(p[Keys.REFRESH_INTERVAL]) ?: RefreshInterval.HOURS_12
         )
     }
 
@@ -133,6 +152,10 @@ class SettingsStore @Inject constructor(
             }
             it[key] = option.name
         }
+    }
+
+    suspend fun setRefreshInterval(interval: RefreshInterval) {
+        context.dataStore.edit { it[Keys.REFRESH_INTERVAL] = interval.name }
     }
 
     suspend fun toggleAdultCategory(categoryId: String, adult: Boolean) {

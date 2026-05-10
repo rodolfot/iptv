@@ -24,21 +24,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
+import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
+import com.iptv.app.work.CatalogRefreshWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.text.DateFormat
+import java.util.Date
 
 data class CredentialsTest(val ok: Boolean, val message: String)
 
@@ -46,7 +52,8 @@ data class CredentialsTest(val ok: Boolean, val message: String)
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val progressDao: EpisodeProgressDao,
-    private val repo: XtreamRepository
+    private val repo: XtreamRepository,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
     private val _testing = MutableStateFlow(false)
     val testing = _testing.asStateFlow()
@@ -55,6 +62,13 @@ class SettingsViewModel @Inject constructor(
 
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
     fun resetProgress() { viewModelScope.launch { progressDao.clearAll() } }
+
+    fun setRefreshInterval(interval: RefreshInterval) {
+        viewModelScope.launch {
+            settings.setRefreshInterval(interval)
+            CatalogRefreshWorker.schedule(appContext, interval, replace = true)
+        }
+    }
 
     fun testCredentials(host: String, user: String, pass: String) {
         viewModelScope.launch {
@@ -99,6 +113,7 @@ fun SettingsScreen(
     val s by vm.settingsFlow.collectAsState()
     val testing by settingsVm.testing.collectAsState()
     val testResult by settingsVm.testResult.collectAsState()
+    val dim = rememberTvDim()
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
     var editingServer by remember { mutableStateOf(false) }
@@ -121,7 +136,7 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
@@ -130,7 +145,7 @@ fun SettingsScreen(
         if (!editingServer) {
             Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
-            Button(onClick = { editingServer = true }) {
+            TouchableButton(onClick = { editingServer = true }) {
                 Text(stringResource(R.string.settings_change_server))
             }
         } else {
@@ -172,11 +187,11 @@ fun SettingsScreen(
             androidx.compose.foundation.layout.Row(
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
             ) {
-                Button(
+                TouchableButton(
                     enabled = !testing && editHost.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank(),
                     onClick = { settingsVm.testCredentials(editHost, editUser, editPass) }
                 ) { Text(stringResource(R.string.settings_test_connection)) }
-                Button(
+                TouchableButton(
                     enabled = testResult?.ok == true,
                     onClick = {
                         settingsVm.saveCredentials(editHost, editUser, editPass) {
@@ -186,7 +201,7 @@ fun SettingsScreen(
                         }
                     }
                 ) { Text(stringResource(R.string.settings_save_credentials)) }
-                Button(onClick = {
+                TouchableButton(onClick = {
                     editingServer = false
                     editHost = s.host; editUser = s.username; editPass = s.password
                     settingsVm.clearTestResult()
@@ -212,7 +227,7 @@ fun SettingsScreen(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             modifier = Modifier.width(360.dp)
         )
-        Button(
+        TouchableButton(
             enabled = pin.length >= 4,
             onClick = { settingsVm.setPin(pin) }
         ) {
@@ -222,18 +237,45 @@ fun SettingsScreen(
         }
 
         Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleMedium)
-        Button(onClick = { vm.refreshAll() }) { Text(stringResource(R.string.settings_refresh)) }
-        Button(onClick = { settingsVm.resetProgress() }) {
+        Text(
+            stringResource(R.string.settings_refresh_interval),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+        ) {
+            RefreshInterval.values().forEach { opt ->
+                val selected = s.refreshInterval == opt
+                TouchableButton(
+                    onClick = { settingsVm.setRefreshInterval(opt) },
+                    selected = selected
+                ) { Text(stringResource(opt.labelRes)) }
+            }
+        }
+        val lastUpdated by vm.lastUpdatedAt.collectAsState()
+        Text(
+            text = lastUpdated?.let {
+                stringResource(
+                    R.string.settings_refresh_last,
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+                )
+            } ?: stringResource(R.string.settings_refresh_never),
+            style = MaterialTheme.typography.bodySmall
+        )
+        TouchableButton(onClick = { vm.bootstrapCatalog(force = true) }) {
+            Text(stringResource(R.string.settings_refresh_now))
+        }
+        TouchableButton(onClick = { settingsVm.resetProgress() }) {
             Text(stringResource(R.string.settings_reset_progress))
         }
 
         Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
-        Button(onClick = { aboutOpen = true }) {
+        TouchableButton(onClick = { aboutOpen = true }) {
             Text(stringResource(R.string.settings_open_about))
         }
 
         Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleMedium)
-        Button(onClick = {
+        TouchableButton(onClick = {
             vm.logout()
             onLogout()
         }) { Text(stringResource(R.string.settings_logout)) }

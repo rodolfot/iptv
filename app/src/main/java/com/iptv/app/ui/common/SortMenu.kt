@@ -23,7 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.iptv.app.R
-import androidx.tv.material3.Button
+// Button replaced with TouchableButton from same package — no import needed.
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -39,7 +39,7 @@ fun SortMenuButton(
     onSelect: (SortOption) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
-    Button(onClick = { open = true }) {
+    TouchableButton(onClick = { open = true }) {
         Icon(Icons.Filled.Sort, contentDescription = null)
         Text("  Ordenar: ${current.label}")
     }
@@ -59,7 +59,7 @@ fun SortMenuButton(
                 ) {
                     Text(stringResource(R.string.sort_title), style = MaterialTheme.typography.titleLarge)
                     options.forEach { opt ->
-                        Button(
+                        TouchableButton(
                             onClick = {
                                 onSelect(opt)
                                 open = false

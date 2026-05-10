@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -36,7 +36,7 @@ import com.iptv.app.ui.common.ChannelCard
 import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.SortMenuButton
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.parental.ParentalPinDialog
 import com.iptv.app.ui.parental.ParentalSession
@@ -55,6 +55,7 @@ fun LiveSection(
     val channels by vm.channels.collectAsState()
     val epgNow by vm.epgNow.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
+    val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingChannel by remember { mutableStateOf<PlayerArgs?>(null) }
@@ -64,15 +65,20 @@ fun LiveSection(
         if (cats.items.isEmpty()) vm.loadLiveCategories()
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
+        val catCols = when (dim.formFactor) {
+            com.iptv.app.ui.common.FormFactor.Phone -> 2
+            com.iptv.app.ui.common.FormFactor.Tablet -> 3
+            com.iptv.app.ui.common.FormFactor.Tv -> 3
+        }
         if (selectedCat == null) {
             Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadLiveCategories(forceRefresh = true) }) }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(catCols),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(cats.items) { cat ->
                     CategoryCard(
@@ -91,7 +97,7 @@ fun LiveSection(
             }
         } else {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                Button(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
                 val sectionDefault = stringResource(R.string.section_live_default)
                 Text(
                     "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: sectionDefault}",
@@ -115,9 +121,9 @@ fun LiveSection(
             val filteredChannels = if (needle.isBlank()) channels.items
                 else channels.items.filter { it.name.lowercase().contains(needle) }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(TvDim.ChannelGridColumns),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(dim.ChannelGridColumns),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(filteredChannels) { ch ->
                     val cat = cats.items.firstOrNull { it.id == selectedCat }

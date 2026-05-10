@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
-import androidx.tv.material3.Button
+// Button replaced with TouchableButton from same package — no import needed.
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -29,6 +29,6 @@ fun ErrorState(
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodyMedium
         )
-        Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+        TouchableButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
     }
 }

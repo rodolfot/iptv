@@ -3,15 +3,22 @@ package com.iptv.app
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.diag.CrashLog
 import com.iptv.app.work.CatalogRefreshWorker
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
 class IptvApp : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var settings: SettingsStore
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -21,6 +28,9 @@ class IptvApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
-        CatalogRefreshWorker.schedule(this)
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            val interval = settings.flow.first().refreshInterval
+            CatalogRefreshWorker.schedule(this@IptvApp, interval)
+        }
     }
 }

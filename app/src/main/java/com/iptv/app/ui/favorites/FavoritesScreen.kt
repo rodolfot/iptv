@@ -23,14 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.PosterCard
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.parental.ParentalPinDialog
 import com.iptv.app.ui.parental.ParentalSession
@@ -46,6 +46,7 @@ fun FavoritesScreen(
 ) {
     val all by vm.favorites.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
+    val dim = rememberTvDim()
     var filter by rememberSaveable { mutableStateOf<ContentType?>(null) }
     var pendingPlay by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<PlayerArgs?>(null) }
 
@@ -61,14 +62,14 @@ fun FavoritesScreen(
             }
         }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
             Text(stringResource(R.string.tab_favorites), style = MaterialTheme.typography.headlineSmall)
             Row(modifier = Modifier.padding(start = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { filter = null }) { Text(stringResource(R.string.filter_all)) }
-                Button(onClick = { filter = ContentType.LIVE }) { Text(stringResource(R.string.filter_channels)) }
-                Button(onClick = { filter = ContentType.MOVIE }) { Text(stringResource(R.string.filter_movies)) }
-                Button(onClick = { filter = ContentType.SERIES }) { Text(stringResource(R.string.filter_series)) }
+                TouchableButton(onClick = { filter = null }) { Text(stringResource(R.string.filter_all)) }
+                TouchableButton(onClick = { filter = ContentType.LIVE }) { Text(stringResource(R.string.filter_channels)) }
+                TouchableButton(onClick = { filter = ContentType.MOVIE }) { Text(stringResource(R.string.filter_movies)) }
+                TouchableButton(onClick = { filter = ContentType.SERIES }) { Text(stringResource(R.string.filter_series)) }
             }
         }
         if (items.isEmpty()) {
@@ -76,9 +77,9 @@ fun FavoritesScreen(
             return
         }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(TvDim.SeriesGridColumns),
-            horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-            verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+            columns = GridCells.Fixed(dim.SeriesGridColumns),
+            horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+            verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
         ) {
             items(items) { f ->
                 val icon = when (f.type) {

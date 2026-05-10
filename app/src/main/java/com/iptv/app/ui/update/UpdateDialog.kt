@@ -25,7 +25,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -88,10 +88,10 @@ fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                     ) {
-                        Button(onClick = { vm.dismiss() }) {
+                        TouchableButton(onClick = { vm.dismiss() }) {
                             Text(stringResource(R.string.update_later))
                         }
-                        Button(onClick = {
+                        TouchableButton(onClick = {
                             val target = update.releasePageUrl.takeIf { it.isNotBlank() }
                                 ?: update.apkUrl
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target))

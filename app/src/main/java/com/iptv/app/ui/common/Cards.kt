@@ -3,6 +3,7 @@
 package com.iptv.app.ui.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +34,33 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 
+/**
+ * Phone uses the standard Material3 Card with a clickable Surface so taps register.
+ * Tablet/TV keep the TV Material3 Card so D-pad focus stays correct on Leanback.
+ */
+@Composable
+private fun TouchableCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(16.dp),
+    content: @Composable () -> Unit
+) {
+    val dim = rememberTvDim()
+    if (dim.formFactor == FormFactor.Phone) {
+        androidx.compose.material3.Card(
+            onClick = onClick,
+            modifier = modifier,
+            shape = shape
+        ) { content() }
+    } else {
+        Card(
+            onClick = onClick,
+            modifier = modifier,
+            shape = CardDefaults.shape(shape = shape)
+        ) { content() }
+    }
+}
+
 @Composable
 fun PosterCard(
     title: String,
@@ -41,12 +69,12 @@ fun PosterCard(
     fallbackIcon: ImageVector = Icons.Filled.Movie,
     onClick: () -> Unit
 ) {
-    Card(
+    val dim = rememberTvDim()
+    TouchableCard(
         onClick = onClick,
         modifier = Modifier
-            .width(TvDim.PosterCardW)
-            .height(TvDim.PosterCardH),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(16.dp))
+            .width(dim.PosterCardW)
+            .height(dim.PosterCardH)
     ) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
             if (imageUrl.isNullOrBlank()) {
@@ -102,12 +130,12 @@ fun ChannelCard(
     nowProgress: Float? = null,
     onClick: () -> Unit
 ) {
-    Card(
+    val dim = rememberTvDim()
+    TouchableCard(
         onClick = onClick,
         modifier = Modifier
-            .width(TvDim.ChannelCardW)
-            .height(TvDim.ChannelCardH),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(16.dp))
+            .width(dim.ChannelCardW)
+            .height(dim.ChannelCardH)
     ) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
             Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
@@ -188,12 +216,17 @@ fun CategoryCard(
     locked: Boolean,
     onClick: () -> Unit
 ) {
-    Card(
+    val dim = rememberTvDim()
+    val (w, h, pad) = when (dim.formFactor) {
+        FormFactor.Phone -> Triple(170.dp, 96.dp, 12.dp)
+        FormFactor.Tablet -> Triple(280.dp, 120.dp, 16.dp)
+        FormFactor.Tv -> Triple(360.dp, 140.dp, 20.dp)
+    }
+    TouchableCard(
         onClick = onClick,
-        modifier = Modifier.width(360.dp).height(140.dp),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(16.dp))
+        modifier = Modifier.width(w).height(h)
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(20.dp)) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(pad)) {
             Column(modifier = Modifier.align(Alignment.CenterStart)) {
                 Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (count != null) {

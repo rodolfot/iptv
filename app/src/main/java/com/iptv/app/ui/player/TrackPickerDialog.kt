@@ -25,7 +25,7 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -93,7 +93,7 @@ fun TrackPickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
-                    Button(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+                    TouchableButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
                 }
             }
         }
@@ -111,7 +111,7 @@ private fun TrackSection(
 ) {
     Text(label, style = MaterialTheme.typography.titleMedium)
 
-    Button(onClick = {
+    TouchableButton(onClick = {
         val params = player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(groups.first().type)
             .setTrackTypeDisabled(groups.first().type, offType != null)
@@ -127,7 +127,7 @@ private fun TrackSection(
             val selected = group.isTrackSelected(i)
             val supported = group.isTrackSupported(i)
             if (!supported) continue
-            Button(
+            TouchableButton(
                 onClick = {
                     val override = TrackSelectionOverride(group.mediaTrackGroup, i)
                     val params = player.trackSelectionParameters.buildUpon()

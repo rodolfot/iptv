@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -52,7 +52,7 @@ import com.iptv.app.domain.model.Series
 import com.iptv.app.ui.common.ChannelCard
 import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.PosterCard
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -147,6 +147,7 @@ fun SearchScreen(
     vm: SearchViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
+    val dim = rememberTvDim()
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(SearchFilter.ALL) }
 
@@ -156,7 +157,7 @@ fun SearchScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
         SearchBar(
@@ -227,7 +228,7 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: B
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick) {
+    TouchableButton(onClick = onClick) {
         Text(
             if (selected) "• $label" else label,
             style = MaterialTheme.typography.labelLarge
@@ -243,6 +244,7 @@ private fun ResultsContent(
     onOpenSeries: (Int, String, String?) -> Unit,
     onOpenChannel: (LiveChannel) -> Unit
 ) {
+    val dim = rememberTvDim()
     val empty = results.channels.isEmpty() && results.movies.isEmpty() && results.series.isEmpty()
     if (empty) {
         Text(stringResource(R.string.nothing_found), style = MaterialTheme.typography.bodyLarge)
@@ -252,7 +254,7 @@ private fun ResultsContent(
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
         if (results.channels.isNotEmpty()) {
             ResultRow("Canais", results.channels.size, Icons.Filled.LiveTv) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                     items(results.channels) { ch ->
                         ChannelCard(
                             title = ch.name,
@@ -267,7 +269,7 @@ private fun ResultsContent(
         }
         if (results.movies.isNotEmpty()) {
             ResultRow("Filmes", results.movies.size, Icons.Filled.Movie) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                     items(results.movies) { m ->
                         PosterCard(
                             title = m.name,
@@ -291,7 +293,7 @@ private fun ResultsContent(
         }
         if (results.series.isNotEmpty()) {
             ResultRow("Séries", results.series.size, Icons.Filled.Tv) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                     items(results.series) { s ->
                         PosterCard(
                             title = s.name,

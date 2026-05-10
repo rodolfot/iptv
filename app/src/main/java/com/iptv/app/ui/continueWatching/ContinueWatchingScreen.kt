@@ -38,7 +38,7 @@ import com.iptv.app.data.db.MovieProgressEntity
 import com.iptv.app.data.db.SeriesProgressDao
 import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.ui.common.PosterCard
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -72,11 +72,12 @@ fun ContinueWatchingScreen(
 ) {
     val movies by vm.movies.collectAsState()
     val series by vm.series.collectAsState()
+    val dim = rememberTvDim()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 12.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
     ) {
         if (movies.isEmpty() && series.isEmpty()) {
             Text(
@@ -92,7 +93,7 @@ fun ContinueWatchingScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                 items(series) { s -> SeriesContinueCard(s, vm, onPlay) }
             }
         }
@@ -104,9 +105,9 @@ fun ContinueWatchingScreen(
                 modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
             )
             LazyVerticalGrid(
-                columns = GridCells.Fixed(TvDim.MoviesGridColumns),
-                horizontalArrangement = Arrangement.spacedBy(TvDim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(TvDim.CardSpacing)
+                columns = GridCells.Fixed(dim.MoviesGridColumns),
+                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(movies) { m -> MovieContinueCard(m, onPlay) }
             }

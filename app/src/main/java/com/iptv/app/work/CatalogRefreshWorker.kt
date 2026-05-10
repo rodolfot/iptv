@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.iptv.app.data.cache.CatalogCacheRepository
 import com.iptv.app.data.epg.EpgRepository
+import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -44,21 +45,37 @@ class CatalogRefreshWorker @AssistedInject constructor(
     companion object {
         private const val UNIQUE_NAME = "catalog_refresh"
 
-        fun schedule(context: Context) {
+        /**
+         * Schedule periodic refresh based on the user-chosen interval.
+         * @param replace true when called after a settings change so the schedule updates immediately.
+         */
+        fun schedule(context: Context, interval: RefreshInterval, replace: Boolean = false) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
+            // WorkManager periodic minimum is 15 min; longer intervals are passed through directly.
+            val (repeat, unit) = repeatFor(interval)
             val request = PeriodicWorkRequestBuilder<CatalogRefreshWorker>(
-                repeatInterval = 6, repeatIntervalTimeUnit = TimeUnit.HOURS,
+                repeatInterval = repeat, repeatIntervalTimeUnit = unit,
                 flexTimeInterval = 1, flexTimeIntervalUnit = TimeUnit.HOURS
             )
                 .setConstraints(constraints)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                if (replace) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
+        }
+
+        private fun repeatFor(interval: RefreshInterval): Pair<Long, TimeUnit> = when (interval) {
+            RefreshInterval.HOURS_1 -> 1L to TimeUnit.HOURS
+            RefreshInterval.HOURS_4 -> 4L to TimeUnit.HOURS
+            RefreshInterval.HOURS_12 -> 12L to TimeUnit.HOURS
+            RefreshInterval.DAYS_1 -> 1L to TimeUnit.DAYS
+            RefreshInterval.DAYS_4 -> 4L to TimeUnit.DAYS
+            RefreshInterval.DAYS_7 -> 7L to TimeUnit.DAYS
+            RefreshInterval.DAYS_30 -> 30L to TimeUnit.DAYS
         }
     }
 }

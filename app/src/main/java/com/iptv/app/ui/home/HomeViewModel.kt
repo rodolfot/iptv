@@ -98,6 +98,28 @@ class HomeViewModel @Inject constructor(
     val favorites = favoriteDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    private val _initialLoading = MutableStateFlow(false)
+    val initialLoading = _initialLoading.asStateFlow()
+
+    /**
+     * Run on Home entry. If the cache is completely empty (first run, post-clear, or
+     * forced manual refresh), block the UI with the loading screen until refresh finishes.
+     * Otherwise, return immediately and let the per-section loaders handle stale-while-revalidate.
+     */
+    fun bootstrapCatalog(force: Boolean = false) {
+        viewModelScope.launch {
+            val movieCount = movieDao.observeAll().firstOrEmpty().size
+            val seriesCount = seriesDao.observeAll().firstOrEmpty().size
+            val liveCount = liveDao.observeAll().firstOrEmpty().size
+            val empty = movieCount == 0 && seriesCount == 0 && liveCount == 0
+            if (!empty && !force) return@launch
+            _initialLoading.value = true
+            cache.refreshAll()
+            _initialLoading.value = false
+            _lastUpdatedAt.value = cache.lastUpdatedAt()
+        }
+    }
+
     fun loadLiveCategories(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _liveCategories.value = _liveCategories.value.copy(loading = true, error = null)
@@ -312,6 +334,17 @@ class HomeViewModel @Inject constructor(
         loadLiveCategories(forceRefresh = true)
         loadMovieCategories(forceRefresh = true)
         loadSeriesCategories(forceRefresh = true)
+    }
+
+    private val _lastUpdatedAt = MutableStateFlow<Long?>(null)
+    val lastUpdatedAt = _lastUpdatedAt.asStateFlow()
+
+    init {
+        viewModelScope.launch { _lastUpdatedAt.value = cache.lastUpdatedAt() }
+    }
+
+    fun refreshLastUpdatedAt() {
+        viewModelScope.launch { _lastUpdatedAt.value = cache.lastUpdatedAt() }
     }
 
     private fun refreshEpgNowFor(items: List<LiveChannel>) {

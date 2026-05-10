@@ -21,7 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.iptv.app.R
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -89,8 +89,8 @@ fun ParentalPinDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
-                    Button(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
-                    Button(onClick = {
+                    TouchableButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+                    TouchableButton(onClick = {
                         if (pin == expectedPin) onUnlocked() else error = true
                     }) { Text(stringResource(R.string.ok)) }
                 }
@@ -150,10 +150,10 @@ fun ParentalPinSetupDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                 ) {
-                    Button(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+                    TouchableButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
                     val minLen = stringResource(R.string.parental_min_length)
                     val mismatch = stringResource(R.string.parental_mismatch)
-                    Button(onClick = {
+                    TouchableButton(onClick = {
                         when {
                             pin.length < 4 -> error = minLen
                             pin != confirm -> error = mismatch

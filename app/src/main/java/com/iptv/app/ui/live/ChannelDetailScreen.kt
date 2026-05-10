@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -43,7 +43,7 @@ import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.epg.EpgRepository
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.model.LiveChannel
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -127,17 +127,18 @@ fun ChannelDetailScreen(
     vm: ChannelDetailViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
+    val dim = rememberTvDim()
     LaunchedEffect(channel.id) { vm.load(channel) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Button(onClick = onBack) { Text(stringResource(R.string.back)) }
+        TouchableButton(onClick = onBack) { Text(stringResource(R.string.back)) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Box(
@@ -160,7 +161,7 @@ fun ChannelDetailScreen(
                     Text("Canal $it", style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = {
+                    TouchableButton(onClick = {
                         onPlay(
                             PlayerArgs(
                                 kind = PlayerKind.LIVE,
@@ -172,7 +173,7 @@ fun ChannelDetailScreen(
                     }) {
                         Text(stringResource(R.string.channel_play))
                     }
-                    Button(onClick = { vm.toggleFavorite(channel) }) {
+                    TouchableButton(onClick = { vm.toggleFavorite(channel) }) {
                         Text(stringResource(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
@@ -183,13 +184,13 @@ fun ChannelDetailScreen(
                         modifier = Modifier.padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(onClick = {
+                        TouchableButton(onClick = {
                             onPlay(timeshiftArgs(channel, minutesAgo = 30))
                         }) { Text(stringResource(R.string.channel_timeshift_30)) }
-                        Button(onClick = {
+                        TouchableButton(onClick = {
                             onPlay(timeshiftArgs(channel, minutesAgo = 60))
                         }) { Text(stringResource(R.string.channel_timeshift, 1)) }
-                        Button(onClick = {
+                        TouchableButton(onClick = {
                             onPlay(timeshiftArgs(channel, minutesAgo = 120))
                         }) { Text(stringResource(R.string.channel_timeshift, 2)) }
                     }

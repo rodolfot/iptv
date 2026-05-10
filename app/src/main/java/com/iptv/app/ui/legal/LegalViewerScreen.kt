@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -13,12 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
+import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.R
-import com.iptv.app.ui.common.TvDim
+import com.iptv.app.ui.common.rememberTvDim
 
 enum class LegalDoc { TERMS, PRIVACY }
 
@@ -26,6 +27,7 @@ enum class LegalDoc { TERMS, PRIVACY }
 @Composable
 fun LegalViewerScreen(doc: LegalDoc, onClose: () -> Unit) {
     val context = LocalContext.current
+    val dim = rememberTvDim()
     val text = remember(doc) {
         when (doc) {
             LegalDoc.TERMS -> LegalText.terms(context)
@@ -43,7 +45,8 @@ fun LegalViewerScreen(doc: LegalDoc, onClose: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = TvDim.ScreenPadding, vertical = 24.dp),
+            .safeDrawingPadding()
+            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(title, style = MaterialTheme.typography.headlineSmall)
@@ -54,6 +57,6 @@ fun LegalViewerScreen(doc: LegalDoc, onClose: () -> Unit) {
         ) {
             Text(text, style = MaterialTheme.typography.bodyMedium)
         }
-        Button(onClick = onClose) { Text(stringResource(R.string.close)) }
+        TouchableButton(onClick = onClose) { Text(stringResource(R.string.close)) }
     }
 }
