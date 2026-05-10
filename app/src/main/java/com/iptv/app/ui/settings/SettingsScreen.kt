@@ -311,6 +311,8 @@ fun SettingsScreen(
             Text(stringResource(R.string.settings_reset_progress))
         }
 
+        NotificationsPermissionSection()
+
         Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
         TouchableButton(onClick = { aboutOpen = true }) {
             Text(stringResource(R.string.settings_open_about))
@@ -321,5 +323,34 @@ fun SettingsScreen(
             vm.logout()
             onLogout()
         }) { Text(stringResource(R.string.settings_logout)) }
+    }
+}
+
+@Composable
+private fun NotificationsPermissionSection() {
+    if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var granted by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted -> granted = isGranted }
+
+    Text(stringResource(R.string.settings_notifications_title), style = MaterialTheme.typography.titleMedium)
+    if (granted) {
+        Text(
+            stringResource(R.string.settings_notifications_perm_granted),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    } else {
+        TouchableButton(onClick = {
+            launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }) { Text(stringResource(R.string.settings_notifications_perm)) }
     }
 }

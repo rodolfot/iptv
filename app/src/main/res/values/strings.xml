@@ -44,6 +44,23 @@
     <string name="profiles_pin_optional">PIN parental (opcional, 4–8 dígitos)</string>
     <string name="settings_profiles_button">Gerenciar perfis</string>
     <string name="profiles_active_label">Perfil ativo: %1$s</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_new_episodes">Novos episódios</string>
+    <string name="notif_channel_catalog">Atualização do catálogo</string>
+    <string name="notif_channel_resume">Continuar assistindo</string>
+    <string name="notif_channel_errors">Erros do servidor</string>
+    <string name="notif_new_episodes_title">Novos episódios disponíveis</string>
+    <string name="notif_new_episodes_text">%1$d nova(s) série(s) com episódios novos.</string>
+    <string name="notif_catalog_title">Catálogo atualizado</string>
+    <string name="notif_catalog_text">Sincronização concluída.</string>
+    <string name="notif_resume_title">Continue de onde parou</string>
+    <string name="notif_resume_text">Você tem títulos em andamento esperando você.</string>
+    <string name="notif_error_title">Servidor inacessível</string>
+    <string name="notif_error_text">Não foi possível atualizar o catálogo. Verifique sua conexão ou credenciais.</string>
+    <string name="settings_notifications_title">Notificações</string>
+    <string name="settings_notifications_perm">Conceder permissão de notificações</string>
+    <string name="settings_notifications_perm_granted">Permissão concedida.</string>
     <string name="retry">Tentar novamente</string>
     <string name="error_prefix">Erro: %1$s</string>
     <string name="cancel">Cancelar</string>

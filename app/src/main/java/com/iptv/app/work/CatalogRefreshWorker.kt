@@ -9,10 +9,16 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.iptv.app.R
+import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.cache.CatalogCacheRepository
+import com.iptv.app.data.db.FavoriteDao
 import com.iptv.app.data.epg.EpgRepository
 import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
+import com.iptv.app.domain.model.ContentType
+import com.iptv.app.notify.NotificationChannels
+import com.iptv.app.notify.Notifications
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -24,7 +30,9 @@ class CatalogRefreshWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val cache: CatalogCacheRepository,
     private val epg: EpgRepository,
-    private val settings: SettingsStore
+    private val settings: SettingsStore,
+    private val favorites: FavoriteDao,
+    private val xtream: XtreamRepository
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -32,8 +40,38 @@ class CatalogRefreshWorker @AssistedInject constructor(
         val s = settings.flow.first()
         if (!s.isLoggedIn) return Result.success()
 
+        val episodeCountsBefore = collectFavoriteEpisodeCounts()
+
         val errors = cache.refreshAll().toMutableList()
         epg.refresh().exceptionOrNull()?.let(errors::add)
+
+        val ctx = applicationContext
+        if (errors.isEmpty()) {
+            Notifications.show(
+                ctx, NotificationChannels.CATALOG, NOTIF_ID_CATALOG,
+                ctx.getString(R.string.notif_catalog_title),
+                ctx.getString(R.string.notif_catalog_text)
+            )
+            val episodeCountsAfter = collectFavoriteEpisodeCounts()
+            val seriesWithNew = episodeCountsAfter.count { (id, after) ->
+                val before = episodeCountsBefore[id]
+                before != null && after > before
+            }
+            if (seriesWithNew > 0) {
+                Notifications.show(
+                    ctx, NotificationChannels.NEW_EPISODES, NOTIF_ID_NEW_EPISODES,
+                    ctx.getString(R.string.notif_new_episodes_title),
+                    ctx.getString(R.string.notif_new_episodes_text, seriesWithNew)
+                )
+            }
+        } else if (runAttemptCount >= 3) {
+            Notifications.show(
+                ctx, NotificationChannels.ERRORS, NOTIF_ID_ERROR,
+                ctx.getString(R.string.notif_error_title),
+                ctx.getString(R.string.notif_error_text)
+            )
+        }
+
         return when {
             errors.isEmpty() -> Result.success()
             // Partial failure: retry with backoff up to a few times before giving up.
@@ -42,8 +80,25 @@ class CatalogRefreshWorker @AssistedInject constructor(
         }
     }
 
+    private suspend fun collectFavoriteEpisodeCounts(): Map<Int, Int> {
+        val seriesFavs = runCatching { favorites.observeByType(ContentType.SERIES).first() }
+            .getOrDefault(emptyList())
+        return seriesFavs.associate { fav ->
+            val count = runCatching { xtream.seriesInfo(fav.itemId) }
+                .getOrNull()
+                ?.episodes
+                ?.values
+                ?.sumOf { it.size }
+                ?: 0
+            fav.itemId to count
+        }
+    }
+
     companion object {
         private const val UNIQUE_NAME = "catalog_refresh"
+        private const val NOTIF_ID_CATALOG = 1001
+        private const val NOTIF_ID_NEW_EPISODES = 1002
+        private const val NOTIF_ID_ERROR = 1003
 
         /**
          * Schedule periodic refresh based on the user-chosen interval.

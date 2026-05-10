@@ -5,7 +5,9 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.diag.CrashLog
+import com.iptv.app.notify.Notifications
 import com.iptv.app.work.CatalogRefreshWorker
+import com.iptv.app.work.ResumeReminderWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,9 +30,11 @@ class IptvApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
+        Notifications.ensureChannels(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             val interval = settings.flow.first().refreshInterval
             CatalogRefreshWorker.schedule(this@IptvApp, interval)
+            ResumeReminderWorker.schedule(this@IptvApp)
         }
     }
 }
