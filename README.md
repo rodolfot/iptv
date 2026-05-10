@@ -118,6 +118,11 @@ A barra superior tem 7 abas. Use as setas para alternar:
 2. Edite URL/usuário/senha → **Testar conexão**
 3. Quando o teste passar, **Salvar e reconectar** atualiza tudo e recarrega o catálogo
 
+**Gerenciar múltiplos perfis (servidores)**
+1. **Config → Servidor → Gerenciar perfis**
+2. Adicione um novo perfil informando nome (ex: "Família"), URL, usuário, senha e — se quiser separar acesso adulto — um PIN parental dedicado a esse perfil
+3. Use **Usar** para trocar de perfil; o app reconecta e recarrega o catálogo automaticamente
+
 **Picture-in-Picture**
 - Durante reprodução, pressione o botão Home do dispositivo. O player desliza para o canto da tela em PiP. (Requer Android 8.0+ e dispositivo com PiP habilitado.)
 
@@ -148,9 +153,12 @@ Se algo der errado, vá em **Config → Sobre → Diagnóstico**. O app mantém 
 - **Time-shift** (`tv_archive`): voltar 30 min / 1 h / 2 h em canais que suportam
 - **Cache offline** de catálogo (TTL 6h, atualizado em background) e metadados de detalhe (TTL 24h)
 - **Auto-update** via GitHub Releases (notifica nova versão e abre a página de download)
-- **i18n**: pt-BR e en
+- **Multi-perfil**: vários servidores Xtream salvos com troca rápida e PIN parental por perfil
+- **Notificações**: novos episódios em séries favoritas, atualização de catálogo concluída, lembrete "continuar assistindo", erros do servidor
+- **i18n**: pt-BR, en e es
 - **Splash screen** com identidade do app
 - **Diagnóstico local** opt-in (sem telemetria, sem analytics, sem coleta externa)
+- **Edge-to-edge + safe-area**: layout respeita notch/Dynamic Island/gesture bar em celulares modernos
 
 ---
 
