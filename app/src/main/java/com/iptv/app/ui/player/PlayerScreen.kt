@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -400,11 +401,21 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { playerView }
         )
-        Column(modifier = Modifier.align(Alignment.TopStart).padding(24.dp)) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .safeDrawingPadding()
+                .padding(24.dp)
+        ) {
             Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
         }
         if (currentTracks != null) {
-            Box(modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .safeDrawingPadding()
+                    .padding(24.dp)
+            ) {
                 TouchableButton(onClick = { trackPickerOpen = true }) {
                     Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_tracks))
                 }

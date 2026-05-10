@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,11 +71,14 @@ fun PosterCard(
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
+    val cardModifier = if (dim.formFactor == FormFactor.Phone) {
+        Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+    } else {
+        Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
+    }
     TouchableCard(
         onClick = onClick,
-        modifier = Modifier
-            .width(dim.PosterCardW)
-            .height(dim.PosterCardH)
+        modifier = cardModifier
     ) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
             if (imageUrl.isNullOrBlank()) {
@@ -131,11 +135,14 @@ fun ChannelCard(
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
+    val channelModifier = if (dim.formFactor == FormFactor.Phone) {
+        Modifier.fillMaxWidth().height(dim.ChannelCardH)
+    } else {
+        Modifier.width(dim.ChannelCardW).height(dim.ChannelCardH)
+    }
     TouchableCard(
         onClick = onClick,
-        modifier = Modifier
-            .width(dim.ChannelCardW)
-            .height(dim.ChannelCardH)
+        modifier = channelModifier
     ) {
         Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
             Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
@@ -222,9 +229,14 @@ fun CategoryCard(
         FormFactor.Tablet -> Triple(280.dp, 120.dp, 16.dp)
         FormFactor.Tv -> Triple(360.dp, 140.dp, 20.dp)
     }
+    val categoryModifier = if (dim.formFactor == FormFactor.Phone) {
+        Modifier.fillMaxWidth().height(h)
+    } else {
+        Modifier.width(w).height(h)
+    }
     TouchableCard(
         onClick = onClick,
-        modifier = Modifier.width(w).height(h)
+        modifier = categoryModifier
     ) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(pad)) {
             Column(modifier = Modifier.align(Alignment.CenterStart)) {

@@ -185,6 +185,9 @@ fun SeriesSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadSeriesCategories()
     }
+    androidx.activity.compose.BackHandler(enabled = selectedCat != null && openSeries == null) {
+        selectedCat = null
+    }
 
     if (openSeries != null) {
         SeriesDetailScreen(
@@ -276,6 +279,9 @@ fun SeriesDetailScreen(
     var selectedSeason by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(seriesId) { vm.load(seriesId, title) }
+    androidx.activity.compose.BackHandler {
+        if (selectedSeason != null) selectedSeason = null else onBack()
+    }
 
     val seasonCols = when (dim.formFactor) {
         com.iptv.app.ui.common.FormFactor.Phone -> 2

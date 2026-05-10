@@ -48,6 +48,7 @@ fun AboutScreen(onClose: () -> Unit) {
         CrashLogScreen(onClose = { crashOpen = false })
         return
     }
+    androidx.activity.compose.BackHandler(onBack = onClose)
 
     Column(
         modifier = Modifier

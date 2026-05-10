@@ -32,6 +32,7 @@ fun CrashLogScreen(onClose: () -> Unit) {
     val context = LocalContext.current
     val dim = rememberTvDim()
     var contents by remember { mutableStateOf(CrashLog.read(context)) }
+    androidx.activity.compose.BackHandler(onBack = onClose)
 
     Column(
         modifier = Modifier

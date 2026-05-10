@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +40,7 @@ fun SortMenuButton(
 ) {
     var open by remember { mutableStateOf(false) }
     TouchableButton(onClick = { open = true }) {
-        Icon(Icons.Filled.Sort, contentDescription = null)
+        Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
         Text("  Ordenar: ${current.label}")
     }
     if (open) {

@@ -28,6 +28,7 @@ enum class LegalDoc { TERMS, PRIVACY }
 fun LegalViewerScreen(doc: LegalDoc, onClose: () -> Unit) {
     val context = LocalContext.current
     val dim = rememberTvDim()
+    androidx.activity.compose.BackHandler(onBack = onClose)
     val text = remember(doc) {
         when (doc) {
             LegalDoc.TERMS -> LegalText.terms(context)

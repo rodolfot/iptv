@@ -62,6 +62,9 @@ fun MoviesSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadMovieCategories()
     }
+    androidx.activity.compose.BackHandler(enabled = selectedCat != null) {
+        selectedCat = null
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         val catCols = when (dim.formFactor) {

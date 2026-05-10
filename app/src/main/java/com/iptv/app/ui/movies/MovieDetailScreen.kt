@@ -129,6 +129,7 @@ fun MovieDetailScreen(
     val state by vm.state.collectAsState()
     val dim = rememberTvDim()
     LaunchedEffect(args.streamId) { vm.load(args.streamId) }
+    androidx.activity.compose.BackHandler(onBack = onBack)
 
     Column(
         modifier = Modifier

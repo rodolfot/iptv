@@ -129,6 +129,7 @@ fun ChannelDetailScreen(
     val state by vm.state.collectAsState()
     val dim = rememberTvDim()
     LaunchedEffect(channel.id) { vm.load(channel) }
+    androidx.activity.compose.BackHandler(onBack = onBack)
 
     Column(
         modifier = Modifier
