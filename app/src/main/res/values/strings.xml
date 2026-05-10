@@ -28,6 +28,22 @@
     <string name="empty_list">Nada por aqui</string>
     <string name="nothing_found">Nada encontrado.</string>
     <string name="back">← Voltar</string>
+
+    <!-- Profiles -->
+    <string name="profiles_title">Perfis</string>
+    <string name="profiles_empty">Nenhum perfil salvo ainda. Adicione o primeiro abaixo.</string>
+    <string name="profiles_active_badge">ativo</string>
+    <string name="profiles_has_pin">Protegido por PIN</string>
+    <string name="profiles_use">Usar</string>
+    <string name="profiles_edit">Editar</string>
+    <string name="profiles_delete">Excluir</string>
+    <string name="profiles_add">Adicionar perfil</string>
+    <string name="profiles_new">Novo perfil</string>
+    <string name="profiles_save">Salvar</string>
+    <string name="profiles_name_label">Nome do perfil (ex: Família)</string>
+    <string name="profiles_pin_optional">PIN parental (opcional, 4–8 dígitos)</string>
+    <string name="settings_profiles_button">Gerenciar perfis</string>
+    <string name="profiles_active_label">Perfil ativo: %1$s</string>
     <string name="retry">Tentar novamente</string>
     <string name="error_prefix">Erro: %1$s</string>
     <string name="cancel">Cancelar</string>

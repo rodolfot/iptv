@@ -53,6 +53,18 @@ class SecureStore @Inject constructor(
         prefs.edit().clear().apply()
     }
 
+    fun getProfilesJson(): String? = prefs.getString(KEY_PROFILES, null)
+
+    fun saveProfilesJson(json: String) {
+        prefs.edit().putString(KEY_PROFILES, json).apply()
+    }
+
+    fun getActiveProfileId(): String? = prefs.getString(KEY_ACTIVE_PROFILE, null)
+
+    fun setActiveProfileId(id: String) {
+        prefs.edit().putString(KEY_ACTIVE_PROFILE, id).apply()
+    }
+
     companion object {
         private const val FILE_NAME = "tartatv_secure"
         private const val KEY_HOST = "host"
@@ -60,5 +72,7 @@ class SecureStore @Inject constructor(
         private const val KEY_PASS = "pass"
         private const val KEY_PIN = "pin"
         private const val KEY_LOGGED = "logged"
+        private const val KEY_PROFILES = "profiles_v1"
+        private const val KEY_ACTIVE_PROFILE = "active_profile_id"
     }
 }

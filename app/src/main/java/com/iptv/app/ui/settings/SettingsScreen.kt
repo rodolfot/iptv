@@ -70,6 +70,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun addProfile(profile: com.iptv.app.data.prefs.Profile) {
+        viewModelScope.launch { settings.addProfile(profile) }
+    }
+
+    fun deleteProfile(id: String) {
+        viewModelScope.launch { settings.deleteProfile(id) }
+    }
+
+    fun activateProfile(id: String, onActivated: () -> Unit) {
+        viewModelScope.launch {
+            settings.activateProfile(id)
+            onActivated()
+        }
+    }
+
     fun testCredentials(host: String, user: String, pass: String) {
         viewModelScope.launch {
             _testing.value = true
@@ -116,6 +131,7 @@ fun SettingsScreen(
     val dim = rememberTvDim()
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
+    var profilesOpen by remember { mutableStateOf(false) }
     var editingServer by remember { mutableStateOf(false) }
     var editHost by remember { mutableStateOf(s.host) }
     var editUser by remember { mutableStateOf(s.username) }
@@ -132,6 +148,18 @@ fun SettingsScreen(
         AboutScreen(onClose = { aboutOpen = false })
         return
     }
+    if (profilesOpen) {
+        ProfilesScreen(
+            vm = settingsVm,
+            settingsStoreFlow = vm.settingsFlow,
+            onClose = { profilesOpen = false },
+            onProfileActivated = {
+                profilesOpen = false
+                vm.refreshAll()
+            }
+        )
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -145,8 +173,22 @@ fun SettingsScreen(
         if (!editingServer) {
             Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
-            TouchableButton(onClick = { editingServer = true }) {
-                Text(stringResource(R.string.settings_change_server))
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                TouchableButton(onClick = { editingServer = true }) {
+                    Text(stringResource(R.string.settings_change_server))
+                }
+                TouchableButton(onClick = { profilesOpen = true }) {
+                    Text(stringResource(R.string.settings_profiles_button))
+                }
+            }
+            if (s.profiles.size > 1) {
+                Text(
+                    stringResource(R.string.profiles_active_label, s.profiles.firstOrNull { it.id == s.activeProfileId }?.name ?: "—"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         } else {
             OutlinedTextField(

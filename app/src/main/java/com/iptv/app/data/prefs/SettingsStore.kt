@@ -30,7 +30,9 @@ data class AppSettings(
     val seriesSort: SortOption = SortOption.ADDED_DATE_DESC,
     val favoritesSort: SortOption = SortOption.NAME_ASC,
     val extraAdultCategoryIds: Set<String> = emptySet(),
-    val refreshInterval: RefreshInterval = RefreshInterval.HOURS_12
+    val refreshInterval: RefreshInterval = RefreshInterval.HOURS_12,
+    val profiles: List<Profile> = emptyList(),
+    val activeProfileId: String? = null
 )
 
 enum class RefreshInterval(val ttlMs: Long, val labelRes: Int) {
@@ -93,8 +95,39 @@ class SettingsStore @Inject constructor(
             favoritesSort = SortOption.fromName(p[Keys.FAV_SORT]) ?: SortOption.NAME_ASC,
             extraAdultCategoryIds = (p[Keys.EXTRA_ADULT] ?: "")
                 .split(",").filter { it.isNotBlank() }.toSet(),
-            refreshInterval = RefreshInterval.fromName(p[Keys.REFRESH_INTERVAL]) ?: RefreshInterval.HOURS_12
+            refreshInterval = RefreshInterval.fromName(p[Keys.REFRESH_INTERVAL]) ?: RefreshInterval.HOURS_12,
+            profiles = Profile.listFromJson(secure.getProfilesJson()),
+            activeProfileId = secure.getActiveProfileId()
         )
+    }
+
+    suspend fun addProfile(profile: Profile) {
+        val current = Profile.listFromJson(secure.getProfilesJson()).toMutableList()
+        current.removeAll { it.id == profile.id }
+        current.add(profile)
+        secure.saveProfilesJson(Profile.listToJson(current))
+        bumpSecure()
+    }
+
+    suspend fun updateProfile(profile: Profile) = addProfile(profile)
+
+    suspend fun deleteProfile(id: String) {
+        val current = Profile.listFromJson(secure.getProfilesJson())
+            .filterNot { it.id == id }
+        secure.saveProfilesJson(Profile.listToJson(current))
+        if (secure.getActiveProfileId() == id) {
+            current.firstOrNull()?.let { activateProfile(it.id) }
+        }
+        bumpSecure()
+    }
+
+    suspend fun activateProfile(id: String) {
+        val target = Profile.listFromJson(secure.getProfilesJson())
+            .firstOrNull { it.id == id } ?: return
+        secure.saveCredentials(target.host, target.username, target.password)
+        target.pin?.let { secure.setPin(it) }
+        secure.setActiveProfileId(id)
+        bumpSecure()
     }
 
     private suspend fun migrateIfNeeded(snapshot: androidx.datastore.preferences.core.Preferences) {
@@ -125,7 +158,32 @@ class SettingsStore @Inject constructor(
 
     suspend fun saveCredentials(host: String, user: String, pass: String) {
         secure.saveCredentials(host, user, pass)
+        upsertActiveProfileFromCurrent(host, user, pass)
         bumpSecure()
+    }
+
+    /** Reflects the just-saved credentials into the active profile (or creates the first one). */
+    private fun upsertActiveProfileFromCurrent(host: String, user: String, pass: String) {
+        val current = Profile.listFromJson(secure.getProfilesJson()).toMutableList()
+        val activeId = secure.getActiveProfileId()
+        val existing = current.firstOrNull { it.id == activeId }
+        if (existing != null) {
+            val idx = current.indexOf(existing)
+            current[idx] = existing.copy(host = host, username = user, password = pass)
+        } else {
+            val derivedName = user.ifBlank { host }
+            val newProfile = Profile(
+                id = Profile.newId(),
+                name = derivedName,
+                host = host,
+                username = user,
+                password = pass,
+                pin = secure.getPin()
+            )
+            current.add(newProfile)
+            secure.setActiveProfileId(newProfile.id)
+        }
+        secure.saveProfilesJson(Profile.listToJson(current))
     }
 
     suspend fun setLoggedOut() {
