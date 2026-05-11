@@ -49,7 +49,8 @@ class OnboardingViewModel @Inject constructor(
     fun setLocale(tag: String?) {
         viewModelScope.launch {
             settings.setAppLocale(tag)
-            com.iptv.app.ui.common.LocaleManager.apply(tag)
+            if (tag.isNullOrBlank()) com.iptv.app.ui.common.LocaleManager.resetToSystem()
+            else com.iptv.app.ui.common.LocaleManager.apply(tag)
         }
     }
 

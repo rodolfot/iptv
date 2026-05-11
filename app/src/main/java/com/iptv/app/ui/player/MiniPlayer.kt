@@ -28,11 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Icon
-import androidx.tv.material3.IconButton
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
@@ -41,7 +40,6 @@ import kotlinx.coroutines.delay
  * Tapping the strip reopens the full PlayerScreen; the play/pause and close
  * controls operate directly on the shared ExoPlayer.
  */
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun MiniPlayer(
     holder: ActivePlaybackHolder,

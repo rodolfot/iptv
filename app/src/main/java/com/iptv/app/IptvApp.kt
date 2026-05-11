@@ -31,14 +31,12 @@ class IptvApp : Application(), Configuration.Provider {
         super.onCreate()
         CrashLog.install(this)
         Notifications.ensureChannels(this)
-        // Apply locale synchronously — must happen before the first activity
-        // inflates so views resolve the right strings.xml on first frame.
-        kotlinx.coroutines.runBlocking {
-            val tag = settings.flow.first().appLocale
-            com.iptv.app.ui.common.LocaleManager.apply(tag)
-        }
+        // Locale is applied via AppCompatDelegate inside the Compose tree once
+        // SettingsStore emits — doing it in `runBlocking` here was deadlocking
+        // because the DataStore IO scheduler hadn't started yet.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             val s = settings.flow.first()
+            com.iptv.app.ui.common.LocaleManager.apply(s.appLocale)
             CatalogRefreshWorker.schedule(this@IptvApp, s.refreshInterval)
             ResumeReminderWorker.schedule(this@IptvApp)
         }

@@ -22,10 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.iptv.app.R
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.foundation.text.KeyboardOptions
 
 class ParentalSession(private var unlockedAt: Long = 0L) {
@@ -38,7 +37,6 @@ class ParentalSession(private var unlockedAt: Long = 0L) {
  * Shown when accessing adult content. If [expectedPin] is null, prompts the user
  * to create one for the first time via [onPinCreated]; otherwise verifies it.
  */
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ParentalPinDialog(
     expectedPin: String?,
@@ -63,9 +61,7 @@ fun ParentalPinDialog(
     Dialog(onDismissRequest = onCancel) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            colors = androidx.tv.material3.SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier.width(480.dp).padding(28.dp),
@@ -99,7 +95,6 @@ fun ParentalPinDialog(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ParentalPinSetupDialog(
     onCreated: (String) -> Unit,
@@ -112,9 +107,7 @@ fun ParentalPinSetupDialog(
     Dialog(onDismissRequest = onCancel) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            colors = androidx.tv.material3.SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier.width(520.dp).padding(28.dp),

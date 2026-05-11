@@ -24,14 +24,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.R
 import com.iptv.app.diag.CrashLog
 import com.iptv.app.ui.common.rememberTvDim
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun CrashLogScreen(onClose: () -> Unit) {
     val context = LocalContext.current

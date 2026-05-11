@@ -17,9 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.R
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.ui.common.EmptyState
@@ -29,7 +28,6 @@ import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun WatchlistScreen(
     vm: HomeViewModel,

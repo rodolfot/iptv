@@ -143,12 +143,6 @@ fun AdvancedFiltersDialog(
     )
 }
 
-/**
- * Pulls a 4-digit year out of release-date strings as Xtream/TMDB return them:
- * "2021-08-15", "2021/08/15", "2021", or sometimes the bare year buried in noise.
- */
-fun parseYear(raw: String?): Int? {
-    if (raw.isNullOrBlank()) return null
-    val match = Regex("""\b(19|20)\d{2}\b""").find(raw)?.value
-    return match?.toIntOrNull()
-}
+// `parseYear` lives in :core (com.iptv.core.text). This alias preserves the
+// historical import path used across the UI code.
+fun parseYear(raw: String?): Int? = com.iptv.core.text.parseYear(raw)

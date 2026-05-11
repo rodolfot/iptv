@@ -18,3 +18,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "iptv"
 include(":app")
+include(":core")

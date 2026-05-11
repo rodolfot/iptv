@@ -15,15 +15,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.R
 import com.iptv.app.ui.common.rememberTvDim
 
 enum class LegalDoc { TERMS, PRIVACY }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun LegalViewerScreen(doc: LegalDoc, onClose: () -> Unit) {
     val context = LocalContext.current

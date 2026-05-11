@@ -27,11 +27,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import com.iptv.app.BuildConfig
 import com.iptv.app.R
 import com.iptv.app.data.prefs.SettingsStore
@@ -75,7 +73,6 @@ class UpdateViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { vm.checkOnce() }
@@ -85,9 +82,7 @@ fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
         Dialog(onDismissRequest = { vm.dismiss() }) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier.width(560.dp).padding(28.dp),

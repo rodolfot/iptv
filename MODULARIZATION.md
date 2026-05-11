@@ -1,6 +1,17 @@
 # Modularization plan
 
-Target layout (NOT yet applied — this is the planned split):
+## Current status
+
+* `:core` (`kotlin("jvm")`, JDK 17) — **created**. Hosts pure-JVM logic:
+  * `com.iptv.core.m3u.M3uParser` + `M3uTrack`
+  * `com.iptv.core.text.parseYear`
+  Both have their own JUnit tests inside the module; no Android dependency.
+  `:app` depends on `:core` via `project(":core")`. The old paths in `:app`
+  (`com.iptv.app.data.m3u.M3uParser`, `parseYear` in `AdvancedFilters.kt`)
+  still compile via `typealias` / delegation, so consumer code didn't move.
+* `:ui`, `:data`, `:domain` — not yet split. Documented below.
+
+Target layout (next steps):
 
 ```text
 :app          (com.android.application, Hilt entry, UI navigation)
@@ -32,18 +43,28 @@ Target layout (NOT yet applied — this is the planned split):
 * **`:ui` separate** unlocks parallel build with `:data` and lets us add a
   TV-specific `:ui-tv` later without rewriting screens.
 
-## Migration order (when we do it)
+## Migration order
 
-1. Create `:core` module. Move `data/m3u/M3uParser.kt`,
-   `ui/common/AdvancedFilters.kt::parseYear`. Migrate tests in
-   `app/src/test/java/com/iptv/app/data/m3u` to the new module's tests
-   folder. Build `:app` against it.
+1. ✅ **Create `:core`** — done. M3U parser + year extraction live here.
 2. Create `:domain` module. Move `domain/model/*.kt` and `domain/sort/*.kt`.
    Keep DTO mappers (which need `data/api/*`) in `:data`.
 3. Create `:data` module. Move `data/` packages. Hilt module migration: keep
    `AppModule.kt` in `:app` but split into `DataModule` / `NetworkModule` /
    `RoomModule` inside `:data`, exposing only DAOs/repos. Workers in `:app`.
 4. Create `:ui` module. Move `ui/` except `MainActivity` and `AppNav`.
+
+## Caveats learned from step 1
+
+* `kotlin("jvm")` modules need the plugin declared in the **root** `plugins {}`
+  block with `apply false` so child modules can `id("org.jetbrains.kotlin.jvm")`
+  without repeating the version. Otherwise Gradle errors out with
+  "plugin already on the classpath with an unknown version".
+* JDK 21 dev boxes default Kotlin's JVM target to 21, but `:app` uses 17. Pin
+  with `kotlin { jvmToolchain(17) }` in every JVM module to keep targets in
+  sync — otherwise Gradle fails the build with "Inconsistent JVM-target".
+* `typealias` shims at the old package path let us move types without rewriting
+  every call site at once. Delete the shims once all consumers reference the
+  new `:core` package.
 
 ## What's already prepared
 

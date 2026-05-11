@@ -13,20 +13,36 @@ import androidx.core.os.LocaleListCompat
  */
 object LocaleManager {
 
-    /** Apply [tag] now. Recreates activities; safe to call from app start. */
+    /**
+     * Apply [tag] now. Recreates activities — only call when the user explicitly
+     * picks a language. On null/blank we deliberately do nothing instead of
+     * calling `setApplicationLocales(empty)` because that triggers a needless
+     * activity recreate on launch even when the user never picked a locale.
+     */
     fun apply(tag: String?) {
-        val locales = if (tag.isNullOrBlank()) {
-            LocaleListCompat.getEmptyLocaleList()
-        } else {
-            LocaleListCompat.forLanguageTags(tag)
+        if (tag.isNullOrBlank()) {
+            // System default — no override needed. Returning early avoids the
+            // recreate-on-boot loop that was killing the Onboarding screen.
+            return
         }
-        AppCompatDelegate.setApplicationLocales(locales)
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
     }
 
-    /** All locales we ship translations for, in display order. */
+    /** Explicit "follow system" — used by the Settings → System option. */
+    fun resetToSystem() {
+        AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+    }
+
+    /**
+     * All locales we ship translations for, in display order. Tag values match
+     * the `values-*` resource folders we ship. Brazilian Portuguese lives in
+     * the default `values/` folder, so we use bare `pt` here — `pt-BR` would
+     * resolve to `values-pt-rBR/` which doesn't exist, dropping us back to the
+     * English fallback.
+     */
     val available: List<LocaleOption> = listOf(
         LocaleOption(null, "🌐 Sistema"),
-        LocaleOption("pt-BR", "Português (Brasil)"),
+        LocaleOption("pt", "Português (Brasil)"),
         LocaleOption("en", "English"),
         LocaleOption("es", "Español"),
         LocaleOption("it", "Italiano"),

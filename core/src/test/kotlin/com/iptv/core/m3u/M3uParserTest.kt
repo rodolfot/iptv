@@ -1,4 +1,4 @@
-package com.iptv.app.data.m3u
+package com.iptv.core.m3u
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

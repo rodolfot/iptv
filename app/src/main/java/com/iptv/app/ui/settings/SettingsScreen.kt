@@ -24,10 +24,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
@@ -68,7 +67,8 @@ class SettingsViewModel @Inject constructor(
     fun setAppLocale(tag: String?) {
         viewModelScope.launch {
             settings.setAppLocale(tag)
-            com.iptv.app.ui.common.LocaleManager.apply(tag)
+            if (tag.isNullOrBlank()) com.iptv.app.ui.common.LocaleManager.resetToSystem()
+            else com.iptv.app.ui.common.LocaleManager.apply(tag)
         }
     }
 
@@ -127,7 +127,6 @@ class SettingsViewModel @Inject constructor(
     fun clearTestResult() { _testResult.value = null }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     vm: HomeViewModel,

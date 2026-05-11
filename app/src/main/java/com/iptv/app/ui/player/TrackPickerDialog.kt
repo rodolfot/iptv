@@ -23,14 +23,11 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import com.iptv.app.R
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TrackPickerDialog(
     player: ExoPlayer,
@@ -44,9 +41,7 @@ fun TrackPickerDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -97,7 +92,6 @@ fun TrackPickerDialog(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun TrackSection(
     label: String,

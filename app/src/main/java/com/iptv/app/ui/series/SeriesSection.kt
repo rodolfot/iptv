@@ -30,9 +30,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.items as lazyItems
 import com.iptv.app.data.api.SeriesInfoDetail
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
@@ -215,7 +215,6 @@ class SeriesDetailViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SeriesSection(
     vm: HomeViewModel,
@@ -240,6 +239,9 @@ fun SeriesSection(
     }
     androidx.activity.compose.BackHandler(enabled = selectedCat != null && openSeries == null) {
         selectedCat = null
+    }
+    if (selectedCat != null && openSeries == null) {
+        com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
     }
 
     if (openSeries != null) {
@@ -269,8 +271,39 @@ fun SeriesSection(
             val needleCat = categoryFilter.trim().lowercase()
             val visibleCats = if (needleCat.isBlank()) cats.items
             else cats.items.filter { it.name.lowercase().contains(needleCat) }
+
+            // FTS hits across all categories — surfaces "Pokemon" even when
+            // the user hasn't entered the right category yet.
+            var foundSeries by remember { mutableStateOf<List<com.iptv.app.domain.model.Series>>(emptyList()) }
+            androidx.compose.runtime.LaunchedEffect(needleCat) {
+                foundSeries = vm.searchSeriesByName(needleCat)
+            }
+
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadSeriesCategories(forceRefresh = true) }) }
+
+            if (foundSeries.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.section_series_default) + " (${foundSeries.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    lazyItems(foundSeries) { s ->
+                        PosterCard(
+                            title = s.name,
+                            imageUrl = s.coverUrl,
+                            fallbackIcon = Icons.Filled.Tv
+                        ) {
+                            openSeries = Triple(s.id, s.name, s.coverUrl)
+                        }
+                    }
+                }
+            }
+
             PullToRefreshBox(
                 isRefreshing = cats.loading,
                 onRefresh = { vm.loadSeriesCategories(forceRefresh = true) },
@@ -297,20 +330,13 @@ fun SeriesSection(
             val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: seriesDefault
             val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
             if (isPhone) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Text(
+                    categoryName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
-                    Text(
-                        categoryName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -327,11 +353,9 @@ fun SeriesSection(
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
                     Text(
-                        "  $categoryName",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(start = 16.dp)
+                        categoryName,
+                        style = MaterialTheme.typography.headlineSmall
                     )
                     Box(modifier = Modifier.weight(1f))
                     TouchableButton(onClick = { filtersDialogOpen = true }) {
@@ -410,7 +434,6 @@ fun SeriesSection(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SeriesDetailScreen(
     seriesId: Int,

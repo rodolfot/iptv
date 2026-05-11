@@ -377,6 +377,24 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { settings.setPin(pin) }
     }
 
+    /**
+     * Cross-category typed search used by the section-level local filter:
+     * when the user is on the category grid and types a query, in addition to
+     * filtering category names we also surface matching items so they can jump
+     * straight from e.g. "Pokemon" → the series, without picking a category.
+     */
+    suspend fun searchMoviesByName(query: String, limit: Int = 60): List<Movie> =
+        if (query.trim().length < 2) emptyList()
+        else cache.searchMovies(query, limit).map { it.toDomain() }
+
+    suspend fun searchSeriesByName(query: String, limit: Int = 60): List<Series> =
+        if (query.trim().length < 2) emptyList()
+        else cache.searchSeries(query, limit).map { it.toDomain() }
+
+    suspend fun searchLiveByName(query: String, limit: Int = 60): List<LiveChannel> =
+        if (query.trim().length < 2) emptyList()
+        else cache.searchLive(query, limit).map { it.toDomain() }
+
     fun refreshAll() {
         loadLiveCategories(forceRefresh = true)
         loadMovieCategories(forceRefresh = true)

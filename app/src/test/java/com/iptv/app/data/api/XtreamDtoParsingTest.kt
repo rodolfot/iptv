@@ -101,7 +101,7 @@ class XtreamDtoParsingTest {
         val parsed = moshi.adapter(SeriesInfoResponse::class.java).fromJson(json)!!
         assertEquals("Show", parsed.info?.name)
         assertEquals(1, parsed.seasons?.size)
-        val episodes = parsed.episodes!!.getValue("1")
+        val episodes = parsed.normalizedEpisodes().getValue("1")
         assertEquals(2, episodes.size)
         assertEquals(1200, episodes[0].info?.durationSecs)
     }

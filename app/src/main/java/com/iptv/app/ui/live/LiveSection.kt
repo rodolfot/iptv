@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,9 +23,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.sort.SortOption
@@ -41,7 +41,6 @@ import com.iptv.app.ui.parental.ParentalSession
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun LiveSection(
     vm: HomeViewModel,
@@ -70,6 +69,9 @@ fun LiveSection(
     androidx.activity.compose.BackHandler(enabled = selectedCat != null) {
         selectedCat = null
     }
+    if (selectedCat != null) {
+        com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         val catCols = when (dim.formFactor) {
@@ -87,8 +89,36 @@ fun LiveSection(
             val needleCat = categoryFilter.trim().lowercase()
             val visibleCats = if (needleCat.isBlank()) cats.items
             else cats.items.filter { it.name.lowercase().contains(needleCat) }
+
+            // FTS hits across all categories.
+            var foundChannels by remember { mutableStateOf<List<com.iptv.app.domain.model.LiveChannel>>(emptyList()) }
+            androidx.compose.runtime.LaunchedEffect(needleCat) {
+                foundChannels = vm.searchLiveByName(needleCat)
+            }
+
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadLiveCategories(forceRefresh = true) }) }
+
+            if (foundChannels.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.section_live_default) + " (${foundChannels.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    lazyItems(foundChannels) { ch ->
+                        com.iptv.app.ui.common.ChannelCard(
+                            title = ch.name,
+                            number = ch.num,
+                            logoUrl = ch.logoUrl
+                        ) { onOpenChannel(ch) }
+                    }
+                }
+            }
+
             PullToRefreshBox(
                 isRefreshing = cats.loading,
                 onRefresh = { vm.loadLiveCategories(forceRefresh = true) },
@@ -120,20 +150,13 @@ fun LiveSection(
             val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: sectionDefault
             val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
             if (isPhone) {
-                Row(
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Text(
+                    categoryName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
-                    Text(
-                        categoryName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                )
                 Row(modifier = Modifier.padding(bottom = 8.dp)) {
                     SortMenuButton(
                         current = settings.liveSort,
@@ -142,11 +165,9 @@ fun LiveSection(
                 }
             } else {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
                     Text(
-                        "  $categoryName",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(start = 16.dp)
+                        categoryName,
+                        style = MaterialTheme.typography.headlineSmall
                     )
                     Box(modifier = Modifier.weight(1f))
                     SortMenuButton(

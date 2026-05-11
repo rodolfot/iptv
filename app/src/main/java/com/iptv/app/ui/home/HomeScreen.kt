@@ -28,11 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Tab
 import androidx.tv.material3.TabRow
-import androidx.tv.material3.Text
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -87,6 +87,7 @@ fun HomeScreen(
     vm: HomeViewModel = hiltViewModel()
 ) {
     val kidsMode by vm.kidsMode.collectAsState()
+    val headerBackController = remember { com.iptv.app.ui.common.HeaderBackController() }
     val visibleTabs = remember(kidsMode) {
         if (kidsMode) ALL_TABS.filter { it.key !in KIDS_HIDDEN } else ALL_TABS
     }
@@ -121,6 +122,9 @@ fun HomeScreen(
         }
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.iptv.app.ui.common.LocalHeaderBack provides headerBackController
+    ) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         UpdatePromptHost()
         Column(
@@ -138,15 +142,28 @@ fun HomeScreen(
             // SeriesDetail has its own nested back (season -> series root), so
             // it keeps its in-screen back button; we only hoist Back to the
             // header for the flat detail screens.
+            // Detail screens take precedence over section-internal back state
+            // — closing the detail must always pop the detail first.
+            val sectionBack = headerBackController.sectionBack.value
             val headerBack: (() -> Unit)? = when {
                 openMovie != null -> ({ openMovie = null })
                 openChannel != null -> ({ openChannel = null })
+                sectionBack != null -> sectionBack
                 else -> null
             }
             TopBar(
                 tabs = visibleTabs,
                 selectedKey = selectedKey,
-                onSelected = { selectedKey = it },
+                onSelected = {
+                    // Tapping a tab must take the user out of any open detail
+                    // — otherwise switching from "Movies → ${movie}" to Series
+                    // keeps the movie detail visible because the detail layer
+                    // wins over the tab-content layer in the `when` below.
+                    openMovie = null
+                    openChannel = null
+                    openSeries = null
+                    selectedKey = it
+                },
                 onBack = headerBack
             )
             when {
@@ -221,6 +238,7 @@ fun HomeScreen(
             }
         }
     }
+    } // CompositionLocalProvider(LocalHeaderBack)
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)

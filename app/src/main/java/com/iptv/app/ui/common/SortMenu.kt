@@ -22,14 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.iptv.app.R
 // Button replaced with TouchableButton from same package — no import needed.
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Icon
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import com.iptv.app.domain.sort.SortOption
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SortMenuButton(
     current: SortOption,
@@ -51,9 +49,7 @@ fun SortMenuButton(
         Dialog(onDismissRequest = { open = false }) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                colors = androidx.tv.material3.SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                color = MaterialTheme.colorScheme.surface
             ) {
                 Column(
                     modifier = Modifier

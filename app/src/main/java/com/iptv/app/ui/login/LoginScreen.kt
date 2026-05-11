@@ -39,35 +39,20 @@ import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.prefs.SettingsStore
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * If the user typed a bare host (no port), try a handful of common Xtream ports
- * concurrently and use the first one that successfully authenticates. The
- * original (port-less) URL is included so providers behind reverse proxies on
- * standard ports keep working.
+ * Returns the host(s) to try when logging in. We used to probe a handful of
+ * common Xtream ports in parallel, but providers behind reverse proxies were
+ * getting the wrong endpoint picked. Now we trust exactly what the user typed.
  */
-internal fun portCandidatesFor(normalizedHost: String): List<String> {
-    val withoutScheme = normalizedHost.removePrefix("http://").removePrefix("https://")
-    val pathSlash = withoutScheme.indexOf('/')
-    val authority = if (pathSlash < 0) withoutScheme else withoutScheme.substring(0, pathSlash)
-    if (':' in authority) return listOf(normalizedHost) // user pinned a port already
-    val scheme = if (normalizedHost.startsWith("https://")) "https" else "http"
-    val ports = listOf(8080, 8880, 80, 25461)
-    return buildList {
-        add(normalizedHost)
-        ports.forEach { add("$scheme://$authority:$it") }
-    }.distinct()
-}
+internal fun portCandidatesFor(normalizedHost: String): List<String> = listOf(normalizedHost)
 
 data class LoginUiState(
     val loading: Boolean = false,
-    val probing: Boolean = false,
     val error: String? = null,
     val success: Boolean = false
 )
@@ -89,61 +74,31 @@ class LoginViewModel @Inject constructor(
         val withScheme = if (rawHost.startsWith("http://") || rawHost.startsWith("https://"))
             rawHost else "http://$rawHost"
         val normalizedHost = withScheme.trimEnd('/')
-        val candidates = portCandidatesFor(normalizedHost)
-        // (delegates to top-level fun for test reach)
         viewModelScope.launch {
-            _state.value = LoginUiState(loading = true, probing = candidates.size > 1)
-            val resolved = if (candidates.size == 1) {
-                runCatching { repo.login(candidates.first(), user.trim(), pass.trim()) }
-                    .map { candidates.first() to it }
-            } else {
-                probePortsInParallel(candidates, user.trim(), pass.trim())
-            }
-            resolved.onSuccess { (chosenHost, resp) ->
-                val auth = resp.userInfo?.auth
-                val ok = auth == 1 || resp.userInfo?.username != null
-                if (ok) {
-                    settings.saveCredentials(chosenHost, user.trim(), pass.trim())
-                    _state.value = LoginUiState(success = true)
-                } else {
-                    _state.value = LoginUiState(error = "Credenciais inválidas: ${resp.userInfo?.message ?: "auth=0"}")
+            _state.value = LoginUiState(loading = true)
+            runCatching { repo.login(normalizedHost, user.trim(), pass.trim()) }
+                .onSuccess { resp ->
+                    val auth = resp.userInfo?.auth
+                    val ok = auth == 1 || resp.userInfo?.username != null
+                    if (ok) {
+                        settings.saveCredentials(normalizedHost, user.trim(), pass.trim())
+                        _state.value = LoginUiState(success = true)
+                    } else {
+                        _state.value = LoginUiState(error = "Credenciais inválidas: ${resp.userInfo?.message ?: "auth=0"}")
+                    }
                 }
-            }.onFailure {
-                val msg = it.message.orEmpty()
-                val friendly = when {
-                    msg.contains("404") -> "Servidor respondeu 404. Verifique se o host inclui a porta correta (ex.: http://seu-servidor.com:8080)."
-                    msg.contains("401") || msg.contains("403") -> "Credenciais recusadas pelo servidor."
-                    msg.contains("UnknownHost", ignoreCase = true) -> "Host não encontrado. Confira o endereço."
-                    msg.contains("timeout", ignoreCase = true) -> "Tempo esgotado conectando ao servidor."
-                    else -> msg.ifBlank { "Erro de conexão" }
+                .onFailure {
+                    val msg = it.message.orEmpty()
+                    val friendly = when {
+                        msg.contains("404") -> "Servidor respondeu 404. Verifique se o host inclui a porta correta (ex.: http://seu-servidor.com:8080)."
+                        msg.contains("401") || msg.contains("403") -> "Credenciais recusadas pelo servidor."
+                        msg.contains("UnknownHost", ignoreCase = true) -> "Host não encontrado. Confira o endereço."
+                        msg.contains("timeout", ignoreCase = true) -> "Tempo esgotado conectando ao servidor."
+                        else -> msg.ifBlank { "Erro de conexão" }
+                    }
+                    _state.value = LoginUiState(error = friendly)
                 }
-                _state.value = LoginUiState(error = friendly)
-            }
         }
-    }
-
-    private fun portCandidatesFor(normalizedHost: String): List<String> =
-        com.iptv.app.ui.login.portCandidatesFor(normalizedHost)
-
-    private suspend fun probePortsInParallel(
-        candidates: List<String>,
-        user: String,
-        pass: String
-    ): Result<Pair<String, com.iptv.app.data.api.LoginResponse>> = coroutineScope {
-        val deferreds = candidates.map { host ->
-            async {
-                runCatching {
-                    val resp = repo.login(host, user, pass)
-                    val ok = resp.userInfo?.auth == 1 || resp.userInfo?.username != null
-                    check(ok) { "auth=0" }
-                    host to resp
-                }
-            }
-        }
-        val results = deferreds.map { it.await() }
-        results.firstOrNull { it.isSuccess }
-            ?: results.firstOrNull { it.isFailure } // bubble up first failure for messaging
-            ?: Result.failure(IllegalStateException("Nenhuma porta respondeu"))
     }
 }
 
@@ -229,12 +184,7 @@ fun LoginScreen(
                 onClick = { vm.login(host, user, pass, fieldsRequired) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                val labelRes = when {
-                    state.probing -> R.string.login_probing
-                    state.loading -> R.string.login_connecting
-                    else -> R.string.login_button
-                }
-                Text(stringResource(labelRes))
+                Text(stringResource(if (state.loading) R.string.login_connecting else R.string.login_button))
             }
         }
     }

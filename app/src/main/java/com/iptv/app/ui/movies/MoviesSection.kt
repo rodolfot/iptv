@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.runtime.Composable
@@ -25,9 +26,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.sort.SortOption
@@ -47,7 +47,6 @@ import com.iptv.app.ui.parental.ParentalSession
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun MoviesSection(
     vm: HomeViewModel,
@@ -75,6 +74,11 @@ fun MoviesSection(
     androidx.activity.compose.BackHandler(enabled = selectedCat != null) {
         selectedCat = null
     }
+    // Surface the "back to categories" action up in the app top bar while the
+    // user is browsing inside one category.
+    if (selectedCat != null) {
+        com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         val catCols = when (dim.formFactor) {
@@ -95,8 +99,49 @@ fun MoviesSection(
             val needle = categoryFilter.trim().lowercase()
             val visibleCats = if (needle.isBlank()) cats.items
             else cats.items.filter { it.name.lowercase().contains(needle) }
+
+            // FTS lookup over titles so "pokemon" surfaces the movie even when
+            // the user hasn't entered any category. Empty when the query is
+            // shorter than 2 chars (matches SearchScreen's contract).
+            var foundMovies by remember { mutableStateOf<List<com.iptv.app.domain.model.Movie>>(emptyList()) }
+            androidx.compose.runtime.LaunchedEffect(needle) {
+                foundMovies = vm.searchMoviesByName(needle)
+            }
+
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadMovieCategories(forceRefresh = true) }) }
+
+            if (foundMovies.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.section_movies_default) + " (${foundMovies.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    lazyItems(foundMovies) { m ->
+                        PosterCard(
+                            title = m.name,
+                            imageUrl = m.posterUrl,
+                            fallbackIcon = Icons.Filled.Movie
+                        ) {
+                            onPlay(
+                                PlayerArgs(
+                                    kind = PlayerKind.MOVIE,
+                                    streamId = m.id,
+                                    title = m.name,
+                                    containerExtension = m.containerExtension,
+                                    posterUrl = m.posterUrl,
+                                    categoryId = m.categoryId
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
             PullToRefreshBox(
                 isRefreshing = cats.loading,
                 onRefresh = { vm.loadMovieCategories(forceRefresh = true) },
@@ -130,20 +175,15 @@ fun MoviesSection(
             val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: moviesDefault
             val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
             if (isPhone) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // Back lives in the app TopBar via RegisterHeaderBack; only the
+                // category name stays here as a header.
+                Text(
+                    categoryName,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
-                    Text(
-                        categoryName,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                )
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -160,11 +200,9 @@ fun MoviesSection(
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
                     Text(
-                        "  $categoryName",
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.padding(start = 16.dp)
+                        categoryName,
+                        style = MaterialTheme.typography.headlineSmall
                     )
                     Box(modifier = Modifier.weight(1f))
                     TouchableButton(onClick = { filtersDialogOpen = true }) {

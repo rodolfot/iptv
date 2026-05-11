@@ -39,10 +39,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.iptv.app.ui.common.TouchableButton
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Icon
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.data.cache.CatalogCacheRepository
 import com.iptv.app.data.cache.toDomain
 import com.iptv.app.data.prefs.SettingsStore
@@ -161,7 +160,6 @@ class SearchViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onPlay: (PlayerArgs) -> Unit,
@@ -213,7 +211,6 @@ fun SearchScreen(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: Boolean) {
     Row(
@@ -250,7 +247,6 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: B
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     TouchableButton(onClick = onClick) {
@@ -261,7 +257,6 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ResultsContent(
     results: SearchResults,
@@ -358,7 +353,6 @@ private fun ResultRow(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PreSearchPanel(
     history: List<String>,
@@ -396,7 +390,6 @@ private fun PreSearchPanel(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun HistoryChip(label: String, onClick: () -> Unit) {
     TouchableButton(onClick = onClick) {

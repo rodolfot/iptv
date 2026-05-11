@@ -29,9 +29,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.ui.home.HomeScreen
 import com.iptv.app.ui.legal.OnboardingScreen
@@ -83,7 +82,6 @@ class MainActivity : ComponentActivity() {
         // Listeners on the Compose side react via DisposableEffect, no extra code needed here.
     }
 
-    @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         enableEdgeToEdge()

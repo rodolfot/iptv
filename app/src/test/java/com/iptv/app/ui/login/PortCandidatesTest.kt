@@ -1,35 +1,30 @@
 package com.iptv.app.ui.login
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Port auto-detection was removed because providers behind reverse proxies were
+ * routing to the wrong endpoint when we probed extra ports in parallel. The
+ * function now just returns the host the user typed; this test pins that
+ * contract so a future "let's bring it back" PR has to deliberately update
+ * both sides.
+ */
 class PortCandidatesTest {
 
     @Test
-    fun `bare host gets common Xtream ports plus the original`() {
-        val cands = portCandidatesFor("http://example.com")
+    fun `returns only the host the user typed`() {
         assertEquals(
-            listOf(
-                "http://example.com",
-                "http://example.com:8080",
-                "http://example.com:8880",
-                "http://example.com:80",
-                "http://example.com:25461"
-            ),
-            cands
+            listOf("http://example.com"),
+            portCandidatesFor("http://example.com")
         )
-    }
-
-    @Test
-    fun `host with explicit port is left alone`() {
-        val cands = portCandidatesFor("http://example.com:1234")
-        assertEquals(listOf("http://example.com:1234"), cands)
-    }
-
-    @Test
-    fun `https scheme is preserved when generating candidates`() {
-        val cands = portCandidatesFor("https://secure.example")
-        assertTrue(cands.all { it.startsWith("https://") })
+        assertEquals(
+            listOf("http://example.com:1234"),
+            portCandidatesFor("http://example.com:1234")
+        )
+        assertEquals(
+            listOf("https://secure.example"),
+            portCandidatesFor("https://secure.example")
+        )
     }
 }

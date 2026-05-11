@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] — 2026-05-11
+
 ### Added
 
 - **Material3 puro** começou: `EmptyState` e `ErrorState` migrados de `androidx.tv.material3` para `androidx.compose.material3` puro. Wrapper `IptvText`/`IptvIcon` em `ui/common/IptvText.kt` deixa o caminho aberto pros próximos arquivos — basta trocar a linha de import. Tabs/cards focáveis pelo D-pad permanecem em `tv.material3` (D-pad é o motivo de existir).

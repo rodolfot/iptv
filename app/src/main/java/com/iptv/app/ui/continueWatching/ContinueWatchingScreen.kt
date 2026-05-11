@@ -29,9 +29,8 @@ import com.iptv.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.MovieCacheEntity
 import com.iptv.app.data.db.MovieProgressDao
@@ -98,7 +97,6 @@ class ContinueWatchingViewModel @Inject constructor(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ContinueWatchingScreen(
     onPlay: (PlayerArgs) -> Unit,
