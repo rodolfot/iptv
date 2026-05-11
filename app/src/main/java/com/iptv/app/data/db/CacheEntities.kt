@@ -31,7 +31,9 @@ data class LiveChannelCacheEntity(
     val categoryId: String?,
     val epgChannelId: String?,
     val addedTimestamp: Long,
-    val tvArchive: Boolean = false
+    val tvArchive: Boolean = false,
+    /** Concrete stream URL when the provider can't derive one (M3U). Null for Xtream. */
+    val streamUrl: String? = null
 )
 
 @Entity(tableName = "movie_cache")

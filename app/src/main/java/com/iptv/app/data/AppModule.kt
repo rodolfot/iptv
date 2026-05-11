@@ -70,6 +70,7 @@ object AppModule {
             .build()
 
     @Provides fun provideFavoriteDao(db: AppDatabase) = db.favoriteDao()
+    @Provides fun provideWatchlistDao(db: AppDatabase) = db.watchlistDao()
     @Provides fun provideEpisodeProgressDao(db: AppDatabase) = db.episodeProgressDao()
     @Provides fun provideMovieProgressDao(db: AppDatabase) = db.movieProgressDao()
     @Provides fun provideSeriesProgressDao(db: AppDatabase) = db.seriesProgressDao()
@@ -80,4 +81,8 @@ object AppModule {
     @Provides fun provideSeriesCacheDao(db: AppDatabase) = db.seriesCacheDao()
     @Provides fun provideEpgDao(db: AppDatabase) = db.epgDao()
     @Provides fun provideDetailCacheDao(db: AppDatabase) = db.detailCacheDao()
+
+    @Provides @Singleton
+    fun provideSyncBackend(): com.iptv.app.data.sync.SyncBackend =
+        com.iptv.app.data.sync.NoopSyncBackend()
 }

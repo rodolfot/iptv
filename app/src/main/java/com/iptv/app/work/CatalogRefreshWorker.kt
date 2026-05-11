@@ -14,6 +14,7 @@ import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.cache.CatalogCacheRepository
 import com.iptv.app.data.db.FavoriteDao
 import com.iptv.app.data.epg.EpgRepository
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.domain.model.ContentType
@@ -32,7 +33,8 @@ class CatalogRefreshWorker @AssistedInject constructor(
     private val epg: EpgRepository,
     private val settings: SettingsStore,
     private val favorites: FavoriteDao,
-    private val xtream: XtreamRepository
+    private val xtream: XtreamRepository,
+    private val currentProfile: CurrentProfile
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -81,7 +83,7 @@ class CatalogRefreshWorker @AssistedInject constructor(
     }
 
     private suspend fun collectFavoriteEpisodeCounts(): Map<Int, Int> {
-        val seriesFavs = runCatching { favorites.observeByType(ContentType.SERIES).first() }
+        val seriesFavs = runCatching { favorites.observeByType(currentProfile.id(), ContentType.SERIES).first() }
             .getOrDefault(emptyList())
         return seriesFavs.associate { fav ->
             val count = runCatching { xtream.seriesInfo(fav.itemId) }

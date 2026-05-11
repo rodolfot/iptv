@@ -3,7 +3,6 @@
 package com.iptv.app.ui.common
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -224,12 +223,15 @@ fun CategoryCard(
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
+    val isPhone = dim.formFactor == FormFactor.Phone
     val (w, h, pad) = when (dim.formFactor) {
-        FormFactor.Phone -> Triple(170.dp, 96.dp, 12.dp)
+        // Smaller, denser tiles on phone — caller asked to see more categories
+        // per viewport without horizontal scroll.
+        FormFactor.Phone -> Triple(170.dp, 68.dp, 10.dp)
         FormFactor.Tablet -> Triple(280.dp, 120.dp, 16.dp)
         FormFactor.Tv -> Triple(360.dp, 140.dp, 20.dp)
     }
-    val categoryModifier = if (dim.formFactor == FormFactor.Phone) {
+    val categoryModifier = if (isPhone) {
         Modifier.fillMaxWidth().height(h)
     } else {
         Modifier.width(w).height(h)
@@ -240,9 +242,20 @@ fun CategoryCard(
     ) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(pad)) {
             Column(modifier = Modifier.align(Alignment.CenterStart)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    title,
+                    style = if (isPhone) MaterialTheme.typography.titleSmall
+                    else MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
                 if (count != null) {
-                    Text("$count itens", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "$count itens",
+                        style = if (isPhone) MaterialTheme.typography.bodySmall
+                        else MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
             if (locked) {

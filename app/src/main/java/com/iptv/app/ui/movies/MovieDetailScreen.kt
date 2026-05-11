@@ -18,9 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,11 +38,13 @@ import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.FavoriteDao
 import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.db.MovieProgressDao
-import com.iptv.app.data.db.MovieProgressEntity
+import com.iptv.app.data.db.WatchlistDao
+import com.iptv.app.data.db.WatchlistEntity
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.domain.model.ContentType
+import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.player.PlayerArgs
-import com.iptv.app.ui.player.PlayerKind
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,6 +57,7 @@ data class MovieDetailUiState(
     val info: VodInfoDetail? = null,
     val resumeMs: Long = 0L,
     val isFavorite: Boolean = false,
+    val isInWatchlist: Boolean = false,
     val error: String? = null
 )
 
@@ -65,7 +65,9 @@ data class MovieDetailUiState(
 class MovieDetailViewModel @Inject constructor(
     private val repo: XtreamRepository,
     private val movieProgressDao: MovieProgressDao,
-    private val favoriteDao: FavoriteDao
+    private val favoriteDao: FavoriteDao,
+    private val watchlistDao: WatchlistDao,
+    private val currentProfile: CurrentProfile
 ) : ViewModel() {
     private val _state = MutableStateFlow(MovieDetailUiState())
     val state = _state.asStateFlow()
@@ -75,14 +77,16 @@ class MovieDetailViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching { repo.vodInfo(streamId) }
                 .onSuccess { resp ->
-                    val resume = movieProgressDao.getById(streamId)
+                    val pid = currentProfile.id()
+                    val resume = movieProgressDao.getById(pid, streamId)
                         ?.takeIf { !it.watched }
                         ?.positionMs ?: 0L
                     _state.value = _state.value.copy(
                         loading = false,
                         info = resp.info,
                         resumeMs = resume,
-                        isFavorite = isFavorite(streamId)
+                        isFavorite = isFavorite(pid, streamId),
+                        isInWatchlist = isInWatchlist(pid, streamId)
                     )
                 }
                 .onFailure { e ->
@@ -91,19 +95,26 @@ class MovieDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun isFavorite(id: Int): Boolean = try {
-        favoriteDao.observeAll().first()
+    private suspend fun isFavorite(profileId: String, id: Int): Boolean = try {
+        favoriteDao.observeAll(profileId).first()
+            .any { it.type == ContentType.MOVIE && it.itemId == id }
+    } catch (_: Throwable) { false }
+
+    private suspend fun isInWatchlist(profileId: String, id: Int): Boolean = try {
+        watchlistDao.observeAll(profileId).first()
             .any { it.type == ContentType.MOVIE && it.itemId == id }
     } catch (_: Throwable) { false }
 
     fun toggleFavorite(args: PlayerArgs) {
         viewModelScope.launch {
+            val pid = currentProfile.id()
             val current = _state.value.isFavorite
             if (current) {
-                favoriteDao.delete(ContentType.MOVIE, args.streamId)
+                favoriteDao.delete(pid, ContentType.MOVIE, args.streamId)
             } else {
                 favoriteDao.insert(
                     FavoriteEntity(
+                        profileId = pid,
                         type = ContentType.MOVIE,
                         itemId = args.streamId,
                         name = args.title,
@@ -114,6 +125,29 @@ class MovieDetailViewModel @Inject constructor(
                 )
             }
             _state.value = _state.value.copy(isFavorite = !current)
+        }
+    }
+
+    fun toggleWatchlist(args: PlayerArgs) {
+        viewModelScope.launch {
+            val pid = currentProfile.id()
+            val current = _state.value.isInWatchlist
+            if (current) {
+                watchlistDao.delete(pid, ContentType.MOVIE, args.streamId)
+            } else {
+                watchlistDao.insert(
+                    WatchlistEntity(
+                        profileId = pid,
+                        type = ContentType.MOVIE,
+                        itemId = args.streamId,
+                        name = args.title,
+                        logoUrl = args.posterUrl,
+                        categoryId = args.categoryId,
+                        containerExtension = args.containerExtension
+                    )
+                )
+            }
+            _state.value = _state.value.copy(isInWatchlist = !current)
         }
     }
 }
@@ -128,6 +162,11 @@ fun MovieDetailScreen(
 ) {
     val state by vm.state.collectAsState()
     val dim = rememberTvDim()
+    val snackbar = LocalSnackbar.current
+    val addedMsg = stringResource(R.string.snack_favorite_added)
+    val removedMsg = stringResource(R.string.snack_favorite_removed)
+    val watchlistAddedMsg = stringResource(R.string.snack_watchlist_added)
+    val watchlistRemovedMsg = stringResource(R.string.snack_watchlist_removed)
     LaunchedEffect(args.streamId) { vm.load(args.streamId) }
     androidx.activity.compose.BackHandler(onBack = onBack)
 
@@ -203,9 +242,22 @@ fun MovieDetailScreen(
                             Text(stringResource(R.string.movie_play))
                         }
                     }
-                    TouchableButton(onClick = { vm.toggleFavorite(args) }) {
+                    TouchableButton(onClick = {
+                        val wasFavorite = state.isFavorite
+                        vm.toggleFavorite(args)
+                        snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
+                    }) {
                         Text(stringResource(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
+                        ))
+                    }
+                    TouchableButton(onClick = {
+                        val wasInList = state.isInWatchlist
+                        vm.toggleWatchlist(args)
+                        snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
+                    }) {
+                        Text(stringResource(
+                            if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
                         ))
                     }
                 }

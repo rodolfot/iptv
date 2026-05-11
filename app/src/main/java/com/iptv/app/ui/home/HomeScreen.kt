@@ -50,22 +50,32 @@ import com.iptv.app.ui.live.LiveSection
 import com.iptv.app.ui.movies.MovieDetailScreen
 import com.iptv.app.ui.movies.MoviesSection
 import com.iptv.app.ui.parental.ParentalSession
+import com.iptv.app.ui.player.LocalPlaybackHolder
+import com.iptv.app.ui.player.MiniPlayer
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.search.SearchScreen
 import com.iptv.app.ui.series.SeriesDetailScreen
 import com.iptv.app.ui.series.SeriesSection
 import com.iptv.app.ui.settings.SettingsScreen
 import com.iptv.app.ui.update.UpdatePromptHost
+import com.iptv.app.ui.watchlist.WatchlistScreen
 
-private val TAB_LABELS = intArrayOf(
-    com.iptv.app.R.string.tab_home,
-    com.iptv.app.R.string.tab_search,
-    com.iptv.app.R.string.tab_live,
-    com.iptv.app.R.string.tab_movies,
-    com.iptv.app.R.string.tab_series,
-    com.iptv.app.R.string.tab_favorites,
-    com.iptv.app.R.string.tab_settings
+private data class TabSpec(val label: Int, val key: String)
+
+private val ALL_TABS = listOf(
+    TabSpec(com.iptv.app.R.string.tab_home, "home"),
+    TabSpec(com.iptv.app.R.string.tab_search, "search"),
+    TabSpec(com.iptv.app.R.string.tab_live, "live"),
+    TabSpec(com.iptv.app.R.string.tab_movies, "movies"),
+    TabSpec(com.iptv.app.R.string.tab_series, "series"),
+    TabSpec(com.iptv.app.R.string.tab_favorites, "favorites"),
+    TabSpec(com.iptv.app.R.string.tab_watchlist, "watchlist"),
+    TabSpec(com.iptv.app.R.string.tab_settings, "settings")
 )
+
+/** Search and Settings are hidden in Kids mode — children shouldn't be able to
+ *  edit credentials or jump to arbitrary content via free-text search. */
+private val KIDS_HIDDEN = setOf("search", "settings", "watchlist")
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -74,12 +84,24 @@ fun HomeScreen(
     onLogout: () -> Unit,
     vm: HomeViewModel = hiltViewModel()
 ) {
-    var selected by rememberSaveable { mutableStateOf(0) }
+    val kidsMode by vm.kidsMode.collectAsState()
+    val visibleTabs = remember(kidsMode) {
+        if (kidsMode) ALL_TABS.filter { it.key !in KIDS_HIDDEN } else ALL_TABS
+    }
+    var selectedKey by rememberSaveable { mutableStateOf(visibleTabs.first().key) }
+    // If the user just entered Kids mode and was on a hidden tab, snap back to home.
+    androidx.compose.runtime.LaunchedEffect(kidsMode) {
+        if (visibleTabs.none { it.key == selectedKey }) {
+            selectedKey = visibleTabs.first().key
+        }
+    }
     val parental = remember { ParentalSession() }
     var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
     var openMovie by remember { mutableStateOf<PlayerArgs?>(null) }
     var openChannel by remember { mutableStateOf<com.iptv.app.domain.model.LiveChannel?>(null) }
     val initialLoading by vm.initialLoading.collectAsState()
+    val playbackHolder = LocalPlaybackHolder.current
+    val showMiniPlayer = playbackHolder?.minimized?.value == true && playbackHolder.player != null
 
     LaunchedEffect(Unit) { vm.bootstrapCatalog() }
 
@@ -108,7 +130,7 @@ fun HomeScreen(
                     )
                 )
         ) {
-            TopBar(selected, { selected = it })
+            TopBar(visibleTabs, selectedKey, { selectedKey = it })
             when {
                 openMovie != null -> MovieDetailScreen(
                     args = openMovie!!,
@@ -121,32 +143,63 @@ fun HomeScreen(
                     onPlay = { args -> openChannel = null; onPlay(args) }
                 )
                 openSeries != null -> {
-                    val (id, title, _) = openSeries!!
+                    val (id, title, cover) = openSeries!!
                     SeriesDetailScreen(
                         seriesId = id,
                         title = title,
+                        coverUrl = cover,
                         onBack = { openSeries = null },
                         onPlay = onPlay
                     )
                 }
-                else -> when (selected) {
-                    0 -> ContinueWatchingScreen(onPlay = onPlay)
-                    1 -> SearchScreen(
+                else -> when (selectedKey) {
+                    "home" -> ContinueWatchingScreen(
+                        onPlay = onPlay,
+                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
+                    )
+                    "search" -> SearchScreen(
                         onPlay = handlePlay,
                         onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) },
                         onOpenChannel = { ch -> openChannel = ch }
                     )
-                    2 -> LiveSection(
+                    "live" -> LiveSection(
                         vm = vm,
                         parental = parental,
                         onPlay = onPlay,
                         onOpenChannel = { ch -> openChannel = ch }
                     )
-                    3 -> MoviesSection(vm = vm, parental = parental, onPlay = handlePlay)
-                    4 -> SeriesSection(vm = vm, onPlay = onPlay)
-                    5 -> FavoritesScreen(vm = vm, parental = parental, onPlay = handlePlay)
-                    6 -> SettingsScreen(vm = vm, onLogout = onLogout)
+                    "movies" -> MoviesSection(vm = vm, parental = parental, onPlay = handlePlay)
+                    "series" -> SeriesSection(vm = vm, onPlay = onPlay)
+                    "favorites" -> FavoritesScreen(vm = vm, parental = parental, onPlay = handlePlay)
+                    "watchlist" -> WatchlistScreen(
+                        vm = vm,
+                        onPlay = handlePlay,
+                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
+                    )
+                    "settings" -> SettingsScreen(vm = vm, onLogout = onLogout)
                 }
+            }
+        }
+        if (showMiniPlayer && playbackHolder != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    // MiniPlayer lives outside the Column that owns the
+                    // safeDrawing insets, so it must claim them itself —
+                    // otherwise it slides under the gesture bar / notch.
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                        )
+                    )
+            ) {
+                MiniPlayer(
+                    holder = playbackHolder,
+                    onExpand = {
+                        playbackHolder.args.value?.let { onPlay(it) }
+                    }
+                )
             }
         }
     }
@@ -154,16 +207,22 @@ fun HomeScreen(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun TopBar(selected: Int, onSelected: (Int) -> Unit) {
+private fun TopBar(
+    tabs: List<TabSpec>,
+    selectedKey: String,
+    onSelected: (String) -> Unit
+) {
     val dim = rememberTvDim()
+    val selectedIndex = tabs.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
     if (dim.formFactor == FormFactor.Phone) {
-        // Compact phone header: TartaTV banner above scrollable tabs, with status-bar inset
-        // so the camera notch / Dynamic Island never overlaps the controls.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
-                .windowInsetsPadding(WindowInsets.statusBars)
+                // `safeDrawing.only(Top)` covers the camera cutout / Dynamic Island,
+                // not just the basic status bar (`WindowInsets.statusBars` leaves
+                // notches uncovered on some manufacturers' edge-to-edge layouts).
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
         ) {
             Row(
                 modifier = Modifier
@@ -183,11 +242,11 @@ private fun TopBar(selected: Int, onSelected: (Int) -> Unit) {
                     .padding(horizontal = dim.ScreenPadding, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                itemsIndexed(TAB_LABELS.toTypedArray()) { i, resId ->
+                itemsIndexed(tabs) { _, spec ->
                     PhoneTab(
-                        label = stringResource(resId),
-                        selected = i == selected,
-                        onClick = { onSelected(i) }
+                        label = stringResource(spec.label),
+                        selected = spec.key == selectedKey,
+                        onClick = { onSelected(spec.key) }
                     )
                 }
             }
@@ -205,15 +264,15 @@ private fun TopBar(selected: Int, onSelected: (Int) -> Unit) {
             stringResource(com.iptv.app.R.string.app_name),
             style = MaterialTheme.typography.headlineMedium
         )
-        TabRow(selectedTabIndex = selected, modifier = Modifier.padding(start = 16.dp)) {
-            TAB_LABELS.forEachIndexed { i, resId ->
+        TabRow(selectedTabIndex = selectedIndex, modifier = Modifier.padding(start = 16.dp)) {
+            tabs.forEach { spec ->
                 Tab(
-                    selected = i == selected,
-                    onFocus = { onSelected(i) },
-                    onClick = { onSelected(i) }
+                    selected = spec.key == selectedKey,
+                    onFocus = { onSelected(spec.key) },
+                    onClick = { onSelected(spec.key) }
                 ) {
                     Text(
-                        stringResource(resId),
+                        stringResource(spec.label),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }

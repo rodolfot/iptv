@@ -46,6 +46,9 @@ interface LiveCacheDao {
     @Query("SELECT * FROM live_cache ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<LiveChannelCacheEntity>>
 
+    @Query("SELECT * FROM live_cache WHERE streamId = :streamId LIMIT 1")
+    suspend fun getById(streamId: Int): LiveChannelCacheEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<LiveChannelCacheEntity>)
 

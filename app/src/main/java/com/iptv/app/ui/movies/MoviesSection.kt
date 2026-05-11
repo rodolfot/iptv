@@ -33,9 +33,13 @@ import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ErrorState
+import com.iptv.app.ui.common.AdvancedFilters
+import com.iptv.app.ui.common.AdvancedFiltersDialog
 import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.PosterCard
+import com.iptv.app.ui.common.PullToRefreshBox
 import com.iptv.app.ui.common.SortMenuButton
+import com.iptv.app.ui.common.parseYear
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.parental.ParentalPinDialog
@@ -50,14 +54,20 @@ fun MoviesSection(
     parental: ParentalSession,
     onPlay: (PlayerArgs) -> Unit
 ) {
-    val cats by vm.movieCategories.collectAsState()
+    val rawCats by vm.movieCategories.collectAsState()
     val movies by vm.movies.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
+    val kidsAllowed by vm.kidsAllowedCategories.collectAsState()
+    val cats = if (kidsAllowed.isEmpty()) rawCats
+        else rawCats.copy(items = rawCats.items.filter { "movie:${it.id}" in kidsAllowed })
     val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingMovie by remember { mutableStateOf<PlayerArgs?>(null) }
     var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
+    var categoryFilter by rememberSaveable { mutableStateOf("") }
+    var advancedFilters by remember(selectedCat) { mutableStateOf(AdvancedFilters()) }
+    var filtersDialogOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadMovieCategories()
@@ -73,43 +83,100 @@ fun MoviesSection(
             com.iptv.app.ui.common.FormFactor.Tv -> 3
         }
         if (selectedCat == null) {
-            Text(stringResource(R.string.section_movie_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+            Text(stringResource(R.string.section_movie_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
+            // Local filter typed by the user, applied to the visible category names.
+            // Saves a round-trip and lets people drill into a category from a
+            // catalog with hundreds of entries.
+            LocalFilterField(
+                value = categoryFilter,
+                onValueChange = { categoryFilter = it },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val needle = categoryFilter.trim().lowercase()
+            val visibleCats = if (needle.isBlank()) cats.items
+            else cats.items.filter { it.name.lowercase().contains(needle) }
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadMovieCategories(forceRefresh = true) }) }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(catCols),
-                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+            PullToRefreshBox(
+                isRefreshing = cats.loading,
+                onRefresh = { vm.loadMovieCategories(forceRefresh = true) },
+                enabled = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
             ) {
-                items(cats.items) { cat ->
-                    CategoryCard(
-                        title = cat.name,
-                        count = null,
-                        locked = cat.isAdult && !parental.isUnlocked()
-                    ) {
-                        if (cat.isAdult && !parental.isUnlocked()) {
-                            pendingCategory = cat
-                        } else {
-                            selectedCat = cat.id
-                            vm.loadMovies(cat.id)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(catCols),
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+                ) {
+                    items(visibleCats) { cat ->
+                        CategoryCard(
+                            title = cat.name,
+                            count = null,
+                            locked = cat.isAdult && !parental.isUnlocked()
+                        ) {
+                            if (cat.isAdult && !parental.isUnlocked()) {
+                                pendingCategory = cat
+                            } else {
+                                selectedCat = cat.id
+                                vm.loadMovies(cat.id)
+                            }
                         }
                     }
                 }
             }
         } else {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
-                val moviesDefault = stringResource(R.string.section_movies_default)
-                Text(
-                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: moviesDefault}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-                Box(modifier = Modifier.weight(1f))
-                SortMenuButton(
-                    current = settings.moviesSort,
-                    options = SortOption.MOVIE_OPTIONS
-                ) { vm.setSort(SortScope.MOVIES, it) }
+            // Phone: stack title row above action row so a long category name
+            // doesn't push the buttons off-screen.
+            val moviesDefault = stringResource(R.string.section_movies_default)
+            val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: moviesDefault
+            val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhone) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                ) {
+                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                    Text(
+                        categoryName,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    TouchableButton(onClick = { filtersDialogOpen = true }) {
+                        Text(stringResource(
+                            if (advancedFilters.isActive) R.string.filters_button_active else R.string.filters_button
+                        ))
+                    }
+                    SortMenuButton(
+                        current = settings.moviesSort,
+                        options = SortOption.MOVIE_OPTIONS
+                    ) { vm.setSort(SortScope.MOVIES, it) }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                    Text(
+                        "  $categoryName",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    TouchableButton(onClick = { filtersDialogOpen = true }) {
+                        Text(stringResource(
+                            if (advancedFilters.isActive) R.string.filters_button_active else R.string.filters_button
+                        ))
+                    }
+                    SortMenuButton(
+                        current = settings.moviesSort,
+                        options = SortOption.MOVIE_OPTIONS
+                    ) { vm.setSort(SortScope.MOVIES, it) }
+                }
             }
             if (movies.loading && movies.items.isEmpty()) Text(stringResource(R.string.loading))
             movies.error?.let { ErrorState(message = it, onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) }) }
@@ -119,8 +186,18 @@ fun MoviesSection(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             val needle = localFilter.trim().lowercase()
-            val filteredMovies = if (needle.isBlank()) movies.items
-                else movies.items.filter { it.name.lowercase().contains(needle) }
+            val filteredMovies = movies.items.asSequence()
+                .filter { needle.isBlank() || it.name.lowercase().contains(needle) }
+                .filter { m ->
+                    val af = advancedFilters
+                    if (!af.isActive) return@filter true
+                    val year = parseYear(m.releaseDate)
+                    val yearOk = (af.yearMin == null || (year != null && year >= af.yearMin)) &&
+                        (af.yearMax == null || (year != null && year <= af.yearMax))
+                    val ratingOk = af.ratingMin == null || m.rating >= af.ratingMin
+                    yearOk && ratingOk
+                }
+                .toList()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(dim.MoviesGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
@@ -174,6 +251,18 @@ fun MoviesSection(
             },
             onCancel = { pendingMovie = null },
             onPinCreated = { vm.setParentalPin(it) }
+        )
+    }
+
+    if (filtersDialogOpen) {
+        AdvancedFiltersDialog(
+            initial = advancedFilters,
+            availableGenres = emptyList(),
+            onDismiss = { filtersDialogOpen = false },
+            onApply = {
+                advancedFilters = it
+                filtersDialogOpen = false
+            }
         )
     }
 }

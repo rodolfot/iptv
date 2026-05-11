@@ -31,8 +31,10 @@ import androidx.tv.material3.Text
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
+import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.work.CatalogRefreshWorker
@@ -53,6 +55,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val progressDao: EpisodeProgressDao,
     private val repo: XtreamRepository,
+    private val currentProfile: CurrentProfile,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
     private val _testing = MutableStateFlow(false)
@@ -61,7 +64,7 @@ class SettingsViewModel @Inject constructor(
     val testResult = _testResult.asStateFlow()
 
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
-    fun resetProgress() { viewModelScope.launch { progressDao.clearAll() } }
+    fun resetProgress() { viewModelScope.launch { progressDao.clearAll(currentProfile.id()) } }
 
     fun setRefreshInterval(interval: RefreshInterval) {
         viewModelScope.launch {
@@ -129,6 +132,10 @@ fun SettingsScreen(
     val testing by settingsVm.testing.collectAsState()
     val testResult by settingsVm.testResult.collectAsState()
     val dim = rememberTvDim()
+    val snackbar = LocalSnackbar.current
+    val pinSavedMsg = stringResource(R.string.snack_pin_saved)
+    val credsSavedMsg = stringResource(R.string.snack_credentials_saved)
+    val refreshingMsg = stringResource(R.string.snack_catalog_refreshing)
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
@@ -240,6 +247,7 @@ fun SettingsScreen(
                             editingServer = false
                             settingsVm.clearTestResult()
                             vm.refreshAll()
+                            snackbar?.show(credsSavedMsg)
                         }
                     }
                 ) { Text(stringResource(R.string.settings_save_credentials)) }
@@ -271,7 +279,10 @@ fun SettingsScreen(
         )
         TouchableButton(
             enabled = pin.length >= 4,
-            onClick = { settingsVm.setPin(pin) }
+            onClick = {
+                settingsVm.setPin(pin)
+                snackbar?.show(pinSavedMsg)
+            }
         ) {
             Text(stringResource(
                 if (s.isPinSet) R.string.settings_pin_save_set else R.string.settings_pin_save_unset
@@ -304,7 +315,10 @@ fun SettingsScreen(
             } ?: stringResource(R.string.settings_refresh_never),
             style = MaterialTheme.typography.bodySmall
         )
-        TouchableButton(onClick = { vm.bootstrapCatalog(force = true) }) {
+        TouchableButton(onClick = {
+            vm.bootstrapCatalog(force = true)
+            snackbar?.show(refreshingMsg)
+        }) {
             Text(stringResource(R.string.settings_refresh_now))
         }
         TouchableButton(onClick = { settingsVm.resetProgress() }) {

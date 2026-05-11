@@ -1,0 +1,1 @@
+Initial F-Droid submission. See CHANGELOG.md for the full history of features.

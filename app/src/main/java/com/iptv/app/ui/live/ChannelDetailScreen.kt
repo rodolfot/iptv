@@ -19,9 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,8 +39,10 @@ import com.iptv.app.data.db.EpgProgrammeEntity
 import com.iptv.app.data.db.FavoriteDao
 import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.epg.EpgRepository
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.model.LiveChannel
+import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
@@ -66,7 +66,8 @@ data class ChannelDetailState(
 @HiltViewModel
 class ChannelDetailViewModel @Inject constructor(
     private val epg: EpgRepository,
-    private val favoriteDao: FavoriteDao
+    private val favoriteDao: FavoriteDao,
+    private val currentProfile: CurrentProfile
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChannelDetailState())
     val state = _state.asStateFlow()
@@ -75,7 +76,7 @@ class ChannelDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 loading = true,
-                isFavorite = isFavorite(channel.id)
+                isFavorite = isFavorite(currentProfile.id(), channel.id)
             )
             val epgChannelId = channel.epgChannelId
             if (epgChannelId.isNullOrBlank()) {
@@ -94,12 +95,14 @@ class ChannelDetailViewModel @Inject constructor(
 
     fun toggleFavorite(channel: LiveChannel) {
         viewModelScope.launch {
+            val pid = currentProfile.id()
             val current = _state.value.isFavorite
             if (current) {
-                favoriteDao.delete(ContentType.LIVE, channel.id)
+                favoriteDao.delete(pid, ContentType.LIVE, channel.id)
             } else {
                 favoriteDao.insert(
                     FavoriteEntity(
+                        profileId = pid,
                         type = ContentType.LIVE,
                         itemId = channel.id,
                         name = channel.name,
@@ -112,8 +115,8 @@ class ChannelDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun isFavorite(id: Int): Boolean = try {
-        favoriteDao.observeAll().first()
+    private suspend fun isFavorite(profileId: String, id: Int): Boolean = try {
+        favoriteDao.observeAll(profileId).first()
             .any { it.type == ContentType.LIVE && it.itemId == id }
     } catch (_: Throwable) { false }
 }
@@ -128,6 +131,9 @@ fun ChannelDetailScreen(
 ) {
     val state by vm.state.collectAsState()
     val dim = rememberTvDim()
+    val snackbar = LocalSnackbar.current
+    val addedMsg = stringResource(R.string.snack_favorite_added)
+    val removedMsg = stringResource(R.string.snack_favorite_removed)
     LaunchedEffect(channel.id) { vm.load(channel) }
     androidx.activity.compose.BackHandler(onBack = onBack)
 
@@ -174,7 +180,11 @@ fun ChannelDetailScreen(
                     }) {
                         Text(stringResource(R.string.channel_play))
                     }
-                    TouchableButton(onClick = { vm.toggleFavorite(channel) }) {
+                    TouchableButton(onClick = {
+                        val wasFavorite = state.isFavorite
+                        vm.toggleFavorite(channel)
+                        snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
+                    }) {
                         Text(stringResource(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
@@ -240,16 +250,36 @@ private fun timeshiftArgs(channel: LiveChannel, minutesAgo: Int): PlayerArgs =
 @Composable
 private fun ProgrammeRow(p: EpgProgrammeEntity, isNow: Boolean) {
     val timeFmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val dim = rememberTvDim()
+    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+    val titleColor = if (isNow) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+    val timeText = "${timeFmt.format(Date(p.startMs))}–${timeFmt.format(Date(p.stopMs))}"
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = if (isPhone) 8.dp else 4.dp)
     ) {
-        Text(
-            "${timeFmt.format(Date(p.startMs))}–${timeFmt.format(Date(p.stopMs))}  •  ${p.title}",
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (isNow) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-        )
+        if (isPhone) {
+            // Two-line layout: time on top in a label color, then the full title with
+            // wrapping. Avoids ellipsizing program names on narrow screens.
+            Text(
+                timeText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                p.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = titleColor
+            )
+        } else {
+            Text(
+                "$timeText  •  ${p.title}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = titleColor
+            )
+        }
         if (isNow) {
             val span = (p.stopMs - p.startMs).coerceAtLeast(1)
             val progress = ((System.currentTimeMillis() - p.startMs).toFloat() / span)
@@ -270,7 +300,11 @@ private fun ProgrammeRow(p: EpgProgrammeEntity, isNow: Boolean) {
             }
         }
         p.description?.takeIf { it.isNotBlank() }?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall)
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 }

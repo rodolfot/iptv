@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Monochrome small-icon for status-bar notifications. Android applies only the
+  alpha channel of this drawable, so we render the TartaTV "T+V" mark as a flat
+  white silhouette inscribed in a 24dp viewport.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="#FFFFFF">
+    <!-- T -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M3,4h18v14H3z M5,6v10h14V6z M2,20h20v2H2z" />
+        android:pathData="M2,5 L13,5 L13,8.4 L9.05,8.4 L9.05,19 L5.95,19 L5.95,8.4 L2,8.4 Z" />
+    <!-- V -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13.5,5 L16.4,5 L18.5,13.4 L20.6,5 L23.5,5 L19.9,19 L17.1,19 Z" />
 </vector>

@@ -3,7 +3,6 @@ package com.iptv.app.data.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.iptv.app.domain.sort.SortOption
@@ -11,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +32,8 @@ data class AppSettings(
     val extraAdultCategoryIds: Set<String> = emptySet(),
     val refreshInterval: RefreshInterval = RefreshInterval.HOURS_12,
     val profiles: List<Profile> = emptyList(),
-    val activeProfileId: String? = null
+    val activeProfileId: String? = null,
+    val searchHistory: List<String> = emptyList()
 )
 
 enum class RefreshInterval(val ttlMs: Long, val labelRes: Int) {
@@ -71,6 +72,8 @@ class SettingsStore @Inject constructor(
         val FAV_SORT = stringPreferencesKey("fav_sort")
         val EXTRA_ADULT = stringPreferencesKey("extra_adult")
         val REFRESH_INTERVAL = stringPreferencesKey("refresh_interval")
+        val SEARCH_HISTORY = stringPreferencesKey("search_history_v1")
+        val SKIPPED_UPDATE = stringPreferencesKey("skipped_update_version")
     }
 
     // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
@@ -97,9 +100,41 @@ class SettingsStore @Inject constructor(
                 .split(",").filter { it.isNotBlank() }.toSet(),
             refreshInterval = RefreshInterval.fromName(p[Keys.REFRESH_INTERVAL]) ?: RefreshInterval.HOURS_12,
             profiles = Profile.listFromJson(secure.getProfilesJson()),
-            activeProfileId = secure.getActiveProfileId()
+            activeProfileId = secure.getActiveProfileId(),
+            searchHistory = decodeHistory(p[Keys.SEARCH_HISTORY])
         )
     }
+
+    suspend fun skipUpdate(version: String) {
+        context.dataStore.edit { it[Keys.SKIPPED_UPDATE] = version }
+    }
+
+    suspend fun skippedUpdate(): String? =
+        context.dataStore.data.map { it[Keys.SKIPPED_UPDATE] }.first()
+
+    suspend fun pushSearchHistory(term: String) {
+        val cleaned = term.trim()
+        if (cleaned.length < 2) return
+        context.dataStore.edit { p ->
+            val current = decodeHistory(p[Keys.SEARCH_HISTORY]).toMutableList()
+            current.removeAll { it.equals(cleaned, ignoreCase = true) }
+            current.add(0, cleaned)
+            p[Keys.SEARCH_HISTORY] = encodeHistory(current.take(MAX_SEARCH_HISTORY))
+        }
+    }
+
+    suspend fun clearSearchHistory() {
+        context.dataStore.edit { it.remove(Keys.SEARCH_HISTORY) }
+    }
+
+    private fun decodeHistory(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
+        // Stored as newline-separated strings to keep arbitrary characters (commas,
+        // spaces, accents) safe without an extra JSON dependency.
+        return raw.split('\n').map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    private fun encodeHistory(items: List<String>): String = items.joinToString("\n")
 
     suspend fun addProfile(profile: Profile) {
         val current = Profile.listFromJson(secure.getProfilesJson()).toMutableList()
@@ -122,11 +157,14 @@ class SettingsStore @Inject constructor(
     }
 
     suspend fun activateProfile(id: String) {
-        val target = Profile.listFromJson(secure.getProfilesJson())
-            .firstOrNull { it.id == id } ?: return
+        val current = Profile.listFromJson(secure.getProfilesJson()).toMutableList()
+        val target = current.firstOrNull { it.id == id } ?: return
         secure.saveCredentials(target.host, target.username, target.password)
         target.pin?.let { secure.setPin(it) }
         secure.setActiveProfileId(id)
+        val touched = target.copy(lastUsedAt = System.currentTimeMillis())
+        current[current.indexOf(target)] = touched
+        secure.saveProfilesJson(Profile.listToJson(current))
         bumpSecure()
     }
 
@@ -230,3 +268,5 @@ class SettingsStore @Inject constructor(
 }
 
 enum class SortScope { LIVE, MOVIES, SERIES, FAVORITES }
+
+private const val MAX_SEARCH_HISTORY = 10

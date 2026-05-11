@@ -37,17 +37,27 @@ import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
 import com.iptv.app.data.db.SeriesProgressDao
 import com.iptv.app.data.db.SeriesProgressEntity
+import com.iptv.app.data.db.WatchlistDao
+import com.iptv.app.data.db.WatchlistEntity
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.data.prefs.SortScope
+import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.Season
 import com.iptv.app.domain.model.toModel
 import com.iptv.app.domain.sort.SortOption
+import com.iptv.app.ui.common.AdvancedFilters
+import com.iptv.app.ui.common.AdvancedFiltersDialog
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.LocalFilterField
+import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.PosterCard
+import com.iptv.app.ui.common.PullToRefreshBox
 import com.iptv.app.ui.common.SortMenuButton
+import com.iptv.app.ui.common.parseYear
 import com.iptv.app.ui.common.rememberTvDim
+import kotlinx.coroutines.flow.first
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
@@ -65,7 +75,9 @@ data class SeriesDetail(
     val resume: SeriesResume? = null,
     val watchedEpisodes: Set<String> = emptySet(),
     val episodePercents: Map<String, Int> = emptyMap(),
-    val info: SeriesInfoDetail? = null
+    val info: SeriesInfoDetail? = null,
+    val isInWatchlist: Boolean = false,
+    val coverUrl: String? = null
 )
 
 data class SeriesResume(
@@ -78,12 +90,14 @@ data class SeriesResume(
 class SeriesDetailViewModel @Inject constructor(
     private val repo: XtreamRepository,
     private val episodeProgressDao: EpisodeProgressDao,
-    private val seriesProgressDao: SeriesProgressDao
+    private val seriesProgressDao: SeriesProgressDao,
+    private val watchlistDao: WatchlistDao,
+    private val currentProfile: CurrentProfile
 ) : ViewModel() {
     private val _state = MutableStateFlow<SeriesDetail?>(null)
     val state = _state.asStateFlow()
 
-    fun load(id: Int, title: String) {
+    fun load(id: Int, title: String, coverUrl: String? = null) {
         viewModelScope.launch {
             runCatching { repo.seriesInfo(id) }
                 .onSuccess { resp ->
@@ -98,13 +112,18 @@ class SeriesDetailViewModel @Inject constructor(
                         }
                     } else seasons.sortedBy { it.seasonNumber }
 
-                    val progressBySeries = episodeProgressDao.getBySeries(id)
+                    val pid = currentProfile.id()
+                    val progressBySeries = episodeProgressDao.getBySeries(pid, id)
                     val watched = progressBySeries.filter { it.watched }.map { it.episodeId }.toSet()
                     val percents = progressBySeries
                         .filter { !it.watched && it.durationMs > 0 }
                         .associate { it.episodeId to ((it.positionMs * 100L) / it.durationMs).toInt().coerceIn(0, 100) }
 
-                    val resume = buildResume(id, episodesMap, progressBySeries)
+                    val resume = buildResume(pid, id, episodesMap, progressBySeries)
+                    val inWatchlist = runCatching {
+                        watchlistDao.observeAll(pid).first()
+                            .any { it.type == ContentType.SERIES && it.itemId == id }
+                    }.getOrDefault(false)
 
                     _state.value = SeriesDetail(
                         seriesId = id,
@@ -114,13 +133,39 @@ class SeriesDetailViewModel @Inject constructor(
                         resume = resume,
                         watchedEpisodes = watched,
                         episodePercents = percents,
-                        info = resp.info
+                        info = resp.info,
+                        isInWatchlist = inWatchlist,
+                        coverUrl = coverUrl
                     )
                 }
         }
     }
 
+    fun toggleWatchlist() {
+        val current = _state.value ?: return
+        viewModelScope.launch {
+            val pid = currentProfile.id()
+            if (current.isInWatchlist) {
+                watchlistDao.delete(pid, ContentType.SERIES, current.seriesId)
+            } else {
+                watchlistDao.insert(
+                    WatchlistEntity(
+                        profileId = pid,
+                        type = ContentType.SERIES,
+                        itemId = current.seriesId,
+                        name = current.title,
+                        logoUrl = current.coverUrl,
+                        categoryId = null,
+                        containerExtension = null
+                    )
+                )
+            }
+            _state.value = current.copy(isInWatchlist = !current.isInWatchlist)
+        }
+    }
+
     private suspend fun buildResume(
+        profileId: String,
         seriesId: Int,
         episodesMap: Map<Int, List<Episode>>,
         progress: List<EpisodeProgressEntity>
@@ -139,7 +184,7 @@ class SeriesDetailViewModel @Inject constructor(
                 return SeriesResume(ep, inProgress.positionMs, pct)
             }
         }
-        val seriesLast: SeriesProgressEntity? = seriesProgressDao.getById(seriesId)
+        val seriesLast: SeriesProgressEntity? = seriesProgressDao.getById(profileId, seriesId)
         if (seriesLast != null) {
             val nextAfter = nextEpisodeAfter(
                 episodesMap,
@@ -174,13 +219,19 @@ fun SeriesSection(
     vm: HomeViewModel,
     onPlay: (PlayerArgs) -> Unit
 ) {
-    val cats by vm.seriesCategories.collectAsState()
+    val rawCats by vm.seriesCategories.collectAsState()
     val series by vm.series.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
+    val kidsAllowed by vm.kidsAllowedCategories.collectAsState()
+    val cats = if (kidsAllowed.isEmpty()) rawCats
+        else rawCats.copy(items = rawCats.items.filter { "series:${it.id}" in kidsAllowed })
     val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
-    var openSeries by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
     var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
+    var categoryFilter by rememberSaveable { mutableStateOf("") }
+    var advancedFilters by remember(selectedCat) { mutableStateOf(AdvancedFilters()) }
+    var filtersDialogOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadSeriesCategories()
@@ -193,6 +244,7 @@ fun SeriesSection(
         SeriesDetailScreen(
             seriesId = openSeries!!.first,
             title = openSeries!!.second,
+            coverUrl = openSeries!!.third,
             onBack = { openSeries = null },
             onPlay = onPlay
         )
@@ -206,35 +258,90 @@ fun SeriesSection(
             com.iptv.app.ui.common.FormFactor.Tv -> 3
         }
         if (selectedCat == null) {
-            Text(stringResource(R.string.section_series_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+            Text(stringResource(R.string.section_series_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
+            LocalFilterField(
+                value = categoryFilter,
+                onValueChange = { categoryFilter = it },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val needleCat = categoryFilter.trim().lowercase()
+            val visibleCats = if (needleCat.isBlank()) cats.items
+            else cats.items.filter { it.name.lowercase().contains(needleCat) }
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadSeriesCategories(forceRefresh = true) }) }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(catCols),
-                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+            PullToRefreshBox(
+                isRefreshing = cats.loading,
+                onRefresh = { vm.loadSeriesCategories(forceRefresh = true) },
+                enabled = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
             ) {
-                items(cats.items) { cat ->
-                    CategoryCard(title = cat.name, count = null, locked = false) {
-                        selectedCat = cat.id
-                        vm.loadSeries(cat.id)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(catCols),
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+                ) {
+                    items(visibleCats) { cat ->
+                        CategoryCard(title = cat.name, count = null, locked = false) {
+                            selectedCat = cat.id
+                            vm.loadSeries(cat.id)
+                        }
                     }
                 }
             }
         } else {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
-                val seriesDefault = stringResource(R.string.section_series_default)
-                Text(
-                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: seriesDefault}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-                Box(modifier = Modifier.weight(1f))
-                SortMenuButton(
-                    current = settings.seriesSort,
-                    options = SortOption.SERIES_OPTIONS
-                ) { vm.setSort(SortScope.SERIES, it) }
+            // Header on phones overflowed horizontally when the category name
+            // was long ("Series | Amazon Prime Video"). Stack title above the
+            // action buttons on phones, keep single row on tablet/TV.
+            val seriesDefault = stringResource(R.string.section_series_default)
+            val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: seriesDefault
+            val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhone) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                ) {
+                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                    Text(
+                        categoryName,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    TouchableButton(onClick = { filtersDialogOpen = true }) {
+                        Text(stringResource(
+                            if (advancedFilters.isActive) R.string.filters_button_active else R.string.filters_button
+                        ))
+                    }
+                    SortMenuButton(
+                        current = settings.seriesSort,
+                        options = SortOption.SERIES_OPTIONS
+                    ) { vm.setSort(SortScope.SERIES, it) }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                    Text(
+                        "  $categoryName",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    TouchableButton(onClick = { filtersDialogOpen = true }) {
+                        Text(stringResource(
+                            if (advancedFilters.isActive) R.string.filters_button_active else R.string.filters_button
+                        ))
+                    }
+                    SortMenuButton(
+                        current = settings.seriesSort,
+                        options = SortOption.SERIES_OPTIONS
+                    ) { vm.setSort(SortScope.SERIES, it) }
+                }
             }
             if (series.loading && series.items.isEmpty()) Text(stringResource(R.string.loading))
             series.error?.let { ErrorState(message = it, onRetry = { vm.loadSeries(selectedCat, forceRefresh = true) }) }
@@ -244,8 +351,33 @@ fun SeriesSection(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             val needle = localFilter.trim().lowercase()
-            val filteredSeries = if (needle.isBlank()) series.items
-                else series.items.filter { it.name.lowercase().contains(needle) }
+            // Build the genre vocabulary from the current category. Splits on common
+            // separators ("Action, Drama" or "Action / Drama") so each label stands alone.
+            val availableGenres = remember(series.items) {
+                series.items
+                    .mapNotNull { it.genre }
+                    .flatMap { it.split(',', '/', ';') }
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .sorted()
+            }
+            val filteredSeries = series.items.asSequence()
+                .filter { needle.isBlank() || it.name.lowercase().contains(needle) }
+                .filter { s ->
+                    val af = advancedFilters
+                    if (!af.isActive) return@filter true
+                    val year = parseYear(s.releaseDate)
+                    val yearOk = (af.yearMin == null || (year != null && year >= af.yearMin)) &&
+                        (af.yearMax == null || (year != null && year <= af.yearMax))
+                    val ratingOk = af.ratingMin == null || s.rating >= af.ratingMin
+                    val genreOk = af.genres.isEmpty() || s.genre?.let { g ->
+                        val tokens = g.split(',', '/', ';').map { it.trim() }
+                        af.genres.any { wanted -> tokens.any { it.equals(wanted, ignoreCase = true) } }
+                    } == true
+                    yearOk && ratingOk && genreOk
+                }
+                .toList()
             LazyVerticalGrid(
                 columns = GridCells.Fixed(dim.SeriesGridColumns),
                 horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
@@ -257,9 +389,20 @@ fun SeriesSection(
                         imageUrl = s.coverUrl,
                         fallbackIcon = Icons.Filled.Tv
                     ) {
-                        openSeries = s.id to s.name
+                        openSeries = Triple(s.id, s.name, s.coverUrl)
                     }
                 }
+            }
+            if (filtersDialogOpen) {
+                AdvancedFiltersDialog(
+                    initial = advancedFilters,
+                    availableGenres = availableGenres,
+                    onDismiss = { filtersDialogOpen = false },
+                    onApply = {
+                        advancedFilters = it
+                        filtersDialogOpen = false
+                    }
+                )
             }
         }
     }
@@ -272,13 +415,17 @@ fun SeriesDetailScreen(
     title: String,
     onBack: () -> Unit,
     onPlay: (PlayerArgs) -> Unit,
+    coverUrl: String? = null,
     vm: SeriesDetailViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
     val dim = rememberTvDim()
+    val snackbar = LocalSnackbar.current
+    val watchlistAddedMsg = stringResource(R.string.snack_watchlist_added)
+    val watchlistRemovedMsg = stringResource(R.string.snack_watchlist_removed)
     var selectedSeason by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(seriesId) { vm.load(seriesId, title) }
+    LaunchedEffect(seriesId) { vm.load(seriesId, title, coverUrl) }
     androidx.activity.compose.BackHandler {
         if (selectedSeason != null) selectedSeason = null else onBack()
     }
@@ -301,6 +448,17 @@ fun SeriesDetailScreen(
             }) { Text(stringResource(R.string.back)) }
             Text("  $title", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 16.dp))
             Box(modifier = Modifier.weight(1f))
+            state?.let { detail ->
+                TouchableButton(onClick = {
+                    val wasInList = detail.isInWatchlist
+                    vm.toggleWatchlist()
+                    snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
+                }) {
+                    Text(stringResource(
+                        if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                    ))
+                }
+            }
             state?.resume?.let { resume ->
                 val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
                 TouchableButton(onClick = {

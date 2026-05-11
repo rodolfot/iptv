@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import com.iptv.app.R
 import com.iptv.app.data.db.MovieProgressDao
 import com.iptv.app.data.db.SeriesProgressDao
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.notify.NotificationChannels
 import com.iptv.app.notify.Notifications
 import dagger.assisted.Assisted
@@ -29,15 +30,17 @@ class ResumeReminderWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val movieProgress: MovieProgressDao,
-    private val seriesProgress: SeriesProgressDao
+    private val seriesProgress: SeriesProgressDao,
+    private val currentProfile: CurrentProfile
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
         val cutoff = System.currentTimeMillis() - DORMANT_THRESHOLD_MS
-        val staleMovies = runCatching { movieProgress.observeInProgress().first() }
+        val pid = currentProfile.id()
+        val staleMovies = runCatching { movieProgress.observeInProgress(pid).first() }
             .getOrDefault(emptyList())
             .count { it.updatedAt in 1..cutoff }
-        val staleSeries = runCatching { seriesProgress.observeRecent().first() }
+        val staleSeries = runCatching { seriesProgress.observeRecent(pid).first() }
             .getOrDefault(emptyList())
             .count { it.updatedAt in 1..cutoff }
         if (staleMovies + staleSeries == 0) return Result.success()

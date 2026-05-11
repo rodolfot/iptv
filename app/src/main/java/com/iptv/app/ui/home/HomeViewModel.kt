@@ -12,6 +12,9 @@ import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.db.LiveCacheDao
 import com.iptv.app.data.db.MovieCacheDao
 import com.iptv.app.data.db.SeriesCacheDao
+import com.iptv.app.data.db.WatchlistDao
+import com.iptv.app.data.db.WatchlistEntity
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
@@ -24,12 +27,16 @@ import com.iptv.app.domain.sort.sorted
 import com.iptv.app.domain.sort.sortedMovies
 import com.iptv.app.domain.sort.sortedSeries
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -59,6 +66,7 @@ data class SeriesState(
     val error: String? = null
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val cache: CatalogCacheRepository,
@@ -68,7 +76,9 @@ class HomeViewModel @Inject constructor(
     private val movieDao: MovieCacheDao,
     private val seriesDao: SeriesCacheDao,
     private val favoriteDao: FavoriteDao,
-    private val settings: SettingsStore
+    private val watchlistDao: WatchlistDao,
+    private val settings: SettingsStore,
+    private val currentProfile: CurrentProfile
 ) : ViewModel() {
 
     private val _epgNow = MutableStateFlow<Map<String, EpgProgrammeEntity>>(emptyMap())
@@ -95,8 +105,34 @@ class HomeViewModel @Inject constructor(
     private val _series = MutableStateFlow(SeriesState())
     val series = _series.asStateFlow()
 
-    val favorites = favoriteDao.observeAll()
+    // Re-subscribe whenever the active profile changes so the user immediately
+    // sees the rows scoped to that profile.
+    val favorites = settings.flow
+        .map { currentProfile.id() }
+        .distinctUntilChanged()
+        .flatMapLatest { favoriteDao.observeAll(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val watchlist = settings.flow
+        .map { currentProfile.id() }
+        .distinctUntilChanged()
+        .flatMapLatest { watchlistDao.observeAll(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Reactive flag for Kids mode. Re-derived whenever the active profile changes. */
+    val kidsMode: StateFlow<Boolean> = settings.flow
+        .map { it.profiles.firstOrNull { p -> p.id == it.activeProfileId }?.kids == true }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Allow-listed category tokens ("live:42") for Kids mode; empty when not Kids. */
+    val kidsAllowedCategories: StateFlow<Set<String>> = settings.flow
+        .map { s ->
+            val active = s.profiles.firstOrNull { p -> p.id == s.activeProfileId }
+            if (active?.kids == true) active.allowedCategories else emptySet()
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     private val _initialLoading = MutableStateFlow(false)
     val initialLoading = _initialLoading.asStateFlow()
@@ -317,8 +353,19 @@ class HomeViewModel @Inject constructor(
 
     fun toggleFavorite(entity: FavoriteEntity) {
         viewModelScope.launch {
-            val existing = favorites.value.firstOrNull { it.type == entity.type && it.itemId == entity.itemId }
-            if (existing == null) favoriteDao.insert(entity) else favoriteDao.delete(entity.type, entity.itemId)
+            val pid = currentProfile.id()
+            val scoped = entity.copy(profileId = pid)
+            val existing = favorites.value.firstOrNull { it.type == scoped.type && it.itemId == scoped.itemId }
+            if (existing == null) favoriteDao.insert(scoped) else favoriteDao.delete(pid, scoped.type, scoped.itemId)
+        }
+    }
+
+    fun toggleWatchlist(entity: WatchlistEntity) {
+        viewModelScope.launch {
+            val pid = currentProfile.id()
+            val scoped = entity.copy(profileId = pid)
+            val existing = watchlist.value.firstOrNull { it.type == scoped.type && it.itemId == scoped.itemId }
+            if (existing == null) watchlistDao.insert(scoped) else watchlistDao.delete(pid, scoped.type, scoped.itemId)
         }
     }
 

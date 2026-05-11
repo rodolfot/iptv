@@ -41,7 +41,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
-import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.iptv.app.ui.common.TouchableButton
@@ -51,10 +50,12 @@ import androidx.tv.material3.Text
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
+import com.iptv.app.data.db.LiveCacheDao
 import com.iptv.app.data.db.MovieProgressDao
 import com.iptv.app.data.db.MovieProgressEntity
 import com.iptv.app.data.db.SeriesProgressDao
 import com.iptv.app.data.db.SeriesProgressEntity
+import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.toModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -91,7 +92,9 @@ class PlayerViewModel @Inject constructor(
     private val repo: XtreamRepository,
     private val progressDao: EpisodeProgressDao,
     private val movieProgressDao: MovieProgressDao,
-    private val seriesProgressDao: SeriesProgressDao
+    private val seriesProgressDao: SeriesProgressDao,
+    private val liveCache: LiveCacheDao,
+    private val currentProfile: CurrentProfile
 ) : ViewModel() {
     private val _state = MutableStateFlow(PlayerUiState())
     val state = _state.asStateFlow()
@@ -100,14 +103,18 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             when (args.kind) {
                 PlayerKind.LIVE -> {
-                    val url = if (args.timeshiftStartMs > 0L) {
-                        repo.timeshiftUrl(
+                    // If the cached channel carries a concrete streamUrl (M3U import),
+                    // play that directly — bypassing Xtream URL construction.
+                    val cached = liveCache.getById(args.streamId)
+                    val directUrl = cached?.streamUrl
+                    val url = when {
+                        directUrl != null && args.timeshiftStartMs == 0L -> directUrl
+                        args.timeshiftStartMs > 0L -> repo.timeshiftUrl(
                             streamId = args.streamId,
                             startMs = args.timeshiftStartMs,
                             durationMin = args.timeshiftDurationMin
                         )
-                    } else {
-                        repo.liveStreamUrl(args.streamId, hls = false)
+                        else -> repo.liveStreamUrl(args.streamId, hls = false)
                     }
                     _state.value = PlayerUiState(
                         items = listOf(PlayableItem(url, args.title)),
@@ -116,7 +123,7 @@ class PlayerViewModel @Inject constructor(
                 }
                 PlayerKind.MOVIE -> {
                     val url = repo.movieStreamUrl(args.streamId, args.containerExtension)
-                    val savedResume = movieProgressDao.getById(args.streamId)
+                    val savedResume = movieProgressDao.getById(currentProfile.id(), args.streamId)
                         ?.takeIf { !it.watched }?.positionMs ?: 0L
                     val resumeMs = if (args.startPositionMs > 0L) args.startPositionMs else savedResume
                     _state.value = PlayerUiState(
@@ -178,10 +185,10 @@ class PlayerViewModel @Inject constructor(
                             )
                         }
                         val startIndex = items.indexOfFirst { it.episodeId == args.episodeId }.coerceAtLeast(0)
-                        val resumeMs = progressDao.getById(args.episodeId)?.takeIf { !it.watched }?.positionMs ?: 0L
+                        val resumeMs = progressDao.getById(currentProfile.id(), args.episodeId)?.takeIf { !it.watched }?.positionMs ?: 0L
                         _state.value = PlayerUiState(
-                            items = items.mapIndexed { idx, it ->
-                                if (idx == startIndex) it.copy(startPositionMs = resumeMs) else it
+                            items = items.mapIndexed { idx, item ->
+                                if (idx == startIndex) item.copy(startPositionMs = resumeMs) else item
                             },
                             currentIndex = startIndex,
                             title = items.getOrNull(startIndex)?.title ?: args.title
@@ -201,10 +208,12 @@ class PlayerViewModel @Inject constructor(
         if (position <= 0L) return
         val watched = duration > 0 && position >= duration - 30_000L
         viewModelScope.launch {
+            val pid = currentProfile.id()
             when {
                 !item.episodeId.isNullOrBlank() && item.seriesId >= 0 -> {
                     progressDao.upsert(
                         EpisodeProgressEntity(
+                            profileId = pid,
                             episodeId = item.episodeId,
                             seriesId = item.seriesId,
                             seasonNumber = item.seasonNumber,
@@ -216,6 +225,7 @@ class PlayerViewModel @Inject constructor(
                     )
                     seriesProgressDao.upsert(
                         SeriesProgressEntity(
+                            profileId = pid,
                             seriesId = item.seriesId,
                             title = item.seriesTitle ?: item.title,
                             coverUrl = item.seriesCover,
@@ -227,10 +237,11 @@ class PlayerViewModel @Inject constructor(
                 }
                 item.movieId >= 0 -> {
                     if (watched) {
-                        movieProgressDao.delete(item.movieId)
+                        movieProgressDao.delete(pid, item.movieId)
                     } else {
                         movieProgressDao.upsert(
                             MovieProgressEntity(
+                                profileId = pid,
                                 movieId = item.movieId,
                                 title = item.title,
                                 posterUrl = item.moviePoster,
@@ -257,11 +268,23 @@ fun PlayerScreen(
 ) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
+    val holder = LocalPlaybackHolder.current
     var playbackError by remember { mutableStateOf<String?>(null) }
     var currentTracks by remember { mutableStateOf<Tracks?>(null) }
     var trackPickerOpen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(args) { vm.load(args) }
+    LaunchedEffect(args) {
+        vm.load(args)
+        // Coming back from a minimized state with the same args: reuse playback as-is.
+        // Otherwise this is a brand-new playback and the player should restart.
+        val reuse = holder?.args?.value == args && holder.player != null
+        if (!reuse) {
+            // New media: explicitly stop the previous one so prepare below picks up cleanly.
+            holder?.player?.stop()
+        }
+        holder?.args?.value = args
+        holder?.minimized?.value = false
+    }
 
     // Enable PiP for this screen, restore previous state on dispose.
     DisposableEffect(Unit) {
@@ -271,19 +294,22 @@ fun PlayerScreen(
         onDispose { activity?.pipEnabled = previous ?: false }
     }
 
-    val exo = remember {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
+    val exo = remember(holder) {
+        holder?.ensurePlayer(context)?.apply {
             repeatMode = Player.REPEAT_MODE_OFF
-        }
+        } ?: ExoPlayer.Builder(context).build().apply { playWhenReady = true }
     }
 
+    // Avoid re-preparing when returning from a minimized session: we'd lose position.
+    var preparedFor by remember { mutableStateOf<List<PlayableItem>?>(null) }
     LaunchedEffect(state.items) {
-        if (state.items.isNotEmpty()) {
-            val mediaItems = state.items.map { MediaItem.fromUri(it.url) }
-            exo.setMediaItems(mediaItems, state.currentIndex, state.items.getOrNull(state.currentIndex)?.startPositionMs ?: 0L)
-            exo.prepare()
-        }
+        if (state.items.isEmpty()) return@LaunchedEffect
+        if (preparedFor == state.items) return@LaunchedEffect
+        val mediaItems = state.items.map { MediaItem.fromUri(it.url) }
+        exo.setMediaItems(mediaItems, state.currentIndex, state.items.getOrNull(state.currentIndex)?.startPositionMs ?: 0L)
+        exo.prepare()
+        exo.playWhenReady = true
+        preparedFor = state.items
     }
 
     LaunchedEffect(state.items.isNotEmpty()) {
@@ -326,11 +352,23 @@ fun PlayerScreen(
                 )
             }
             exo.removeListener(listener)
-            exo.release()
+            // Don't release here: the holder owns the player and the mini-player
+            // may still need it. Release happens only when the user dismisses the
+            // mini-player or the activity is destroyed.
+            if (holder == null) {
+                exo.release()
+            }
         }
     }
 
-    BackHandler { onClose() }
+    val onMinimize = {
+        // Keep the player alive and let it surface as the mini-player.
+        if (holder != null && state.items.isNotEmpty()) {
+            holder.minimized.value = true
+        }
+        onClose()
+    }
+    BackHandler { onMinimize() }
 
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(state.items.isNotEmpty()) {
@@ -489,7 +527,11 @@ fun PlayerScreen(
                         color = Color.White,
                         modifier = Modifier.padding(top = 16.dp, bottom = 24.dp)
                     )
-                    TouchableButton(onClick = onClose) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back)) }
+                    TouchableButton(onClick = {
+                        // Playback error: don't keep the broken stream alive in the mini-player.
+                        holder?.release()
+                        onClose()
+                    }) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back)) }
                 }
             }
         }

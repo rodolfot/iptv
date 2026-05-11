@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TartaTV</string>
+
+    <!-- Login -->
+    <string name="login_title">Mit deiner Liste verbinden</string>
+    <string name="login_brand">TartaTV</string>
+    <string name="login_host">Server-URL (z. B. http://bscx.one)</string>
+    <string name="login_user">Benutzer</string>
+    <string name="login_pass">Passwort</string>
+    <string name="login_button">Anmelden</string>
+    <string name="login_connecting">Verbinde…</string>
+    <string name="login_probing">Port wird ermittelt…</string>
+    <string name="login_invalid">Ungültige Zugangsdaten oder Server nicht erreichbar</string>
+    <string name="login_fields_required">Bitte fülle alle Felder aus</string>
+
+    <!-- Tabs -->
+    <string name="tab_home">Start</string>
+    <string name="tab_search">Suche</string>
+    <string name="tab_live">Live</string>
+    <string name="tab_movies">Filme</string>
+    <string name="tab_series">Serien</string>
+    <string name="tab_favorites">Favoriten</string>
+    <string name="tab_watchlist">Liste</string>
+    <string name="tab_settings">Einstellungen</string>
+
+    <!-- Common UI -->
+    <string name="loading">Lädt…</string>
+    <string name="loading_catalog">Katalog wird geladen…</string>
+    <string name="empty_list">Nichts hier</string>
+    <string name="nothing_found">Nichts gefunden.</string>
+    <string name="back">← Zurück</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="error_prefix">Fehler: %1$s</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="ok">OK</string>
+    <string name="save">Speichern</string>
+    <string name="close">Schließen</string>
+
+    <!-- Sections -->
+    <string name="section_categories">Kategorien</string>
+    <string name="section_movie_categories">Filmkategorien</string>
+    <string name="section_series_categories">Serienkategorien</string>
+    <string name="section_live_default">Sender</string>
+    <string name="section_movies_default">Filme</string>
+    <string name="section_series_default">Serien</string>
+    <string name="section_seasons">Staffeln</string>
+
+    <!-- Continue watching / home -->
+    <string name="continue_empty">Noch nichts begonnen. Starte einen Film oder eine Folge, damit sie hier erscheint.</string>
+    <string name="continue_series">Serien fortsetzen</string>
+    <string name="continue_movies">Filme fortsetzen</string>
+    <string name="recommended_because_movie">Weil du %1$s gesehen hast</string>
+    <string name="recommended_because_series">Weil du %1$s gesehen hast</string>
+
+    <!-- Movie detail -->
+    <string name="movie_play">Ansehen</string>
+    <string name="movie_resume">Fortsetzen ab %1$s</string>
+    <string name="movie_restart">Von vorn beginnen</string>
+    <string name="series_resume">S%1$dE%2$d fortsetzen</string>
+    <string name="series_play_next">S%1$dE%2$d ansehen</string>
+    <string name="watched_mark">Gesehen</string>
+    <string name="movie_director">Regie: %1$s</string>
+    <string name="movie_cast">Besetzung: %1$s</string>
+    <string name="movie_genre">Genre: %1$s</string>
+    <string name="movie_release">Erschienen: %1$s</string>
+    <string name="movie_rating">Bewertung: %1$s</string>
+    <string name="movie_duration">Dauer: %1$s</string>
+    <string name="synopsis">Inhalt</string>
+    <string name="add_favorite">Zu Favoriten hinzufügen</string>
+    <string name="remove_favorite">Aus Favoriten entfernen</string>
+
+    <!-- Channel detail / EPG -->
+    <string name="channel_now">Jetzt</string>
+    <string name="channel_upcoming">Als Nächstes</string>
+    <string name="channel_no_epg">Keine Programminfo für diesen Sender.</string>
+    <string name="channel_play">Ansehen</string>
+    <string name="channel_timeshift">%1$dh zurück</string>
+    <string name="channel_timeshift_30">30 Min zurück</string>
+
+    <!-- Player tracks -->
+    <string name="player_tracks">Spuren</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_subtitle">Untertitel</string>
+    <string name="player_video">Qualität</string>
+    <string name="player_track_off">Aus</string>
+    <string name="player_track_auto">Automatisch</string>
+    <string name="next_episode_in">Nächste Folge in %1$ds</string>
+    <string name="cancel_autoplay">Abbrechen (Zurück)</string>
+
+    <!-- Search -->
+    <string name="search_hint">Sender, Filme oder Serien suchen…</string>
+    <string name="search_min_chars">Mindestens 2 Buchstaben eingeben.</string>
+    <string name="search_in_category">In dieser Kategorie filtern</string>
+    <string name="search_history_title">Letzte Suchen</string>
+    <string name="search_history_clear">Leeren</string>
+    <string name="filter_all">Alle</string>
+    <string name="filter_channels">Sender</string>
+    <string name="filter_movies">Filme</string>
+    <string name="filter_series">Serien</string>
+
+    <!-- Sort -->
+    <string name="sort_title">Sortieren nach</string>
+    <string name="sort_button">Sortieren</string>
+
+    <!-- Advanced filters -->
+    <string name="filters_button">Filter</string>
+    <string name="filters_button_active">Filter •</string>
+    <string name="filters_title">Erweiterte Filter</string>
+    <string name="filters_year_range">Erscheinungsjahr</string>
+    <string name="filters_year_from">Von</string>
+    <string name="filters_year_to">Bis</string>
+    <string name="filters_rating_min">Mindestbewertung</string>
+    <string name="filters_rating_min_label">0 bis 10</string>
+    <string name="filters_genres">Genres</string>
+    <string name="filters_apply">Anwenden</string>
+    <string name="filters_reset">Leeren</string>
+
+    <!-- Favorites -->
+    <string name="favorite">Zu Favoriten hinzufügen</string>
+    <string name="unfavorite">Aus Favoriten entfernen</string>
+    <string name="favorites_empty">Noch nichts hier.</string>
+
+    <!-- Parental -->
+    <string name="parental_title">Eingeschränkter Inhalt</string>
+    <string name="parental_message">PIN eingeben, um fortzufahren</string>
+    <string name="parental_pass_label">PIN</string>
+    <string name="parental_wrong">Falsche PIN</string>
+    <string name="parental_setup_title">Erstelle deine Eltern-PIN</string>
+    <string name="parental_setup_message">Erstelle eine 4–8-stellige numerische PIN, um Erwachseneninhalte freizuschalten. Sie wird bei jedem Zugriff auf eingeschränkte Inhalte verlangt.</string>
+    <string name="parental_new_pass">Neue PIN</string>
+    <string name="parental_confirm_pass">PIN bestätigen</string>
+    <string name="parental_create">Erstellen</string>
+    <string name="parental_min_length">Die PIN muss mindestens 4 Ziffern haben</string>
+    <string name="parental_mismatch">PINs stimmen nicht überein</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_host">Host: %1$s</string>
+    <string name="settings_user">Benutzer: %1$s</string>
+    <string name="settings_parental_title">Eltern-PIN</string>
+    <string name="settings_pin_set">PIN konfiguriert.</string>
+    <string name="settings_pin_unset">Keine PIN gesetzt. Erstelle eine, um Erwachseneninhalte freizuschalten.</string>
+    <string name="settings_pin_label_set">PIN ändern</string>
+    <string name="settings_pin_label_unset">PIN festlegen</string>
+    <string name="settings_pin_save_set">PIN speichern</string>
+    <string name="settings_pin_save_unset">PIN festlegen</string>
+    <string name="settings_catalog">Katalog</string>
+    <string name="settings_refresh">Katalog aktualisieren</string>
+    <string name="settings_refresh_now">Jetzt aktualisieren</string>
+    <string name="settings_refresh_interval">Aktualisierungsintervall</string>
+    <string name="settings_refresh_last">Letzte Aktualisierung: %1$s</string>
+    <string name="settings_refresh_never">Nie aktualisiert</string>
+    <string name="refresh_interval_1h">Alle 1 Stunde</string>
+    <string name="refresh_interval_4h">Alle 4 Stunden</string>
+    <string name="refresh_interval_12h">Alle 12 Stunden</string>
+    <string name="refresh_interval_1d">Täglich</string>
+    <string name="refresh_interval_4d">Alle 4 Tage</string>
+    <string name="refresh_interval_7d">Alle 7 Tage</string>
+    <string name="refresh_interval_30d">Alle 30 Tage</string>
+    <string name="catalog_loading_title">Katalog wird aktualisiert</string>
+    <string name="catalog_loading_subtitle">Lade Kategorien, Filme und Serien…</string>
+    <string name="catalog_loading_seconds">%1$d s</string>
+    <string name="settings_clear_cache">Cache leeren</string>
+    <string name="settings_reset_progress">Serien-Fortschritt zurücksetzen</string>
+    <string name="settings_session">Sitzung</string>
+    <string name="settings_logout">Abmelden</string>
+    <string name="settings_change_server">Server wechseln</string>
+    <string name="settings_test_connection">Verbindung testen</string>
+    <string name="settings_save_credentials">Speichern und neu verbinden</string>
+    <string name="settings_connection_ok">Verbindung OK</string>
+    <string name="settings_connection_failed">Fehler: %1$s</string>
+    <string name="settings_about">Über</string>
+    <string name="settings_open_about">Über TartaTV</string>
+
+    <!-- Player -->
+    <string name="player_unsupported_title">Wiedergabe nicht möglich</string>
+    <string name="player_unsupported_4k">Dieser Inhalt liegt im 4K/HDR-Format (HEVC) vor und wird auf diesem Gerät nicht unterstützt. Probiere eine SD/HD-Version oder nutze einen Fernseher.</string>
+    <string name="player_unsupported_format">Videoformat wird auf diesem Gerät nicht unterstützt.</string>
+    <string name="player_network_failed">Netzwerkfehler. Prüfe deine Verbindung.</string>
+    <string name="player_http_failed">Der Server hat den Stream abgelehnt (HTTP). Verbindungslimit oder Inhalt nicht verfügbar.</string>
+    <string name="player_generic_error">Wiedergabefehler: %1$s.</string>
+
+    <!-- About / Legal -->
+    <string name="about_title">Über TartaTV</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_intro">TartaTV ist ein TV-Client, der vom Nutzer bereitgestellte Xtream-Codes-Listen wiedergibt. Es vertreibt, hostet oder verkauft keine Inhalte — die Wiedergabe hängt ausschließlich von deiner Liste ab.</string>
+    <string name="about_terms">Nutzungsbedingungen</string>
+    <string name="about_privacy">Datenschutzerklärung</string>
+    <string name="about_open_source">Open-Source-Bibliotheken</string>
+    <string name="about_crash_log">Diagnose (lokale Logs)</string>
+    <string name="crash_log_title">Diagnose</string>
+    <string name="crash_log_empty">Keine Fehler protokolliert.</string>
+    <string name="crash_log_clear">Logs löschen</string>
+    <string name="crash_log_copy">Kopieren</string>
+    <string name="crash_log_share">Teilen</string>
+    <string name="crash_log_copied">Log in die Zwischenablage kopiert.</string>
+
+    <!-- Onboarding / acceptance -->
+    <string name="onboarding_title">Willkommen bei TartaTV</string>
+    <string name="onboarding_message">Um die App zu nutzen, musst du den Nutzungsbedingungen und der Datenschutzerklärung zustimmen.</string>
+    <string name="onboarding_read_terms">Nutzungsbedingungen lesen</string>
+    <string name="onboarding_read_privacy">Datenschutzerklärung lesen</string>
+    <string name="onboarding_accept">Ich stimme zu und möchte fortfahren</string>
+    <string name="onboarding_decline">Ich stimme nicht zu</string>
+
+    <!-- Update -->
+    <string name="update_title">Neue Version verfügbar</string>
+    <string name="update_message">Version %1$s ist verfügbar. Du nutzt %2$s.</string>
+    <string name="update_open">Download-Seite öffnen</string>
+    <string name="update_later">Später</string>
+    <string name="update_skip">Diese Version überspringen</string>
+    <string name="update_changelog_title">Neuerungen dieser Version</string>
+
+    <!-- Profiles -->
+    <string name="profiles_title">Profile</string>
+    <string name="profiles_empty">Noch keine Profile gespeichert. Füge unten dein erstes hinzu.</string>
+    <string name="profiles_active_badge">aktiv</string>
+    <string name="profiles_active_label">Aktives Profil: %1$s</string>
+    <string name="profiles_has_pin">PIN-geschützt</string>
+    <string name="profiles_use">Verwenden</string>
+    <string name="profiles_edit">Bearbeiten</string>
+    <string name="profiles_delete">Löschen</string>
+    <string name="profiles_add">Profil hinzufügen</string>
+    <string name="profiles_new">Neues Profil</string>
+    <string name="profiles_save">Speichern</string>
+    <string name="profiles_name_label">Profilname (z. B. Familie)</string>
+    <string name="profiles_pin_optional">Eltern-PIN (optional, 4–8 Ziffern)</string>
+    <string name="profile_provider_xtream">Xtream</string>
+    <string name="profile_provider_m3u">M3U</string>
+    <string name="profile_m3u_url_label">M3U-Playlist-URL (z. B. http://srv/list.m3u)</string>
+    <string name="settings_profiles_button">Profile verwalten</string>
+    <string name="profiles_kids">Kindermodus</string>
+    <string name="profiles_kids_desc">Blendet Einstellungen und Suche aus. Zeigt nur erlaubte Kategorien.</string>
+    <string name="profiles_kids_categories">Erlaubte Kategorien</string>
+    <string name="profiles_kids_no_categories">Noch keine Kategorien erlaubt. Unten welche hinzufügen.</string>
+    <string name="kids_locked_title">Kindermodus aktiv</string>
+    <string name="kids_locked_message">Dieser Bereich ist im Kindermodus deaktiviert. Wechsle das Profil auf einem anderen Gerät, um zuzugreifen.</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_new_episodes">Neue Folgen</string>
+    <string name="notif_channel_catalog">Katalog-Aktualisierung</string>
+    <string name="notif_channel_resume">Weiter ansehen</string>
+    <string name="notif_channel_errors">Server-Fehler</string>
+    <string name="notif_new_episodes_title">Neue Folgen verfügbar</string>
+    <string name="notif_new_episodes_text">%1$d Serien haben neue Folgen.</string>
+    <string name="notif_catalog_title">Katalog aktualisiert</string>
+    <string name="notif_catalog_text">Synchronisierung abgeschlossen.</string>
+    <string name="notif_resume_title">Mach weiter, wo du aufgehört hast</string>
+    <string name="notif_resume_text">Es warten unfertige Titel auf dich.</string>
+    <string name="notif_error_title">Server nicht erreichbar</string>
+    <string name="notif_error_text">Katalog konnte nicht aktualisiert werden. Verbindung oder Zugangsdaten prüfen.</string>
+    <string name="settings_notifications_title">Benachrichtigungen</string>
+    <string name="settings_notifications_perm">Benachrichtigungserlaubnis erteilen</string>
+    <string name="settings_notifications_perm_granted">Erlaubnis erteilt.</string>
+
+    <!-- Accessibility -->
+    <string name="a11y_locked">Gesperrter Inhalt</string>
+    <string name="a11y_favorite">Zu Favoriten hinzufügen</string>
+    <string name="a11y_unfavorite">Aus Favoriten entfernen</string>
+    <string name="a11y_play">Abspielen</string>
+    <string name="a11y_close">Schließen</string>
+
+    <!-- Empty states -->
+    <string name="empty_continue_title">Deine Reise beginnt hier</string>
+    <string name="empty_continue_message">Filme und Folgen, die du beginnst, erscheinen hier, damit du dort weitermachen kannst, wo du aufgehört hast.</string>
+    <string name="empty_continue_action">Filme durchstöbern</string>
+    <string name="empty_favorites_title">Noch keine Favoriten</string>
+    <string name="empty_favorites_message">Nutze die Favoriten-Schaltfläche in den Detailansichten von Filmen, Serien und Sendern, um sie hier zu sammeln.</string>
+    <string name="empty_search_title">Was möchtest du sehen?</string>
+    <string name="empty_search_message">Suche nach Name, Genre, Besetzung oder Inhalt. Sofort und auch offline.</string>
+    <string name="empty_search_no_results_title">Nichts gefunden</string>
+    <string name="empty_search_no_results_message">Probiere andere Wörter oder wechsle den Filter zwischen Sendern, Filmen und Serien.</string>
+
+    <!-- Watchlist -->
+    <string name="watchlist_title">Liste</string>
+    <string name="watchlist_add">Zur Liste hinzufügen</string>
+    <string name="watchlist_remove">Aus der Liste entfernen</string>
+    <string name="empty_watchlist_title">Deine Liste ist leer</string>
+    <string name="empty_watchlist_message">Nutze „Zur Liste hinzufügen" in den Detailansichten von Filmen und Serien, um Titel für später vorzumerken.</string>
+    <string name="snack_watchlist_added">Zur Liste hinzugefügt.</string>
+    <string name="snack_watchlist_removed">Aus der Liste entfernt.</string>
+
+    <!-- Snackbars / feedback -->
+    <string name="snack_favorite_added">Zu Favoriten hinzugefügt.</string>
+    <string name="snack_favorite_removed">Aus Favoriten entfernt.</string>
+    <string name="snack_profile_saved">Profil gespeichert.</string>
+    <string name="snack_profile_deleted">Profil gelöscht.</string>
+    <string name="snack_profile_switched">Aktives Profil gewechselt.</string>
+    <string name="snack_credentials_saved">Zugangsdaten aktualisiert.</string>
+    <string name="snack_pin_saved">Eltern-PIN gespeichert.</string>
+    <string name="snack_catalog_refreshing">Katalog wird aktualisiert…</string>
+    <string name="snack_catalog_refreshed">Katalog aktualisiert.</string>
+    <string name="snack_undo">Rückgängig</string>
+</resources>

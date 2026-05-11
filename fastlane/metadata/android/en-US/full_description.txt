@@ -1,0 +1,41 @@
+TartaTV is an Android TV client that plays IPTV lists in the Xtream Codes
+standard. You provide your own server URL, username and password — the app
+does not distribute, host or sell any content. Playback depends entirely on
+the list you supply.
+
+Features:
+
+* Live channels grouped by category, with XMLTV EPG (current programme and
+  upcoming days)
+* Movies (VOD) with poster, plot, cast, director, genre, rating, duration,
+  and resume from where you stopped
+* Series with seasons, episodes, autoplay of the next episode, watched marks
+  and per-episode progress
+* "Continue watching" home, consolidating movies and episodes in progress
+* Recommendations based on what you watched (computed locally, no telemetry)
+* Watchlist separate from Favorites
+* Global search by name, genre, cast, plot — over a local FTS4 index
+* Advanced filters (year, rating, genres) per movies/series category
+* Parental PIN (encrypted) with mandatory setup before first adult-category
+  access
+* Multi-profile (separate Xtream accounts, separate favorites/progress) and
+  Kids profile with allow-listed categories
+* Picture-in-Picture and a persistent mini-player when you leave full screen
+* Time-shift on channels that support tv_archive (rewind 30 min / 1 h / 2 h)
+* Offline catalog cache (TTL 6h, refreshed in background) and offline detail
+  cache (TTL 24h)
+* Auto-update via GitHub Releases with full changelog in-app
+* Notifications: new episodes on favourite series, catalog refresh complete,
+  resume reminder, server errors
+* Languages: Portuguese, English, Spanish, Italian, French, German
+
+Privacy:
+
+* No telemetry, analytics or crash reporting — everything stays on your
+  device
+* Credentials and PIN are stored encrypted (AES-256, EncryptedSharedPreferences)
+* No Android cloud backup of credentials or cache
+* Only requests INTERNET, ACCESS_NETWORK_STATE, WAKE_LOCK and FOREGROUND_SERVICE
+  permissions
+
+The TartaTV name and mark belong to their holder.

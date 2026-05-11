@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -26,15 +25,14 @@ import com.iptv.app.ui.common.TouchableButton
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
-import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ChannelCard
 import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.LocalFilterField
+import com.iptv.app.ui.common.PullToRefreshBox
 import com.iptv.app.ui.common.SortMenuButton
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
@@ -51,15 +49,20 @@ fun LiveSection(
     onPlay: (PlayerArgs) -> Unit,
     onOpenChannel: (com.iptv.app.domain.model.LiveChannel) -> Unit = {}
 ) {
-    val cats by vm.liveCategories.collectAsState()
+    val rawCats by vm.liveCategories.collectAsState()
     val channels by vm.channels.collectAsState()
     val epgNow by vm.epgNow.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
+    val kidsAllowed by vm.kidsAllowedCategories.collectAsState()
+    // In Kids mode the parent picks specific categories; everything else is hidden.
+    val cats = if (kidsAllowed.isEmpty()) rawCats
+        else rawCats.copy(items = rawCats.items.filter { "live:${it.id}" in kidsAllowed })
     val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingChannel by remember { mutableStateOf<PlayerArgs?>(null) }
     var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
+    var categoryFilter by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadLiveCategories()
@@ -75,43 +78,82 @@ fun LiveSection(
             com.iptv.app.ui.common.FormFactor.Tv -> 3
         }
         if (selectedCat == null) {
-            Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+            Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
+            LocalFilterField(
+                value = categoryFilter,
+                onValueChange = { categoryFilter = it },
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            val needleCat = categoryFilter.trim().lowercase()
+            val visibleCats = if (needleCat.isBlank()) cats.items
+            else cats.items.filter { it.name.lowercase().contains(needleCat) }
             if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadLiveCategories(forceRefresh = true) }) }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(catCols),
-                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+            PullToRefreshBox(
+                isRefreshing = cats.loading,
+                onRefresh = { vm.loadLiveCategories(forceRefresh = true) },
+                enabled = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
             ) {
-                items(cats.items) { cat ->
-                    CategoryCard(
-                        title = cat.name,
-                        count = null,
-                        locked = cat.isAdult && !parental.isUnlocked()
-                    ) {
-                        if (cat.isAdult && !parental.isUnlocked()) {
-                            pendingCategory = cat
-                        } else {
-                            selectedCat = cat.id
-                            vm.loadChannels(cat.id)
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(catCols),
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+                ) {
+                    items(visibleCats) { cat ->
+                        CategoryCard(
+                            title = cat.name,
+                            count = null,
+                            locked = cat.isAdult && !parental.isUnlocked()
+                        ) {
+                            if (cat.isAdult && !parental.isUnlocked()) {
+                                pendingCategory = cat
+                            } else {
+                                selectedCat = cat.id
+                                vm.loadChannels(cat.id)
+                            }
                         }
                     }
                 }
             }
         } else {
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
-                TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
-                val sectionDefault = stringResource(R.string.section_live_default)
-                Text(
-                    "  ${cats.items.firstOrNull { it.id == selectedCat }?.name ?: sectionDefault}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-                Box(modifier = Modifier.weight(1f))
-                SortMenuButton(
-                    current = settings.liveSort,
-                    options = SortOption.LIVE_OPTIONS
-                ) { vm.setSort(SortScope.LIVE, it) }
+            val sectionDefault = stringResource(R.string.section_live_default)
+            val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: sectionDefault
+            val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhone) {
+                Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 4.dp)
+                ) {
+                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                    Text(
+                        categoryName,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(modifier = Modifier.padding(bottom = 8.dp)) {
+                    SortMenuButton(
+                        current = settings.liveSort,
+                        options = SortOption.LIVE_OPTIONS
+                    ) { vm.setSort(SortScope.LIVE, it) }
+                }
+            } else {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                    TouchableButton(onClick = { selectedCat = null }) { Text(stringResource(R.string.back)) }
+                    Text(
+                        "  $categoryName",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    SortMenuButton(
+                        current = settings.liveSort,
+                        options = SortOption.LIVE_OPTIONS
+                    ) { vm.setSort(SortScope.LIVE, it) }
+                }
             }
             if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
             channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }

@@ -1,6 +1,8 @@
 package com.iptv.app.data.cache
 
 import com.iptv.app.data.api.XtreamRepository
+import com.iptv.app.data.m3u.M3uRepository
+import com.iptv.app.data.prefs.ProviderType
 import com.iptv.app.data.db.CacheMetaDao
 import com.iptv.app.data.db.CacheMetaEntity
 import com.iptv.app.data.db.CategoryCacheDao
@@ -22,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class CatalogCacheRepository @Inject constructor(
     private val api: XtreamRepository,
+    private val m3u: M3uRepository,
     private val meta: CacheMetaDao,
     private val categories: CategoryCacheDao,
     private val live: LiveCacheDao,
@@ -29,6 +32,13 @@ class CatalogCacheRepository @Inject constructor(
     private val series: SeriesCacheDao,
     private val settings: SettingsStore
 ) {
+
+    /** Active profile's provider — decides Xtream vs. M3U dispatch. */
+    private suspend fun activeProvider(): ProviderType {
+        val s = settings.flow.first()
+        return s.profiles.firstOrNull { it.id == s.activeProfileId }?.provider
+            ?: ProviderType.XTREAM
+    }
     enum class Scope(val key: String) {
         LIVE_CATEGORIES("live_categories"),
         MOVIE_CATEGORIES("movie_categories"),
@@ -56,6 +66,13 @@ class CatalogCacheRepository @Inject constructor(
     /* ----------------- Categories ----------------- */
 
     suspend fun refreshLiveCategories(): Result<Unit> = runCatching {
+        if (activeProvider() == ProviderType.M3U) {
+            // M3U batches everything in a single playlist fetch.
+            m3u.refresh().getOrThrow()
+            touch(Scope.LIVE_CATEGORIES)
+            touch(Scope.LIVE_STREAMS)
+            return@runCatching
+        }
         val extra = settings.flow.first().extraAdultCategoryIds
         val items = api.liveCategories().map { it.toCacheEntity(ContentType.LIVE, extra) }
         categories.replaceAll(ContentType.LIVE, items)
@@ -63,6 +80,11 @@ class CatalogCacheRepository @Inject constructor(
     }
 
     suspend fun refreshMovieCategories(): Result<Unit> = runCatching {
+        if (activeProvider() == ProviderType.M3U) {
+            // M3U has no movie categories — leave the table empty, no error.
+            touch(Scope.MOVIE_CATEGORIES)
+            return@runCatching
+        }
         val extra = settings.flow.first().extraAdultCategoryIds
         val items = api.vodCategories().map { it.toCacheEntity(ContentType.MOVIE, extra) }
         categories.replaceAll(ContentType.MOVIE, items)
@@ -70,6 +92,10 @@ class CatalogCacheRepository @Inject constructor(
     }
 
     suspend fun refreshSeriesCategories(): Result<Unit> = runCatching {
+        if (activeProvider() == ProviderType.M3U) {
+            touch(Scope.SERIES_CATEGORIES)
+            return@runCatching
+        }
         val extra = settings.flow.first().extraAdultCategoryIds
         val items = api.seriesCategories().map { it.toCacheEntity(ContentType.SERIES, extra) }
         categories.replaceAll(ContentType.SERIES, items)
@@ -79,6 +105,12 @@ class CatalogCacheRepository @Inject constructor(
     /* ----------------- Streams ----------------- */
 
     suspend fun refreshLiveStreams(): Result<Unit> = runCatching {
+        if (activeProvider() == ProviderType.M3U) {
+            m3u.refresh().getOrThrow()
+            touch(Scope.LIVE_CATEGORIES)
+            touch(Scope.LIVE_STREAMS)
+            return@runCatching
+        }
         val items = api.liveStreams(null).map {
             LiveChannelCacheEntity(
                 streamId = it.streamId,
@@ -96,6 +128,10 @@ class CatalogCacheRepository @Inject constructor(
     }
 
     suspend fun refreshMovieStreams(): Result<Unit> = runCatching {
+        if (activeProvider() == ProviderType.M3U) {
+            touch(Scope.MOVIE_STREAMS)
+            return@runCatching
+        }
         val items = api.vodStreams(null).map {
             MovieCacheEntity(
                 streamId = it.streamId,
@@ -113,6 +149,10 @@ class CatalogCacheRepository @Inject constructor(
     }
 
     suspend fun refreshSeriesList(): Result<Unit> = runCatching {
+        if (activeProvider() == ProviderType.M3U) {
+            touch(Scope.SERIES_LIST)
+            return@runCatching
+        }
         val items = api.series(null).map {
             SeriesCacheEntity(
                 seriesId = it.seriesId,

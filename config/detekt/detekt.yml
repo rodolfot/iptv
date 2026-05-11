@@ -1,0 +1,82 @@
+# Light initial detekt config. We keep the default ruleset but turn off rules
+# that would generate noise for the current codebase shape (lots of Compose
+# composables, intentional Hilt-injected constructors, long ViewModels). As
+# the project matures, prefer enabling specific rules over weakening these.
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+
+complexity:
+  active: true
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  TooManyFunctions:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  NestedBlockDepth:
+    active: false
+  ComplexCondition:
+    active: false
+
+style:
+  active: true
+  MaxLineLength:
+    active: false
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: false
+  WildcardImport:
+    active: true
+  UnusedPrivateMember:
+    active: true
+  UnusedImports:
+    active: true
+  NewLineAtEndOfFile:
+    active: true
+  SerialVersionUIDInSerializableClass:
+    active: false
+  ForbiddenComment:
+    active: false
+
+naming:
+  active: true
+  TopLevelPropertyNaming:
+    active: false
+  VariableNaming:
+    active: false
+  FunctionNaming:
+    active: false
+  ConstructorParameterNaming:
+    active: false
+  # ViewModels frequently live next to their Screen composable in the same file.
+  MatchingDeclarationName:
+    active: false
+
+empty-blocks:
+  active: true
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: false
+
+potential-bugs:
+  active: true
+  UnsafeCallOnNullableType:
+    active: false
+
+performance:
+  active: true
+  # We pass migrations as a vararg array via *ALL_MIGRATIONS — the spread copy
+  # is ~6 entries, not worth refactoring around.
+  SpreadOperator:
+    active: false

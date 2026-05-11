@@ -38,10 +38,12 @@ UI calibrada para TV 55", controle remoto e D-pad. Também roda em telefones e t
    - Habilite **Fontes desconhecidas** em Configurações → Segurança
    - Copie o APK para um pendrive e abra com o gerenciador de arquivos da TV, **ou**
    - Instale via ADB de outro dispositivo na mesma rede:
+
      ```bash
      adb connect <ip-da-tv>:5555
      adb install tartatv-X.Y.Z.apk
      ```
+
 3. **Em um celular/tablet**:
    - Abra o APK pelo navegador ou app de arquivos e confirme a instalação
 
@@ -83,50 +85,59 @@ A barra superior tem 7 abas. Use as setas para alternar:
 
 ### 4. Fluxos de uso
 
-**Assistir a um canal ao vivo**
+#### Assistir a um canal ao vivo
+
 1. Aba **Ao Vivo** → escolha categoria → selecione o canal
 2. Abre a tela de detalhe do canal: programa atual ("Agora") + grade dos próximos programas agrupados por dia
 3. Botões: **Assistir** · **Favoritar** · **Voltar 30 min / 1h / 2h** (apenas para canais com `tv_archive`)
 4. Se o canal não estiver em formato suportado pelo dispositivo (ex: 4K HEVC em emulador), o player mostra uma mensagem amigável
 
-**Assistir a um filme**
+#### Assistir a um filme
+
 1. Aba **Filmes** → escolha categoria → selecione o filme
 2. Abre a tela de detalhe: poster, sinopse, elenco, direção, gênero, lançamento, avaliação
 3. Botões: **Assistir** ou **Continuar de HH:MM:SS** + **Favoritar**
 
-**Assistir a uma série**
+#### Assistir a uma série
+
 1. Aba **Séries** → escolha categoria → selecione a série
 2. Tela de temporadas. Se há um episódio em andamento ou um próximo a assistir, aparece o botão **Continuar T2E5** no topo
 3. Selecione a temporada → escolha o episódio
 4. Episódios assistidos aparecem com ✓; episódios pausados mostram porcentagem
 5. **Autoplay**: ao acabar um episódio, o próximo da temporada começa automaticamente
 
-**Buscar**
+#### Buscar
+
 1. Aba **Buscar** → digite ao menos 2 letras
 2. Resultados separados por **Canais / Filmes / Séries**
 3. Filtros para limitar à categoria desejada
 4. **Filtro local dentro de uma categoria**: ao abrir uma categoria, use o campo de busca acima da grade para filtrar pelos itens visíveis sem chamar a rede
 
-**PIN parental**
+#### PIN parental
+
 1. Na primeira tentativa de abrir um canal/filme em categoria adulta, o app pede para criar um PIN (4–8 dígitos numéricos com confirmação)
 2. PIN fica criptografado no dispositivo
 3. Sessão desbloqueada vale por 15 minutos
 4. Para alterar/redefinir, vá em **Config → Senha parental**
 
-**Trocar de servidor sem fazer logout**
+#### Trocar de servidor sem fazer logout
+
 1. **Config → Servidor → Trocar servidor**
 2. Edite URL/usuário/senha → **Testar conexão**
 3. Quando o teste passar, **Salvar e reconectar** atualiza tudo e recarrega o catálogo
 
-**Gerenciar múltiplos perfis (servidores)**
+#### Gerenciar múltiplos perfis (servidores)
+
 1. **Config → Servidor → Gerenciar perfis**
 2. Adicione um novo perfil informando nome (ex: "Família"), URL, usuário, senha e — se quiser separar acesso adulto — um PIN parental dedicado a esse perfil
 3. Use **Usar** para trocar de perfil; o app reconecta e recarrega o catálogo automaticamente
 
-**Picture-in-Picture**
+#### Picture-in-Picture
+
 - Durante reprodução, pressione o botão Home do dispositivo. O player desliza para o canto da tela em PiP. (Requer Android 8.0+ e dispositivo com PiP habilitado.)
 
-**Atualizar o app**
+#### Atualizar o app
+
 - Quando uma nova versão é publicada no GitHub Releases, o app mostra um diálogo na Home com botão **Abrir página de download**
 - Você baixa o APK manualmente e reinstala (Android sideload)
 
@@ -255,16 +266,20 @@ APKs em `app/build/outputs/apk/{debug,release}/`.
 Para gerar APK assinado com sua própria chave:
 
 1. Gere keystore (uma vez):
+
    ```bash
    keytool -genkey -v -keystore tartatv.jks -alias tartatv -keyalg RSA -keysize 2048 -validity 10000
    ```
+
 2. Em `~/.gradle/gradle.properties` (não commitar):
-   ```
+
+   ```properties
    RELEASE_KEYSTORE_FILE=/caminho/para/tartatv.jks
    RELEASE_KEYSTORE_PASSWORD=...
    RELEASE_KEY_ALIAS=tartatv
    RELEASE_KEY_PASSWORD=...
    ```
+
 3. `./gradlew :app:assembleRelease` → APK assinado com sua chave permanente
 
 ### Release via GitHub Actions
@@ -276,6 +291,7 @@ O workflow `.github/workflows/release.yml` é disparado por tags `v*` e:
 3. Cria GitHub Release e anexa o APK
 
 Configure os secrets do repo:
+
 - `RELEASE_KEYSTORE_BASE64` (saída de `base64 -w 0 tartatv.jks`)
 - `RELEASE_KEYSTORE_PASSWORD`
 - `RELEASE_KEY_ALIAS`
@@ -293,7 +309,7 @@ git tag v1.0.0 && git push --tags
 
 ### Estrutura
 
-```
+```text
 app/src/main/java/com/iptv/app/
 ├─ data/
 │  ├─ api/        # Retrofit (XtreamApi) + DTOs

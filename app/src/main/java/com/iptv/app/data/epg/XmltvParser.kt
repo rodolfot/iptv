@@ -81,7 +81,7 @@ object XmltvParser {
                                     channelId = ch,
                                     startMs = currentStart,
                                     stopMs = currentStop,
-                                    title = currentTitle!!.trim(),
+                                    title = currentTitle.trim(),
                                     description = currentDesc?.trim()
                                 )
                             )

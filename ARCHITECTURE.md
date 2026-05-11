@@ -4,7 +4,7 @@ Visão técnica do TartaTV.
 
 ## Camadas
 
-```
+```text
 ┌────────────────────────────────────────────────┐
 │                     UI                         │
 │  Compose · TouchableButton/Card adaptativos   │
@@ -37,7 +37,7 @@ Visão técnica do TartaTV.
 
 ## Pacotes
 
-```
+```text
 app/src/main/java/com/iptv/app/
 ├─ MainActivity.kt + IptvApp.kt + AppNav
 ├─ data/

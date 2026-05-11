@@ -14,6 +14,7 @@ class Converters {
 @Database(
     entities = [
         FavoriteEntity::class,
+        WatchlistEntity::class,
         EpisodeProgressEntity::class,
         MovieProgressEntity::class,
         SeriesProgressEntity::class,
@@ -28,12 +29,13 @@ class Converters {
         EpgProgrammeEntity::class,
         DetailCacheEntity::class
     ],
-    version = 6,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
+    abstract fun watchlistDao(): WatchlistDao
     abstract fun episodeProgressDao(): EpisodeProgressDao
     abstract fun movieProgressDao(): MovieProgressDao
     abstract fun seriesProgressDao(): SeriesProgressDao

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext is enabled globally because Xtream IPTV servers commonly run on
+  plain HTTP on non-standard ports and the user provides their own host.
+
+  We narrow that with a couple of explicit allow-lists:
+  * Anything we own / fetch ourselves (api.github.com, dl.google.com) MUST use
+    TLS — no cleartext fallback even if the user's network MITMs DNS.
+  * Local/loopback addresses keep cleartext for local testing.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- App-update endpoints: HTTPS only, no exceptions. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.github.com</domain>
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">objects.githubusercontent.com</domain>
+        <domain includeSubdomains="true">dl.google.com</domain>
+    </domain-config>
+</network-security-config>

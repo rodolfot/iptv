@@ -10,6 +10,7 @@
     <string name="login_pass">Password</string>
     <string name="login_button">Sign in</string>
     <string name="login_connecting">Connecting…</string>
+    <string name="login_probing">Detecting port…</string>
     <string name="login_invalid">Invalid credentials or unreachable server</string>
     <string name="login_fields_required">Please fill in all fields</string>
 
@@ -20,6 +21,7 @@
     <string name="tab_movies">Movies</string>
     <string name="tab_series">Series</string>
     <string name="tab_favorites">Favorites</string>
+    <string name="tab_watchlist">Watchlist</string>
     <string name="tab_settings">Settings</string>
 
     <!-- Common UI -->
@@ -48,6 +50,8 @@
     <string name="continue_empty">Nothing in progress yet. Start watching a movie or episode to see it here.</string>
     <string name="continue_series">Resume series</string>
     <string name="continue_movies">Resume movies</string>
+    <string name="recommended_because_movie">Because you watched %1$s</string>
+    <string name="recommended_because_series">Because you watched %1$s</string>
 
     <!-- Movie detail -->
     <string name="movie_play">Watch</string>
@@ -88,6 +92,8 @@
     <string name="search_hint">Search channels, movies, or series…</string>
     <string name="search_min_chars">Type at least 2 letters to search.</string>
     <string name="search_in_category">Filter in this category</string>
+    <string name="search_history_title">Recent searches</string>
+    <string name="search_history_clear">Clear</string>
     <string name="filter_all">All</string>
     <string name="filter_channels">Channels</string>
     <string name="filter_movies">Movies</string>
@@ -96,6 +102,19 @@
     <!-- Sort -->
     <string name="sort_title">Sort by</string>
     <string name="sort_button">Sort</string>
+
+    <!-- Advanced filters -->
+    <string name="filters_button">Filters</string>
+    <string name="filters_button_active">Filters •</string>
+    <string name="filters_title">Advanced filters</string>
+    <string name="filters_year_range">Release year</string>
+    <string name="filters_year_from">From</string>
+    <string name="filters_year_to">To</string>
+    <string name="filters_rating_min">Minimum rating</string>
+    <string name="filters_rating_min_label">0 to 10</string>
+    <string name="filters_genres">Genres</string>
+    <string name="filters_apply">Apply</string>
+    <string name="filters_reset">Clear</string>
 
     <!-- Favorites -->
     <string name="favorite">Favorite</string>
@@ -174,6 +193,9 @@
     <string name="crash_log_title">Diagnostics</string>
     <string name="crash_log_empty">No errors logged.</string>
     <string name="crash_log_clear">Clear logs</string>
+    <string name="crash_log_copy">Copy</string>
+    <string name="crash_log_share">Share</string>
+    <string name="crash_log_copied">Log copied to clipboard.</string>
 
     <!-- Onboarding / acceptance -->
     <string name="onboarding_title">Welcome to TartaTV</string>
@@ -188,6 +210,8 @@
     <string name="update_message">Version %1$s is available. You are running %2$s.</string>
     <string name="update_open">Open download page</string>
     <string name="update_later">Later</string>
+    <string name="update_skip">Skip this version</string>
+    <string name="update_changelog_title">What\'s new in this version</string>
 
     <!-- Profiles -->
     <string name="profiles_title">Profiles</string>
@@ -203,7 +227,16 @@
     <string name="profiles_save">Save</string>
     <string name="profiles_name_label">Profile name (e.g. Family)</string>
     <string name="profiles_pin_optional">Parental PIN (optional, 4–8 digits)</string>
+    <string name="profile_provider_xtream">Xtream</string>
+    <string name="profile_provider_m3u">M3U</string>
+    <string name="profile_m3u_url_label">M3U playlist URL (e.g. http://srv/list.m3u)</string>
     <string name="settings_profiles_button">Manage profiles</string>
+    <string name="profiles_kids">Kids mode</string>
+    <string name="profiles_kids_desc">Hides Settings and Search. Shows only the categories allowed below.</string>
+    <string name="profiles_kids_categories">Allowed categories</string>
+    <string name="profiles_kids_no_categories">No categories allowed yet. Add some below.</string>
+    <string name="kids_locked_title">Kids mode active</string>
+    <string name="kids_locked_message">This section is disabled for the Kids profile. Switch profile on another device to access it.</string>
 
     <!-- Notifications -->
     <string name="notif_channel_new_episodes">New episodes</string>
@@ -228,4 +261,36 @@
     <string name="a11y_unfavorite">Remove from favorites</string>
     <string name="a11y_play">Play</string>
     <string name="a11y_close">Close</string>
+
+    <!-- Empty states -->
+    <string name="empty_continue_title">Your journey starts here</string>
+    <string name="empty_continue_message">Movies and episodes you start show up here so you can pick up where you left off.</string>
+    <string name="empty_continue_action">Browse movies</string>
+    <string name="empty_favorites_title">No favorites yet</string>
+    <string name="empty_favorites_message">Use the Favorite button on movie, series, and channel detail screens to keep them here.</string>
+    <string name="empty_search_title">What do you want to watch?</string>
+    <string name="empty_search_message">Search by name, genre, cast, or plot. It\'s instant and works offline.</string>
+    <string name="empty_search_no_results_title">Nothing found</string>
+    <string name="empty_search_no_results_message">Try different words or switch the filter between Channels, Movies and Series.</string>
+
+    <!-- Watchlist -->
+    <string name="watchlist_title">Watchlist</string>
+    <string name="watchlist_add">Add to watchlist</string>
+    <string name="watchlist_remove">Remove from watchlist</string>
+    <string name="empty_watchlist_title">Your watchlist is empty</string>
+    <string name="empty_watchlist_message">Use "Add to watchlist" on movie and series detail screens to keep titles you want to watch later.</string>
+    <string name="snack_watchlist_added">Added to watchlist.</string>
+    <string name="snack_watchlist_removed">Removed from watchlist.</string>
+
+    <!-- Snackbars / feedback -->
+    <string name="snack_favorite_added">Added to favorites.</string>
+    <string name="snack_favorite_removed">Removed from favorites.</string>
+    <string name="snack_profile_saved">Profile saved.</string>
+    <string name="snack_profile_deleted">Profile deleted.</string>
+    <string name="snack_profile_switched">Active profile switched.</string>
+    <string name="snack_credentials_saved">Credentials updated.</string>
+    <string name="snack_pin_saved">Parental PIN saved.</string>
+    <string name="snack_catalog_refreshing">Refreshing catalog…</string>
+    <string name="snack_catalog_refreshed">Catalog updated.</string>
+    <string name="snack_undo">Undo</string>
 </resources>

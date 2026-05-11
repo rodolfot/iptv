@@ -10,11 +10,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.compose.NavHost
@@ -29,6 +38,10 @@ import com.iptv.app.ui.legal.OnboardingScreen
 import com.iptv.app.ui.login.LoginScreen
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerScreen
+import com.iptv.app.ui.common.LocalSnackbar
+import com.iptv.app.ui.common.SnackbarController
+import com.iptv.app.ui.player.ActivePlaybackHolder
+import com.iptv.app.ui.player.LocalPlaybackHolder
 import com.iptv.app.ui.theme.IptvTheme
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,6 +55,13 @@ class MainActivity : ComponentActivity() {
 
     /** When true, leaving the app while playing puts the player into PiP. */
     var pipEnabled: Boolean = false
+
+    val playbackHolder = ActivePlaybackHolder()
+
+    override fun onDestroy() {
+        playbackHolder.release()
+        super.onDestroy()
+    }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
@@ -75,7 +95,23 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
                 ) {
-                    AppNav()
+                    val snackbarHostState = remember { SnackbarHostState() }
+                    val scope = rememberCoroutineScope()
+                    val controller = remember { SnackbarController(snackbarHostState, scope) }
+                    CompositionLocalProvider(
+                        LocalSnackbar provides controller,
+                        LocalPlaybackHolder provides playbackHolder
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AppNav()
+                            SnackbarHost(
+                                hostState = snackbarHostState,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

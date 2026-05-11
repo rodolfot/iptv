@@ -23,7 +23,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,10 +45,12 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.data.cache.CatalogCacheRepository
 import com.iptv.app.data.cache.toDomain
+import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.domain.model.LiveChannel
 import com.iptv.app.domain.model.Movie
 import com.iptv.app.domain.model.Series
 import com.iptv.app.ui.common.ChannelCard
+import com.iptv.app.ui.common.EmptyState
 import com.iptv.app.ui.common.ErrorState
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.rememberTvDim
@@ -59,7 +60,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -80,13 +84,26 @@ enum class SearchFilter { ALL, LIVE, MOVIE, SERIES }
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val cache: CatalogCacheRepository
+    private val cache: CatalogCacheRepository,
+    private val settings: SettingsStore
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state = _state.asStateFlow()
 
+    val history = settings.flow
+        .map { it.searchHistory }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     private var queryJob: Job? = null
+
+    fun rememberSearch(term: String) {
+        viewModelScope.launch { settings.pushSearchHistory(term) }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch { settings.clearSearchHistory() }
+    }
 
     fun loadCatalog() {
         if (_state.value.catalogReady || _state.value.loadingCatalog) return
@@ -131,9 +148,15 @@ class SearchViewModel @Inject constructor(
             val series = if (filter == SearchFilter.ALL || filter == SearchFilter.SERIES)
                 cache.searchSeries(q).map { it.toDomain() }
             else emptyList()
-            _state.value = _state.value.copy(
-                results = SearchResults(channels, movies, series)
-            )
+            val results = SearchResults(channels, movies, series)
+            _state.value = _state.value.copy(results = results)
+            // Persist the term once it produced something useful, then debounce more
+            // so transient typings don't stack the history.
+            val hasResults = channels.isNotEmpty() || movies.isNotEmpty() || series.isNotEmpty()
+            if (hasResults) {
+                delay(600)
+                settings.pushSearchHistory(q)
+            }
         }
     }
 }
@@ -147,6 +170,7 @@ fun SearchScreen(
     vm: SearchViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
+    val history by vm.history.collectAsState()
     val dim = rememberTvDim()
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(SearchFilter.ALL) }
@@ -179,9 +203,10 @@ fun SearchScreen(
             state.loadingCatalog -> Text(stringResource(R.string.loading_catalog))
             state.error != null && !state.catalogReady ->
                 ErrorState(message = state.error!!, onRetry = { vm.retry() })
-            query.trim().length < 2 -> Text(
-                stringResource(R.string.search_min_chars),
-                style = MaterialTheme.typography.bodyLarge
+            query.trim().length < 2 -> PreSearchPanel(
+                history = history,
+                onPick = { query = it },
+                onClear = { vm.clearHistory() }
             )
             else -> ResultsContent(state.results, onPlay, onOpenSeries, onOpenChannel)
         }
@@ -247,7 +272,11 @@ private fun ResultsContent(
     val dim = rememberTvDim()
     val empty = results.channels.isEmpty() && results.movies.isEmpty() && results.series.isEmpty()
     if (empty) {
-        Text(stringResource(R.string.nothing_found), style = MaterialTheme.typography.bodyLarge)
+        EmptyState(
+            title = stringResource(R.string.empty_search_no_results_title),
+            message = stringResource(R.string.empty_search_no_results_message),
+            icon = Icons.Filled.Search
+        )
         return
     }
 
@@ -326,5 +355,51 @@ private fun ResultRow(
             )
         }
         content()
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun PreSearchPanel(
+    history: List<String>,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    if (history.isEmpty()) {
+        EmptyState(
+            title = stringResource(R.string.empty_search_title),
+            message = stringResource(R.string.empty_search_message),
+            icon = Icons.Filled.Search
+        )
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                stringResource(R.string.search_history_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            TouchableButton(onClick = onClear) {
+                Text(stringResource(R.string.search_history_clear))
+            }
+        }
+        // Wrap chips in a flow-like LazyRow; on Phone the content scrolls horizontally
+        // when there are many entries.
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(history) { term ->
+                HistoryChip(label = term, onClick = { onPick(term) })
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun HistoryChip(label: String, onClick: () -> Unit) {
+    TouchableButton(onClick = onClick) {
+        Text("• $label", style = MaterialTheme.typography.labelLarge)
     }
 }

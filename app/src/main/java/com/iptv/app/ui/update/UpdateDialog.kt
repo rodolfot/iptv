@@ -3,19 +3,20 @@ package com.iptv.app.ui.update
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +34,7 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import com.iptv.app.BuildConfig
 import com.iptv.app.R
+import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.update.UpdateChecker
 import com.iptv.app.update.UpdateInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,7 +45,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
-    private val checker: UpdateChecker
+    private val checker: UpdateChecker,
+    private val settings: SettingsStore
 ) : ViewModel() {
     private val _info = MutableStateFlow<UpdateInfo?>(null)
     val info = _info.asStateFlow()
@@ -52,10 +55,24 @@ class UpdateViewModel @Inject constructor(
     fun checkOnce() {
         if (checked) return
         checked = true
-        viewModelScope.launch { _info.value = checker.check() }
+        viewModelScope.launch {
+            val release = checker.check() ?: return@launch
+            // Respect a previously-skipped version: only re-prompt when a newer one ships.
+            val skipped = settings.skippedUpdate()
+            if (skipped == release.versionName) return@launch
+            _info.value = release
+        }
     }
 
     fun dismiss() { _info.value = null }
+
+    fun skipThisVersion() {
+        val current = _info.value ?: return
+        viewModelScope.launch {
+            settings.skipUpdate(current.versionName)
+            _info.value = null
+        }
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -82,12 +99,28 @@ fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
                         style = MaterialTheme.typography.bodyMedium
                     )
                     if (update.notes.isNotBlank()) {
-                        Text(update.notes.take(400), style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            stringResource(R.string.update_changelog_title),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        // Show full release notes inside a scrollable, height-bounded box so
+                        // long changelogs fit without pushing the action buttons off-screen.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 220.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(update.notes, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
                     ) {
+                        TouchableButton(onClick = { vm.skipThisVersion() }) {
+                            Text(stringResource(R.string.update_skip))
+                        }
                         TouchableButton(onClick = { vm.dismiss() }) {
                             Text(stringResource(R.string.update_later))
                         }

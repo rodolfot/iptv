@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
@@ -29,6 +30,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.sort.SortOption
+import com.iptv.app.ui.common.EmptyState
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
@@ -73,7 +75,11 @@ fun FavoritesScreen(
             }
         }
         if (items.isEmpty()) {
-            Text(stringResource(R.string.favorites_empty), style = MaterialTheme.typography.bodyLarge)
+            EmptyState(
+                title = stringResource(R.string.empty_favorites_title),
+                message = stringResource(R.string.empty_favorites_message),
+                icon = Icons.Filled.Favorite
+            )
             return
         }
         LazyVerticalGrid(
