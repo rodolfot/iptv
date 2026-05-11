@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,15 @@ import javax.inject.Inject
 class OnboardingViewModel @Inject constructor(
     private val settings: SettingsStore
 ) : ViewModel() {
+    val state = settings.flow
+
+    fun setLocale(tag: String?) {
+        viewModelScope.launch {
+            settings.setAppLocale(tag)
+            com.iptv.app.ui.common.LocaleManager.apply(tag)
+        }
+    }
+
     fun accept(onDone: () -> Unit) {
         viewModelScope.launch {
             settings.acceptTerms()
@@ -59,9 +69,7 @@ fun OnboardingScreen(
     var viewing by remember { mutableStateOf<LegalDoc?>(null) }
     val dim = rememberTvDim()
     val isPhone = dim.formFactor == FormFactor.Phone
-    // Reading the activity allows the "Decline" button to actually close the
-    // screen without taking the whole process down — `exitProcess` was killing
-    // the JVM, which on some launchers leaves the splash on top of the home.
+    val settingsState by vm.state.collectAsState(initial = com.iptv.app.data.prefs.AppSettings())
     val activity = LocalContext.current as? android.app.Activity
 
     if (viewing != null) {
@@ -94,6 +102,21 @@ fun OnboardingScreen(
                 stringResource(R.string.onboarding_message),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // First-run language picker. Tapping a row immediately swaps the
+            // app locale, so the rest of this very screen re-renders in the
+            // chosen language as confirmation.
+            Text(
+                stringResource(R.string.onboarding_language_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            com.iptv.app.ui.common.LanguagePicker(
+                selectedTag = settingsState.appLocale,
+                onPick = { vm.setLocale(it) }
             )
 
             Spacer(Modifier.height(8.dp))

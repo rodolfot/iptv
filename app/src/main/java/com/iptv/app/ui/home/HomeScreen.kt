@@ -49,6 +49,8 @@ import com.iptv.app.ui.live.ChannelDetailScreen
 import com.iptv.app.ui.live.LiveSection
 import com.iptv.app.ui.movies.MovieDetailScreen
 import com.iptv.app.ui.movies.MoviesSection
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import com.iptv.app.ui.parental.ParentalSession
 import com.iptv.app.ui.player.LocalPlaybackHolder
 import com.iptv.app.ui.player.MiniPlayer
@@ -130,7 +132,23 @@ fun HomeScreen(
                     )
                 )
         ) {
-            TopBar(visibleTabs, selectedKey, { selectedKey = it })
+            // When a detail screen is open, surface its Back action up here in
+            // the top bar (next to the logo) so the action lives in a stable
+            // place instead of floating loose inside each detail.
+            // SeriesDetail has its own nested back (season -> series root), so
+            // it keeps its in-screen back button; we only hoist Back to the
+            // header for the flat detail screens.
+            val headerBack: (() -> Unit)? = when {
+                openMovie != null -> ({ openMovie = null })
+                openChannel != null -> ({ openChannel = null })
+                else -> null
+            }
+            TopBar(
+                tabs = visibleTabs,
+                selectedKey = selectedKey,
+                onSelected = { selectedKey = it },
+                onBack = headerBack
+            )
             when {
                 openMovie != null -> MovieDetailScreen(
                     args = openMovie!!,
@@ -210,7 +228,8 @@ fun HomeScreen(
 private fun TopBar(
     tabs: List<TabSpec>,
     selectedKey: String,
-    onSelected: (String) -> Unit
+    onSelected: (String) -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     val dim = rememberTvDim()
     val selectedIndex = tabs.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
@@ -228,12 +247,24 @@ private fun TopBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = dim.ScreenPadding, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (onBack != null) {
+                    // Centralised back button: the detail screens hide their
+                    // own button and surface it here so the user always finds
+                    // the action in the same spot.
+                    com.iptv.app.ui.common.TouchableButton(onClick = onBack) {
+                        androidx.compose.material3.Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(com.iptv.app.R.string.back)
+                        )
+                    }
+                }
                 Image(
                     painter = painterResource(com.iptv.app.R.drawable.app_banner),
                     contentDescription = stringResource(com.iptv.app.R.string.app_name),
-                    modifier = Modifier.height(36.dp)
+                    modifier = Modifier.height(28.dp)
                 )
             }
             LazyRow(
@@ -260,6 +291,14 @@ private fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(24.dp)
     ) {
+        if (onBack != null) {
+            com.iptv.app.ui.common.TouchableButton(onClick = onBack) {
+                androidx.compose.material3.Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(com.iptv.app.R.string.back)
+                )
+            }
+        }
         Text(
             stringResource(com.iptv.app.R.string.app_name),
             style = MaterialTheme.typography.headlineMedium

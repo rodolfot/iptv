@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -102,7 +104,7 @@ class SeriesDetailViewModel @Inject constructor(
             runCatching { repo.seriesInfo(id) }
                 .onSuccess { resp ->
                     val seasons = resp.seasons?.map { it.toModel() } ?: emptyList()
-                    val episodesMap = (resp.episodes ?: emptyMap()).mapNotNull { (k, v) ->
+                    val episodesMap = resp.normalizedEpisodes().mapNotNull { (k, v) ->
                         val sk = k.toIntOrNull() ?: return@mapNotNull null
                         sk to v.sortedBy { it.episodeNum ?: 0 }.map { it.toModel(id, sk) }
                     }.toMap()
@@ -442,23 +444,57 @@ fun SeriesDetailScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+        val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+        // Top row: Back + title (title is weighted so it ellipsizes instead
+        // of pushing the action icons off-screen).
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 4.dp)
+        ) {
             TouchableButton(onClick = {
                 if (selectedSeason != null) selectedSeason = null else onBack()
             }) { Text(stringResource(R.string.back)) }
-            Text("  $title", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(start = 16.dp))
-            Box(modifier = Modifier.weight(1f))
+            Text(
+                title,
+                style = if (isPhone) MaterialTheme.typography.titleMedium
+                else MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            // Watchlist sits on the same row as Back/Title because it's tiny
+            // (icon-only). It used to live on the action row below where it
+            // had to share with the resume button — long series titles would
+            // push it past the right edge.
             state?.let { detail ->
                 TouchableButton(onClick = {
                     val wasInList = detail.isInWatchlist
                     vm.toggleWatchlist()
                     snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
                 }) {
-                    Text(stringResource(
-                        if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
-                    ))
+                    androidx.compose.material3.Icon(
+                        if (detail.isInWatchlist) Icons.Filled.Bookmark
+                        else Icons.Filled.BookmarkBorder,
+                        contentDescription = stringResource(
+                            if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                        )
+                    )
+                    if (!isPhone) {
+                        Text(
+                            "  " + stringResource(
+                                if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                            )
+                        )
+                    }
                 }
             }
+        }
+        // Action row: Resume / Play next. Empty when there's nothing to resume.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
             state?.resume?.let { resume ->
                 val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
                 TouchableButton(onClick = {
@@ -504,46 +540,69 @@ fun SeriesDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
                 items(detail.seasons) { s ->
+                    // Trust the actual map size, not the provider's
+                    // `episode_count` field — providers commonly advertise
+                    // counts they then fail to return.
+                    val realCount = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
+                    val unavailable = realCount == 0
+                    val displayName = if (unavailable) "${s.name} (vazia)" else s.name
                     CategoryCard(
-                        title = s.name,
-                        count = s.episodeCount.takeIf { it > 0 } ?: detail.episodesBySeason[s.seasonNumber]?.size,
+                        title = displayName,
+                        count = if (unavailable) null else realCount,
                         locked = false
-                    ) { selectedSeason = s.seasonNumber }
+                    ) {
+                        // Open even if empty so the user sees the explanation
+                        // empty-state instead of a silently dead tap.
+                        selectedSeason = s.seasonNumber
+                    }
                 }
             }
         } else {
             val episodes = detail.episodesBySeason[selectedSeason] ?: emptyList()
             Text(
-                "Temporada $selectedSeason — ${episodes.size} episódios",
+                "Temporada $selectedSeason — ${episodes.size} ${stringResource(R.string.season_episodes_suffix)}",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(episodeCols),
-                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
-            ) {
-                items(episodes) { e ->
-                    val isWatched = e.id in detail.watchedEpisodes
-                    val pct = detail.episodePercents[e.id] ?: 0
-                    val titlePrefix = if (isWatched) "✓ " else ""
-                    PosterCard(
-                        title = "${titlePrefix}T${e.seasonNumber}E${e.episodeNum} • ${e.title}" +
-                            (if (pct in 1..99) "  (${pct}%)" else ""),
-                        imageUrl = e.poster,
-                        fallbackIcon = Icons.Filled.Tv
-                    ) {
-                        onPlay(
-                            PlayerArgs(
-                                kind = PlayerKind.EPISODE,
-                                streamId = e.id.toIntOrNull() ?: 0,
-                                title = e.title,
-                                containerExtension = e.containerExtension,
-                                seriesId = e.seriesId,
-                                seasonNumber = e.seasonNumber,
-                                episodeId = e.id
+            if (episodes.isEmpty()) {
+                // The Xtream `seasons[].episode_count` told us there are episodes,
+                // but the provider didn't return them in `episodes` (different
+                // payload shape or behind a "load more" call we don't implement).
+                // Surface this honestly instead of dropping the user on a blank
+                // screen.
+                com.iptv.app.ui.common.EmptyState(
+                    title = stringResource(R.string.season_empty_title),
+                    message = stringResource(R.string.season_empty_message),
+                    icon = Icons.Filled.Tv
+                )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(episodeCols),
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+                ) {
+                    items(episodes) { e ->
+                        val isWatched = e.id in detail.watchedEpisodes
+                        val pct = detail.episodePercents[e.id] ?: 0
+                        val titlePrefix = if (isWatched) "✓ " else ""
+                        PosterCard(
+                            title = "${titlePrefix}T${e.seasonNumber}E${e.episodeNum} • ${e.title}" +
+                                (if (pct in 1..99) "  (${pct}%)" else ""),
+                            imageUrl = e.poster,
+                            fallbackIcon = Icons.Filled.Tv
+                        ) {
+                            onPlay(
+                                PlayerArgs(
+                                    kind = PlayerKind.EPISODE,
+                                    streamId = e.id.toIntOrNull() ?: 0,
+                                    title = e.title,
+                                    containerExtension = e.containerExtension,
+                                    seriesId = e.seriesId,
+                                    seasonNumber = e.seasonNumber,
+                                    episodeId = e.id
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }

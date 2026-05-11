@@ -37,9 +37,15 @@ fun SortMenuButton(
     onSelect: (SortOption) -> Unit
 ) {
     var open by remember { mutableStateOf(false) }
+    val dim = rememberTvDim()
+    val displayLabel = if (dim.formFactor == FormFactor.Phone) current.shortLabel else current.label
     TouchableButton(onClick = { open = true }) {
         Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null)
-        Text("  Ordenar: ${current.label}")
+        Text(
+            "  $displayLabel",
+            maxLines = 1,
+            style = MaterialTheme.typography.labelLarge
+        )
     }
     if (open) {
         Dialog(onDismissRequest = { open = false }) {

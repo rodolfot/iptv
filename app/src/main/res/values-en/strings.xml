@@ -45,6 +45,9 @@
     <string name="section_movies_default">Movies</string>
     <string name="section_series_default">Series</string>
     <string name="section_seasons">Seasons</string>
+    <string name="season_episodes_suffix">episodes</string>
+    <string name="season_empty_title">Episodes unavailable</string>
+    <string name="season_empty_message">This season did not return episodes from the server. It may be a provider limitation — try another season or come back later.</string>
 
     <!-- Continue watching / home -->
     <string name="continue_empty">Nothing in progress yet. Start watching a movie or episode to see it here.</string>
@@ -198,6 +201,8 @@
     <string name="crash_log_copied">Log copied to clipboard.</string>
 
     <!-- Onboarding / acceptance -->
+    <string name="settings_language">App language</string>
+    <string name="onboarding_language_title">Choose language</string>
     <string name="onboarding_title">Welcome to TartaTV</string>
     <string name="onboarding_message">To use the app, you need to agree to the Terms of Use and Privacy Policy.</string>
     <string name="onboarding_read_terms">Read Terms of Use</string>

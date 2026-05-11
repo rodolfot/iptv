@@ -65,6 +65,12 @@ class SettingsViewModel @Inject constructor(
 
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
     fun resetProgress() { viewModelScope.launch { progressDao.clearAll(currentProfile.id()) } }
+    fun setAppLocale(tag: String?) {
+        viewModelScope.launch {
+            settings.setAppLocale(tag)
+            com.iptv.app.ui.common.LocaleManager.apply(tag)
+        }
+    }
 
     fun setRefreshInterval(interval: RefreshInterval) {
         viewModelScope.launch {
@@ -326,6 +332,12 @@ fun SettingsScreen(
         }
 
         NotificationsPermissionSection()
+
+        Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+        com.iptv.app.ui.common.LanguagePicker(
+            selectedTag = s.appLocale,
+            onPick = { settingsVm.setAppLocale(it) }
+        )
 
         Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
         TouchableButton(onClick = { aboutOpen = true }) {

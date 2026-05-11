@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -178,7 +180,8 @@ fun MovieDetailScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        TouchableButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+        // Back button moved up to the app top bar (next to the logo) so it
+        // has a stable home across all detail screens.
 
         val (posterW, posterH) = when (dim.formFactor) {
             com.iptv.app.ui.common.FormFactor.Phone -> 140.dp to 210.dp
@@ -251,14 +254,24 @@ fun MovieDetailScreen(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
                     }
+                    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
                     TouchableButton(onClick = {
                         val wasInList = state.isInWatchlist
                         vm.toggleWatchlist(args)
                         snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
                     }) {
-                        Text(stringResource(
-                            if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
-                        ))
+                        androidx.compose.material3.Icon(
+                            if (state.isInWatchlist) Icons.Filled.Bookmark
+                            else Icons.Filled.BookmarkBorder,
+                            contentDescription = stringResource(
+                                if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                            )
+                        )
+                        if (!isPhone) {
+                            Text("  " + stringResource(
+                                if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                            ))
+                        }
                     }
                 }
             }

@@ -33,6 +33,11 @@ android {
         versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: gitCommitCount
         versionName = (project.findProperty("VERSION_NAME") as String?) ?: gitDescribe
 
+        // Per-app language picker support (Android 13+ uses LocaleManager,
+        // 12 and below fall back to AppCompatDelegate). The list mirrors the
+        // values-* resource folders we ship.
+        resourceConfigurations += listOf("pt", "en", "es", "it", "fr", "de")
+
         // Auto-update endpoint. Override with -PUPDATE_REPO_OWNER=... in CI/local.
         buildConfigField(
             "String", "UPDATE_REPO_OWNER",
@@ -111,6 +116,8 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.13.1")
+    // AppCompatDelegate.setApplicationLocales — runtime per-app locale switch.
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")

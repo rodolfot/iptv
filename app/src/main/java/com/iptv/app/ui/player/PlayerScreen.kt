@@ -3,6 +3,8 @@ package com.iptv.app.ui.player
 import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -146,7 +148,7 @@ class PlayerViewModel @Inject constructor(
                         val seriesTitle = info.info?.name ?: args.title
                         val seriesCover = info.info?.cover ?: args.posterUrl
                         val orderedEpisodes = mutableListOf<Episode>()
-                        val episodesMap = info.episodes ?: emptyMap()
+                        val episodesMap = info.normalizedEpisodes()
                         val keys = episodesMap.keys.mapNotNull { it.toIntOrNull() }.sorted()
                         keys.forEach { sk ->
                             episodesMap[sk.toString()]
@@ -378,6 +380,10 @@ fun PlayerScreen(
     }
     val dim = com.iptv.app.ui.common.rememberTvDim()
     val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+    // Mirrors the ExoPlayer chrome visibility so our own overlay (Back +
+    // Tracks) appears/disappears together with the playback controls instead
+    // of always sitting on top of the video.
+    var controlsVisible by remember { mutableStateOf(true) }
     val playerView = remember(isPhone) {
         PlayerView(context).apply {
             player = exo
@@ -389,6 +395,11 @@ fun PlayerScreen(
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             isFocusable = true
             isFocusableInTouchMode = true
+            setControllerVisibilityListener(
+                PlayerView.ControllerVisibilityListener { visibility ->
+                    controlsVisible = visibility == android.view.View.VISIBLE
+                }
+            )
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -478,20 +489,33 @@ fun PlayerScreen(
                 )
             }
         }
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .safeDrawingPadding()
-                .padding(24.dp)
-        ) {
-            Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+        if (controlsVisible) {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .safeDrawingPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                // Goes through onMinimize() so a back press here still surfaces
+                // the mini-player rather than killing playback.
+                com.iptv.app.ui.common.TouchableButton(onClick = onMinimize) {
+                    androidx.compose.material3.Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back),
+                        tint = Color.White
+                    )
+                }
+                Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+            }
         }
-        if (currentTracks != null) {
+        if (currentTracks != null && controlsVisible) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .safeDrawingPadding()
-                    .padding(24.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 TouchableButton(onClick = { trackPickerOpen = true }) {
                     Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_tracks))

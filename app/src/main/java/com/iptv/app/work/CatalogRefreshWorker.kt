@@ -88,7 +88,7 @@ class CatalogRefreshWorker @AssistedInject constructor(
         return seriesFavs.associate { fav ->
             val count = runCatching { xtream.seriesInfo(fav.itemId) }
                 .getOrNull()
-                ?.episodes
+                ?.normalizedEpisodes()
                 ?.values
                 ?.sumOf { it.size }
                 ?: 0

@@ -45,6 +45,9 @@
     <string name="section_movies_default">Películas</string>
     <string name="section_series_default">Series</string>
     <string name="section_seasons">Temporadas</string>
+    <string name="season_episodes_suffix">episodios</string>
+    <string name="season_empty_title">Episodios no disponibles</string>
+    <string name="season_empty_message">Esta temporada no devolvió episodios desde el servidor. Puede ser una limitación del proveedor — prueba otra temporada o vuelve más tarde.</string>
 
     <!-- Continue watching / home -->
     <string name="continue_empty">No hay nada en curso aún. Empieza a ver una película o un episodio para verlo aquí.</string>
@@ -198,6 +201,8 @@
     <string name="crash_log_copied">Registro copiado al portapapeles.</string>
 
     <!-- Onboarding / acceptance -->
+    <string name="settings_language">Idioma de la app</string>
+    <string name="onboarding_language_title">Elige idioma</string>
     <string name="onboarding_title">Bienvenido a TartaTV</string>
     <string name="onboarding_message">Para usar la aplicación, debes aceptar los Términos de Uso y la Política de Privacidad.</string>
     <string name="onboarding_read_terms">Leer Términos de Uso</string>

@@ -145,7 +145,7 @@ fun ChannelDetailScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        TouchableButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+        // Back moved up to the app top bar.
 
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             Box(

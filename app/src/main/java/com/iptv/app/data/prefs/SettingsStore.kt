@@ -33,7 +33,9 @@ data class AppSettings(
     val refreshInterval: RefreshInterval = RefreshInterval.HOURS_12,
     val profiles: List<Profile> = emptyList(),
     val activeProfileId: String? = null,
-    val searchHistory: List<String> = emptyList()
+    val searchHistory: List<String> = emptyList(),
+    /** BCP-47 tag (e.g. "pt-BR", "en", "es"). Null = follow system locale. */
+    val appLocale: String? = null
 )
 
 enum class RefreshInterval(val ttlMs: Long, val labelRes: Int) {
@@ -74,6 +76,7 @@ class SettingsStore @Inject constructor(
         val REFRESH_INTERVAL = stringPreferencesKey("refresh_interval")
         val SEARCH_HISTORY = stringPreferencesKey("search_history_v1")
         val SKIPPED_UPDATE = stringPreferencesKey("skipped_update_version")
+        val APP_LOCALE = stringPreferencesKey("app_locale")
     }
 
     // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
@@ -101,8 +104,15 @@ class SettingsStore @Inject constructor(
             refreshInterval = RefreshInterval.fromName(p[Keys.REFRESH_INTERVAL]) ?: RefreshInterval.HOURS_12,
             profiles = Profile.listFromJson(secure.getProfilesJson()),
             activeProfileId = secure.getActiveProfileId(),
-            searchHistory = decodeHistory(p[Keys.SEARCH_HISTORY])
+            searchHistory = decodeHistory(p[Keys.SEARCH_HISTORY]),
+            appLocale = p[Keys.APP_LOCALE]
         )
+    }
+
+    suspend fun setAppLocale(tag: String?) {
+        context.dataStore.edit {
+            if (tag.isNullOrBlank()) it.remove(Keys.APP_LOCALE) else it[Keys.APP_LOCALE] = tag
+        }
     }
 
     suspend fun skipUpdate(version: String) {

@@ -198,12 +198,43 @@ data class SeriesDto(
     @Json(name = "category_id") val categoryId: String? = null
 )
 
+/**
+ * Provider variance:
+ *  - happy path: `episodes` is an object like `{"1": [..], "2": [..]}`
+ *  - some providers send `episodes: []` (an array) when there's nothing → we
+ *    must NOT fail the whole `seriesInfo` call in that case.
+ *  - some send `episodes: {}` (empty object) — fine.
+ * We declare `episodes` as `Any?` and normalise in [normalizedEpisodes] so
+ * Moshi never throws on the array shape.
+ */
 @JsonClass(generateAdapter = true)
 data class SeriesInfoResponse(
     val seasons: List<SeasonDto>? = null,
     val info: SeriesInfoDetail? = null,
-    val episodes: Map<String, List<EpisodeDto>>? = null
-)
+    val episodes: Any? = null
+) {
+    @Suppress("UNCHECKED_CAST")
+    fun normalizedEpisodes(): Map<String, List<EpisodeDto>> {
+        val map = episodes as? Map<String, *> ?: return emptyMap()
+        // The inner lists arrive as `List<Map<String, Any?>>` because Moshi
+        // decodes JSON objects into Maps when the field type is Any. Re-encode
+        // each entry through the Moshi adapter to get EpisodeDto back.
+        val moshi = com.squareup.moshi.Moshi.Builder()
+            .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+            .build()
+        val listType = com.squareup.moshi.Types.newParameterizedType(
+            List::class.java, EpisodeDto::class.java
+        )
+        val listAdapter = moshi.adapter<List<EpisodeDto>>(listType).lenient()
+        val mapAdapter = moshi.adapter(Any::class.java)
+        return map.entries.mapNotNull { (k, v) ->
+            val key = k.toString()
+            val json = mapAdapter.toJson(v) ?: return@mapNotNull null
+            val list = runCatching { listAdapter.fromJson(json) }.getOrNull() ?: return@mapNotNull null
+            key to list
+        }.toMap()
+    }
+}
 
 @JsonClass(generateAdapter = true)
 data class SeasonDto(

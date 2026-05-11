@@ -31,9 +31,15 @@ class IptvApp : Application(), Configuration.Provider {
         super.onCreate()
         CrashLog.install(this)
         Notifications.ensureChannels(this)
+        // Apply locale synchronously — must happen before the first activity
+        // inflates so views resolve the right strings.xml on first frame.
+        kotlinx.coroutines.runBlocking {
+            val tag = settings.flow.first().appLocale
+            com.iptv.app.ui.common.LocaleManager.apply(tag)
+        }
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            val interval = settings.flow.first().refreshInterval
-            CatalogRefreshWorker.schedule(this@IptvApp, interval)
+            val s = settings.flow.first()
+            CatalogRefreshWorker.schedule(this@IptvApp, s.refreshInterval)
             ResumeReminderWorker.schedule(this@IptvApp)
         }
     }
