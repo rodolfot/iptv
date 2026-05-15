@@ -127,14 +127,29 @@ fun SeasonDto.toModel(): Season = Season(
     episodeCount = episodeCount ?: 0
 )
 
-fun EpisodeDto.toModel(seriesId: Int, fallbackSeason: Int): Episode = Episode(
-    id = id,
-    seriesId = seriesId,
-    seasonNumber = season ?: fallbackSeason,
-    episodeNum = episodeNum ?: 0,
-    title = title ?: "Episódio ${episodeNum ?: 0}",
-    containerExtension = containerExtension,
-    plot = info?.plot,
-    durationSecs = info?.durationSecs,
-    poster = info?.movieImage
-)
+fun EpisodeDto.toModel(seriesId: Int, fallbackSeason: Int): Episode {
+    // Providers spread the same data across different keys. Resolve title,
+    // synopsis and poster from any of the common spellings.
+    val resolvedTitle = listOfNotNull(title, info?.name, info?.title)
+        .firstOrNull { it.isNotBlank() }
+        ?: "Episódio ${episodeNum ?: 0}"
+    val resolvedPlot = listOfNotNull(info?.plot, info?.overview)
+        .firstOrNull { it.isNotBlank() }
+    val resolvedPoster = listOfNotNull(
+        info?.movieImage,
+        info?.coverBig,
+        info?.cover,
+        info?.image
+    ).firstOrNull { it.isNotBlank() }
+    return Episode(
+        id = id,
+        seriesId = seriesId,
+        seasonNumber = season ?: fallbackSeason,
+        episodeNum = episodeNum ?: 0,
+        title = resolvedTitle,
+        containerExtension = containerExtension,
+        plot = resolvedPlot,
+        durationSecs = info?.durationSecs,
+        poster = resolvedPoster
+    )
+}

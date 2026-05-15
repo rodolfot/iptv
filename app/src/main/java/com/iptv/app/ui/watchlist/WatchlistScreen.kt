@@ -51,8 +51,13 @@ fun WatchlistScreen(
             )
             return
         }
+        val posterMinWidth = when (dim.formFactor) {
+            com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
+            com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
+            com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
+        }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(dim.SeriesGridColumns),
+            columns = GridCells.Adaptive(posterMinWidth),
             horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
             verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
         ) {
@@ -65,7 +70,8 @@ fun WatchlistScreen(
                 PosterCard(
                     title = entry.name,
                     imageUrl = entry.logoUrl,
-                    fallbackIcon = icon
+                    fallbackIcon = icon,
+                    fillWidth = true
                 ) {
                     when (entry.type) {
                         ContentType.MOVIE -> onPlay(

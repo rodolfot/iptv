@@ -1,13 +1,31 @@
 package com.iptv.app.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -19,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -141,6 +160,9 @@ fun SettingsScreen(
     val pinSavedMsg = stringResource(R.string.snack_pin_saved)
     val credsSavedMsg = stringResource(R.string.snack_credentials_saved)
     val refreshingMsg = stringResource(R.string.snack_catalog_refreshing)
+    val refreshIntervalSavedMsg = stringResource(R.string.snack_refresh_interval_saved)
+    val localeSavedMsg = stringResource(R.string.snack_locale_saved)
+    val languageLabel = stringResource(R.string.settings_language_label)
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
@@ -173,6 +195,8 @@ fun SettingsScreen(
         return
     }
 
+    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -181,7 +205,14 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleMedium)
+
+        // On TV/Tablet, split the settings into two side-by-side columns so
+        // most of the page fits within a single viewport — the D-pad can't
+        // jump back to the top of a long scroll, so density matters.
+        val rootArrangement = if (isPhone) Arrangement.spacedBy(20.dp) else Arrangement.spacedBy(32.dp)
+
+        val leftColumn: @Composable () -> Unit = {
+            Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleMedium)
         if (!editingServer) {
             Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
@@ -269,17 +300,12 @@ fun SettingsScreen(
             stringResource(if (s.isPinSet) R.string.settings_pin_set else R.string.settings_pin_unset),
             style = MaterialTheme.typography.bodySmall
         )
-        OutlinedTextField(
+        PinField(
             value = pin,
             onValueChange = { pin = it.filter(Char::isDigit).take(8) },
-            label = {
-                Text(stringResource(
-                    if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
-                ))
-            },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            placeholder = stringResource(
+                if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
+            ),
             modifier = Modifier.width(360.dp)
         )
         TouchableButton(
@@ -295,19 +321,23 @@ fun SettingsScreen(
         }
 
         Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleMedium)
-        Text(
-            stringResource(R.string.settings_refresh_interval),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
-        ) {
-            RefreshInterval.values().forEach { opt ->
-                val selected = s.refreshInterval == opt
-                TouchableButton(
-                    onClick = { settingsVm.setRefreshInterval(opt) },
-                    selected = selected
-                ) { Text(stringResource(opt.labelRes)) }
+        run {
+            val intervalOptions = RefreshInterval.values().map {
+                com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
+            }
+            val current = intervalOptions.firstOrNull { it.id == s.refreshInterval }
+            com.iptv.app.ui.common.ComboColumn(
+                label = stringResource(R.string.settings_refresh_interval)
+            ) {
+                com.iptv.app.ui.common.ComboBox(
+                    selected = current,
+                    options = intervalOptions,
+                    onSelect = {
+                        settingsVm.setRefreshInterval(it.id)
+                        snackbar?.show(refreshIntervalSavedMsg)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
         val lastUpdated by vm.lastUpdatedAt.collectAsState()
@@ -329,25 +359,65 @@ fun SettingsScreen(
         TouchableButton(onClick = { settingsVm.resetProgress() }) {
             Text(stringResource(R.string.settings_reset_progress))
         }
+        } // end leftColumn
 
-        NotificationsPermissionSection()
+        val rightColumn: @Composable () -> Unit = {
+            NotificationsPermissionSection()
 
-        Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
-        com.iptv.app.ui.common.LanguagePicker(
-            selectedTag = s.appLocale,
-            onPick = { settingsVm.setAppLocale(it) }
-        )
+            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            run {
+                val localeOptions = com.iptv.app.ui.common.LocaleManager.available.map {
+                    com.iptv.app.ui.common.ComboOption(
+                        id = it.tag ?: "__system__",
+                        label = it.display
+                    )
+                }
+                val currentKey = s.appLocale ?: "__system__"
+                val current = localeOptions.firstOrNull { it.id == currentKey }
+                com.iptv.app.ui.common.ComboColumn(label = languageLabel) {
+                    com.iptv.app.ui.common.ComboBox(
+                        selected = current,
+                        options = localeOptions,
+                        onSelect = {
+                            val tag = if (it.id == "__system__") null else it.id
+                            settingsVm.setAppLocale(tag)
+                            snackbar?.show(localeSavedMsg)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
 
         Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
         TouchableButton(onClick = { aboutOpen = true }) {
             Text(stringResource(R.string.settings_open_about))
         }
 
-        Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleMedium)
-        TouchableButton(onClick = {
-            vm.logout()
-            onLogout()
-        }) { Text(stringResource(R.string.settings_logout)) }
+            Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleMedium)
+            TouchableButton(onClick = {
+                vm.logout()
+                onLogout()
+            }) { Text(stringResource(R.string.settings_logout)) }
+        } // end rightColumn
+
+        if (isPhone) {
+            leftColumn()
+            rightColumn()
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = rootArrangement
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) { leftColumn() }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) { rightColumn() }
+            }
+        }
     }
 }
 
@@ -377,5 +447,89 @@ private fun NotificationsPermissionSection() {
         TouchableButton(onClick = {
             launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }) { Text(stringResource(R.string.settings_notifications_perm)) }
+    }
+}
+
+/**
+ * D-pad friendly PIN input. Same pattern as the catalog filter field:
+ *  - Focus alone never opens the IME.
+ *  - OK / D-pad center / Enter enters edit mode (then the IME shows).
+ *  - Back / Escape leaves edit mode without losing focus.
+ *
+ * Prevents the soft keyboard from popping up just because the user navigated
+ * past the field with the remote.
+ */
+@Composable
+private fun PinField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier
+) {
+    var editing by remember { mutableStateOf(false) }
+    val editorFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(editing) {
+        if (editing) {
+            editorFocus.requestFocus()
+            keyboard?.show()
+        } else {
+            keyboard?.hide()
+        }
+    }
+
+    val shape = RoundedCornerShape(10.dp)
+    val borderColor = if (editing) MaterialTheme.colorScheme.primary else Color(0x40FFFFFF)
+    val masked = "•".repeat(value.length)
+
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(2.dp, borderColor, shape)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (editing) {
+            androidx.compose.foundation.text.BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { editing = false }),
+                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 18.sp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(editorFocus)
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Back, Key.Escape -> { editing = false; true }
+                            else -> false
+                        }
+                    }
+            )
+        } else {
+            Text(
+                text = if (value.isEmpty()) placeholder else masked,
+                color = if (value.isEmpty()) Color(0x80FFFFFF) else Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> { editing = true; true }
+                            else -> false
+                        }
+                    }
+                    .clickable { editing = true }
+            )
+        }
     }
 }

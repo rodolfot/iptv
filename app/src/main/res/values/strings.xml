@@ -292,6 +292,10 @@
     <string name="snack_favorite_removed">Removido dos favoritos.</string>
     <string name="snack_profile_saved">Perfil salvo.</string>
     <string name="snack_profile_deleted">Perfil excluído.</string>
+    <string name="snack_refresh_interval_saved">Intervalo de atualização salvo.</string>
+    <string name="snack_locale_saved">Idioma alterado.</string>
+    <string name="settings_language_label">Idioma do aplicativo</string>
+    <string name="settings_locale_system">Sistema</string>
     <string name="snack_profile_switched">Perfil ativo trocado.</string>
     <string name="snack_credentials_saved">Credenciais atualizadas.</string>
     <string name="snack_pin_saved">PIN parental salvo.</string>

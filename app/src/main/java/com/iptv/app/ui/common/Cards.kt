@@ -17,7 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,13 +69,15 @@ fun PosterCard(
     imageUrl: String?,
     locked: Boolean = false,
     fallbackIcon: ImageVector = Icons.Filled.Movie,
+    fillWidth: Boolean = false,
+    rating: Double? = null,
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
-    val cardModifier = if (dim.formFactor == FormFactor.Phone) {
-        Modifier.fillMaxWidth().aspectRatio(2f / 3f)
-    } else {
-        Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
+    val cardModifier = when {
+        fillWidth -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+        dim.formFactor == FormFactor.Phone -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+        else -> Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
     }
     TouchableCard(
         onClick = onClick,
@@ -102,6 +106,32 @@ fun PosterCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Filled.Lock, contentDescription = "Bloqueado", tint = Color.White)
+                }
+            }
+            // Rating chip — only when the provider returned something useful.
+            // Many catalogs return 0.0 for "unknown"; treat that as missing
+            // so we don't show a meaningless "★ 0.0" on every card.
+            if (rating != null && rating > 0.0) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xCC000000))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFC107),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        " %.1f".format(rating),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             }
             Box(
@@ -228,8 +258,8 @@ fun CategoryCard(
         // Smaller, denser tiles on phone — caller asked to see more categories
         // per viewport without horizontal scroll.
         FormFactor.Phone -> Triple(170.dp, 68.dp, 10.dp)
-        FormFactor.Tablet -> Triple(280.dp, 120.dp, 16.dp)
-        FormFactor.Tv -> Triple(360.dp, 140.dp, 20.dp)
+        FormFactor.Tablet -> Triple(220.dp, 88.dp, 14.dp)
+        FormFactor.Tv -> Triple(280.dp, 96.dp, 16.dp)
     }
     val categoryModifier = if (isPhone) {
         Modifier.fillMaxWidth().height(h)
@@ -244,8 +274,11 @@ fun CategoryCard(
             Column(modifier = Modifier.align(Alignment.CenterStart)) {
                 Text(
                     title,
-                    style = if (isPhone) MaterialTheme.typography.titleSmall
-                    else MaterialTheme.typography.titleLarge,
+                    style = when (dim.formFactor) {
+                        FormFactor.Phone -> MaterialTheme.typography.titleSmall
+                        FormFactor.Tablet -> MaterialTheme.typography.titleMedium
+                        FormFactor.Tv -> MaterialTheme.typography.titleMedium
+                    },
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

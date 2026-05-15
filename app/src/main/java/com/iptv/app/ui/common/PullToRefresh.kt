@@ -47,8 +47,12 @@ fun PullToRefreshBox(
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(isRefreshing) {
-        if (isRefreshing) offset.animateTo(triggerPx) else offset.animateTo(0f)
+    LaunchedEffect(isRefreshing, enabled) {
+        // Only show the indicator when this composable is the one driving the
+        // refresh (i.e. the platform actually has a pull gesture). On TV we
+        // pass enabled=false, so we never want a phantom spinner from
+        // background reloads.
+        if (isRefreshing && enabled) offset.animateTo(triggerPx) else offset.animateTo(0f)
     }
 
     val connection = remember(enabled, isRefreshing) {

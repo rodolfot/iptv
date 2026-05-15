@@ -104,7 +104,13 @@ fun HomeScreen(
     var openChannel by remember { mutableStateOf<com.iptv.app.domain.model.LiveChannel?>(null) }
     val initialLoading by vm.initialLoading.collectAsState()
     val playbackHolder = LocalPlaybackHolder.current
-    val showMiniPlayer = playbackHolder?.minimized?.value == true && playbackHolder.player != null
+    val miniPlayerFormFactor = com.iptv.app.ui.common.rememberTvDim().formFactor
+    // TV/Tablet have no D-pad-reachable dock for the mini-player, and audio
+    // bleeding into the menus is more annoying than convenient — only phones
+    // get the strip.
+    val showMiniPlayer = playbackHolder?.minimized?.value == true &&
+        playbackHolder.player != null &&
+        miniPlayerFormFactor == com.iptv.app.ui.common.FormFactor.Phone
 
     LaunchedEffect(Unit) { vm.bootstrapCatalog() }
 

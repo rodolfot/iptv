@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -27,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
+import com.iptv.app.domain.model.sortedForDisplay
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ChannelCard
@@ -53,9 +55,16 @@ fun LiveSection(
     val epgNow by vm.epgNow.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
     val kidsAllowed by vm.kidsAllowedCategories.collectAsState()
-    // In Kids mode the parent picks specific categories; everything else is hidden.
-    val cats = if (kidsAllowed.isEmpty()) rawCats
-        else rawCats.copy(items = rawCats.items.filter { "live:${it.id}" in kidsAllowed })
+    val kidsActive by vm.kidsMode.collectAsState()
+    // Kids profile: prefer the parent's allowlist; otherwise at least hide
+    // categories flagged as adult so toggling Kids isn't a no-op.
+    val cats = when {
+        !kidsActive -> rawCats
+        kidsAllowed.isNotEmpty() -> rawCats.copy(
+            items = rawCats.items.filter { "live:${it.id}" in kidsAllowed }
+        )
+        else -> rawCats.copy(items = rawCats.items.filter { !it.isAdult })
+    }
     val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
@@ -77,7 +86,7 @@ fun LiveSection(
         val catCols = when (dim.formFactor) {
             com.iptv.app.ui.common.FormFactor.Phone -> 2
             com.iptv.app.ui.common.FormFactor.Tablet -> 3
-            com.iptv.app.ui.common.FormFactor.Tv -> 3
+            com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
         if (selectedCat == null) {
             Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
@@ -87,8 +96,9 @@ fun LiveSection(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             val needleCat = categoryFilter.trim().lowercase()
-            val visibleCats = if (needleCat.isBlank()) cats.items
-            else cats.items.filter { it.name.lowercase().contains(needleCat) }
+            val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+            val visibleCats = if (needleCat.isBlank()) sortedCats
+            else sortedCats.filter { it.name.lowercase().contains(needleCat) }
 
             // FTS hits across all categories.
             var foundChannels by remember { mutableStateOf<List<com.iptv.app.domain.model.LiveChannel>>(emptyList()) }
@@ -149,7 +159,13 @@ fun LiveSection(
             val sectionDefault = stringResource(R.string.section_live_default)
             val categoryName = cats.items.firstOrNull { it.id == selectedCat }?.name ?: sectionDefault
             val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            val needle = localFilter.trim().lowercase()
+            val filteredChannels = if (needle.isBlank()) channels.items
+                else channels.items.filter { it.name.lowercase().contains(needle) }
+
             if (isPhone) {
+                // Phone keeps the original stacked layout — narrow screen has
+                // no room for an inline filter beside the title.
                 Text(
                     categoryName,
                     style = MaterialTheme.typography.titleMedium,
@@ -163,51 +179,86 @@ fun LiveSection(
                         options = SortOption.LIVE_OPTIONS
                     ) { vm.setSort(SortScope.LIVE, it) }
                 }
+                if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
+                channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
+                LocalFilterField(
+                    value = localFilter,
+                    onValueChange = { localFilter = it },
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(dim.ChannelGridColumns),
+                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                    verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
+                ) {
+                    items(filteredChannels) { ch ->
+                        val cat = cats.items.firstOrNull { it.id == selectedCat }
+                        val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                        val now = ch.epgChannelId?.let { epgNow[it] }
+                        val nowProgress = now?.let {
+                            val span = (it.stopMs - it.startMs).coerceAtLeast(1)
+                            ((System.currentTimeMillis() - it.startMs).toFloat() / span)
+                                .coerceIn(0f, 1f)
+                        }
+                        ChannelCard(
+                            title = ch.name,
+                            number = ch.num,
+                            logoUrl = ch.logoUrl,
+                            locked = locked,
+                            nowPlaying = now?.title,
+                            nowProgress = nowProgress
+                        ) {
+                            if (locked) {
+                                pendingChannel = PlayerArgs(
+                                    kind = PlayerKind.LIVE,
+                                    streamId = ch.id,
+                                    title = ch.name,
+                                    containerExtension = null
+                                )
+                            } else {
+                                onOpenChannel(ch)
+                            }
+                        }
+                    }
+                }
             } else {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+                // TV/Tablet: title + sort on the left, filter inline on the
+                // right. Channels render as a vertical list with an EPG side
+                // panel for the focused row.
+                Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
                     Text(
                         categoryName,
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
-                    Box(modifier = Modifier.weight(1f))
-                    SortMenuButton(
-                        current = settings.liveSort,
-                        options = SortOption.LIVE_OPTIONS
-                    ) { vm.setSort(SortScope.LIVE, it) }
-                }
-            }
-            if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
-            channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
-            LocalFilterField(
-                value = localFilter,
-                onValueChange = { localFilter = it },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            val needle = localFilter.trim().lowercase()
-            val filteredChannels = if (needle.isBlank()) channels.items
-                else channels.items.filter { it.name.lowercase().contains(needle) }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(dim.ChannelGridColumns),
-                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
-            ) {
-                items(filteredChannels) { ch ->
-                    val cat = cats.items.firstOrNull { it.id == selectedCat }
-                    val locked = (cat?.isAdult == true) && !parental.isUnlocked()
-                    val now = ch.epgChannelId?.let { epgNow[it] }
-                    val nowProgress = now?.let {
-                        val span = (it.stopMs - it.startMs).coerceAtLeast(1)
-                        ((System.currentTimeMillis() - it.startMs).toFloat() / span)
-                            .coerceIn(0f, 1f)
+                    Box(modifier = Modifier.padding(start = 12.dp)) {
+                        SortMenuButton(
+                            current = settings.liveSort,
+                            options = SortOption.LIVE_OPTIONS
+                        ) { vm.setSort(SortScope.LIVE, it) }
                     }
-                    ChannelCard(
-                        title = ch.name,
-                        number = ch.num,
-                        logoUrl = ch.logoUrl,
-                        locked = locked,
-                        nowPlaying = now?.title,
-                        nowProgress = nowProgress
-                    ) {
+                    Box(modifier = Modifier.weight(1f))
+                    LocalFilterField(
+                        value = localFilter,
+                        onValueChange = { localFilter = it },
+                        modifier = Modifier.width(360.dp)
+                    )
+                }
+                if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
+                channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
+                val cat = cats.items.firstOrNull { it.id == selectedCat }
+                ChannelListWithEpg(
+                    vm = vm,
+                    channels = filteredChannels,
+                    epgNow = epgNow,
+                    isCategoryAdult = cat?.isAdult == true,
+                    isParentalUnlocked = parental.isUnlocked(),
+                    onPlay = { ch ->
+                        val locked = (cat?.isAdult == true) && !parental.isUnlocked()
                         if (locked) {
                             pendingChannel = PlayerArgs(
                                 kind = PlayerKind.LIVE,
@@ -219,7 +270,7 @@ fun LiveSection(
                             onOpenChannel(ch)
                         }
                     }
-                }
+                )
             }
         }
     }

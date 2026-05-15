@@ -195,41 +195,40 @@ private fun ProfileEditor(
             ) { Text(stringResource(R.string.profile_provider_m3u)) }
         }
 
-        OutlinedTextField(
+        com.iptv.app.ui.common.TvSafeTextField(
             value = name, onValueChange = { name = it },
-            label = { Text(stringResource(R.string.profiles_name_label)) },
-            singleLine = true, modifier = Modifier.fillMaxWidth()
+            label = stringResource(R.string.profiles_name_label),
+            modifier = Modifier.fillMaxWidth()
         )
-        OutlinedTextField(
+        com.iptv.app.ui.common.TvSafeTextField(
             value = host, onValueChange = { host = it },
-            label = {
-                Text(stringResource(
-                    if (isM3u) R.string.profile_m3u_url_label else R.string.login_host
-                ))
-            },
-            singleLine = true, modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
+            label = stringResource(
+                if (isM3u) R.string.profile_m3u_url_label else R.string.login_host
+            ),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            modifier = Modifier.fillMaxWidth()
         )
         if (!isM3u) {
-            OutlinedTextField(
+            com.iptv.app.ui.common.TvSafeTextField(
                 value = user, onValueChange = { user = it },
-                label = { Text(stringResource(R.string.login_user)) },
-                singleLine = true, modifier = Modifier.fillMaxWidth()
+                label = stringResource(R.string.login_user),
+                modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
+            com.iptv.app.ui.common.TvSafeTextField(
                 value = pass, onValueChange = { pass = it },
-                label = { Text(stringResource(R.string.login_pass)) },
-                singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                label = stringResource(R.string.login_pass),
+                isPassword = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth()
             )
         }
-        OutlinedTextField(
-            value = pin, onValueChange = { if (it.length <= 8) pin = it.filter { c -> c.isDigit() } },
-            label = { Text(stringResource(R.string.profiles_pin_optional)) },
-            singleLine = true, visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword)
+        com.iptv.app.ui.common.TvSafeTextField(
+            value = pin,
+            onValueChange = { if (it.length <= 8) pin = it.filter { c -> c.isDigit() } },
+            label = stringResource(R.string.profiles_pin_optional),
+            isPassword = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            modifier = Modifier.fillMaxWidth()
         )
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
