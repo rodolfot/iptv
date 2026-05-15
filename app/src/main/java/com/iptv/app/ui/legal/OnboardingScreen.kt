@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -68,10 +71,29 @@ fun OnboardingScreen(
     vm: OnboardingViewModel = hiltViewModel()
 ) {
     var viewing by remember { mutableStateOf<LegalDoc?>(null) }
+    // Remember which document the user opened so we can return focus to the
+    // matching button when they come back — otherwise the page re-renders
+    // with focus at the very top, forcing the user to scroll down again.
+    var lastViewed by remember { mutableStateOf<LegalDoc?>(null) }
     val dim = rememberTvDim()
     val isPhone = dim.formFactor == FormFactor.Phone
     val settingsState by vm.state.collectAsState(initial = com.iptv.app.data.prefs.AppSettings())
     val activity = LocalContext.current as? android.app.Activity
+
+    val termsFocus = remember { FocusRequester() }
+    val privacyFocus = remember { FocusRequester() }
+    LaunchedEffect(viewing, lastViewed) {
+        if (viewing == null && lastViewed != null) {
+            runCatching {
+                when (lastViewed) {
+                    LegalDoc.TERMS -> termsFocus.requestFocus()
+                    LegalDoc.PRIVACY -> privacyFocus.requestFocus()
+                    null -> {}
+                }
+            }
+            lastViewed = null
+        }
+    }
 
     if (viewing != null) {
         LegalViewerScreen(doc = viewing!!, onClose = { viewing = null })
@@ -109,16 +131,33 @@ fun OnboardingScreen(
 
             // First-run language picker. Tapping a row immediately swaps the
             // app locale, so the rest of this very screen re-renders in the
-            // chosen language as confirmation.
+            // chosen language as confirmation. Combo (one button + dialog)
+            // keeps the screen short on TV — the old vertical list pushed the
+            // primary CTAs below the fold.
             Text(
                 stringResource(R.string.onboarding_language_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            com.iptv.app.ui.common.LanguagePicker(
-                selectedTag = settingsState.appLocale,
-                onPick = { vm.setLocale(it) }
-            )
+            run {
+                val options = com.iptv.app.ui.common.LocaleManager.available.map {
+                    com.iptv.app.ui.common.ComboOption(
+                        id = it.tag ?: "__system__",
+                        label = it.display
+                    )
+                }
+                val currentKey = settingsState.appLocale ?: "__system__"
+                val current = options.firstOrNull { it.id == currentKey }
+                com.iptv.app.ui.common.ComboBox(
+                    selected = current,
+                    options = options,
+                    onSelect = {
+                        val tag = if (it.id == "__system__") null else it.id
+                        vm.setLocale(tag)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -127,18 +166,26 @@ fun OnboardingScreen(
             if (isPhone) {
                 FullWidthButton(
                     label = stringResource(R.string.onboarding_read_terms),
-                    onClick = { viewing = LegalDoc.TERMS }
+                    onClick = { lastViewed = LegalDoc.TERMS; viewing = LegalDoc.TERMS },
+                    modifier = Modifier.focusRequester(termsFocus)
                 )
                 FullWidthButton(
                     label = stringResource(R.string.onboarding_read_privacy),
-                    onClick = { viewing = LegalDoc.PRIVACY }
+                    onClick = { lastViewed = LegalDoc.PRIVACY; viewing = LegalDoc.PRIVACY },
+                    modifier = Modifier.focusRequester(privacyFocus)
                 )
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TouchableButton(onClick = { viewing = LegalDoc.TERMS }) {
+                    TouchableButton(
+                        onClick = { lastViewed = LegalDoc.TERMS; viewing = LegalDoc.TERMS },
+                        modifier = Modifier.focusRequester(termsFocus)
+                    ) {
                         Text(stringResource(R.string.onboarding_read_terms))
                     }
-                    TouchableButton(onClick = { viewing = LegalDoc.PRIVACY }) {
+                    TouchableButton(
+                        onClick = { lastViewed = LegalDoc.PRIVACY; viewing = LegalDoc.PRIVACY },
+                        modifier = Modifier.focusRequester(privacyFocus)
+                    ) {
                         Text(stringResource(R.string.onboarding_read_privacy))
                     }
                 }
@@ -165,12 +212,13 @@ fun OnboardingScreen(
 private fun FullWidthButton(
     label: String,
     onClick: () -> Unit,
-    primary: Boolean = false
+    primary: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     TouchableButton(
         onClick = onClick,
         selected = primary,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().then(modifier)
     ) {
         Text(
             label,
