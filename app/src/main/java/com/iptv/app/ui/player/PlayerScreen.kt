@@ -147,14 +147,18 @@ class PlayerViewModel @Inject constructor(
                     runCatching { repo.seriesInfo(args.seriesId) }.onSuccess { info ->
                         val seriesTitle = info.info?.name ?: args.title
                         val seriesCover = info.info?.cover ?: args.posterUrl
-                        val orderedEpisodes = mutableListOf<Episode>()
+                        // Group by each episode's `season` field, not by the
+                        // map key — providers sometimes lump everything under
+                        // "0" but still carry the right season per episode.
+                        // Same fix as in SeriesDetailViewModel.
                         val episodesMap = info.normalizedEpisodes()
-                        val keys = episodesMap.keys.mapNotNull { it.toIntOrNull() }.sorted()
-                        keys.forEach { sk ->
-                            episodesMap[sk.toString()]
-                                ?.sortedBy { it.episodeNum ?: 0 }
-                                ?.forEach { e -> orderedEpisodes.add(e.toModel(args.seriesId, sk)) }
+                        val allEpisodes = episodesMap.flatMap { (key, list) ->
+                            val fallback = key.toIntOrNull() ?: 0
+                            list.map { it.toModel(args.seriesId, fallback) }
                         }
+                        val orderedEpisodes = allEpisodes.sortedWith(
+                            compareBy({ it.seasonNumber }, { it.episodeNum })
+                        )
                         if (orderedEpisodes.isEmpty()) {
                             // fallback: single episode by id
                             val url = repo.episodeStreamUrl(args.episodeId, args.containerExtension)
@@ -329,6 +333,14 @@ fun PlayerScreen(
     DisposableEffect(exo) {
         val listener = object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // Auto-advance from one episode to the next happens for free
+                // because all episodes are in the same playlist. Force resume
+                // in case the user had paused the previous item — they pressed
+                // play once, they expect the queue to keep going.
+                if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+                    reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
+                    exo.playWhenReady = true
+                }
                 val idx = exo.currentMediaItemIndex
                 vm.onTransition(idx)
                 playbackError = null

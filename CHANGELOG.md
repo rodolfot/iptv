@@ -8,6 +8,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ### Added
 
+- **Nota (rating) nos pôsteres** de filmes e séries: chip "★ X.X" no canto superior esquerdo, escondido quando o provedor não retorna nota válida (0.0 = desconhecido).
+- **Autoplay de episódios**: ao terminar um episódio, o próximo da série inicia automaticamente. A fila já carregava todos os episódios — agora `playWhenReady` é forçado em cada transição (caso o usuário tenha pausado o anterior).
 - **Painel lateral de EPG** nas listas de canais ao vivo (TV/Tablet): a lista virou coluna única; ao mover o foco, o painel direito mostra programa atual + próximos do canal focado. OK arma o canal (indicador ▶), OK de novo abre o player.
 - **Combo box D-pad friendly** (`ComboBox` + `ComboColumn`): botão que abre diálogo com lista de opções, usado em Config para Intervalo de atualização e Idioma do aplicativo (substituem linhas de botões que estouravam a largura da tela).
 - **`TvSafeTextField`** reutilizável: campo de texto que não abre o IME apenas porque recebeu foco pelo D-pad. OK entra em edição (teclado aparece), Voltar sai. Adotado em login e editor de perfis.

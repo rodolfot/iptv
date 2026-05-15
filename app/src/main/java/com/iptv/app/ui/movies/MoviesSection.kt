@@ -136,7 +136,8 @@ fun MoviesSection(
                         PosterCard(
                             title = m.name,
                             imageUrl = m.posterUrl,
-                            fallbackIcon = Icons.Filled.Movie
+                            fallbackIcon = Icons.Filled.Movie,
+                            rating = m.rating
                         ) {
                             onPlay(
                                 PlayerArgs(
@@ -269,7 +270,8 @@ fun MoviesSection(
                         imageUrl = m.posterUrl,
                         locked = locked,
                         fallbackIcon = Icons.Filled.Movie,
-                        fillWidth = true
+                        fillWidth = true,
+                        rating = m.rating
                     ) {
                         val args = PlayerArgs(
                             kind = PlayerKind.MOVIE,

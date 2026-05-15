@@ -366,7 +366,8 @@ fun SeriesSection(
                         PosterCard(
                             title = s.name,
                             imageUrl = s.coverUrl,
-                            fallbackIcon = Icons.Filled.Tv
+                            fallbackIcon = Icons.Filled.Tv,
+                            rating = s.rating
                         ) {
                             openSeries = Triple(s.id, s.name, s.coverUrl)
                         }
@@ -489,7 +490,8 @@ fun SeriesSection(
                         title = s.name,
                         imageUrl = s.coverUrl,
                         fallbackIcon = Icons.Filled.Tv,
-                        fillWidth = true
+                        fillWidth = true,
+                        rating = s.rating
                     ) {
                         openSeries = Triple(s.id, s.name, s.coverUrl)
                     }

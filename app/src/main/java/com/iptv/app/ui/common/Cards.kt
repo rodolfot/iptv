@@ -17,7 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +70,7 @@ fun PosterCard(
     locked: Boolean = false,
     fallbackIcon: ImageVector = Icons.Filled.Movie,
     fillWidth: Boolean = false,
+    rating: Double? = null,
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
@@ -103,6 +106,32 @@ fun PosterCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Filled.Lock, contentDescription = "Bloqueado", tint = Color.White)
+                }
+            }
+            // Rating chip — only when the provider returned something useful.
+            // Many catalogs return 0.0 for "unknown"; treat that as missing
+            // so we don't show a meaningless "★ 0.0" on every card.
+            if (rating != null && rating > 0.0) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xCC000000))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFC107),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        " %.1f".format(rating),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
             }
             Box(
