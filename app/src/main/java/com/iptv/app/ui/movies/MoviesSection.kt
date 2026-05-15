@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -97,15 +98,35 @@ fun MoviesSection(
             com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
         if (selectedCat == null) {
-            Text(stringResource(R.string.section_movie_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
-            // Local filter typed by the user, applied to the visible category names.
-            // Saves a round-trip and lets people drill into a category from a
-            // catalog with hundreds of entries.
-            LocalFilterField(
-                value = categoryFilter,
-                onValueChange = { categoryFilter = it },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            val isPhoneCats = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhoneCats) {
+                Text(
+                    stringResource(R.string.section_movie_categories),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                LocalFilterField(
+                    value = categoryFilter,
+                    onValueChange = { categoryFilter = it },
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.section_movie_categories),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    LocalFilterField(
+                        value = categoryFilter,
+                        onValueChange = { categoryFilter = it },
+                        modifier = Modifier.width(360.dp)
+                    )
+                }
+            }
             val needle = categoryFilter.trim().lowercase()
             val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
             val visibleCats = if (needle.isBlank()) sortedCats

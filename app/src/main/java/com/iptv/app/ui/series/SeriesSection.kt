@@ -331,12 +331,35 @@ fun SeriesSection(
             com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
         if (selectedCat == null) {
-            Text(stringResource(R.string.section_series_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
-            LocalFilterField(
-                value = categoryFilter,
-                onValueChange = { categoryFilter = it },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            val isPhoneCats = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhoneCats) {
+                Text(
+                    stringResource(R.string.section_series_categories),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                LocalFilterField(
+                    value = categoryFilter,
+                    onValueChange = { categoryFilter = it },
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.section_series_categories),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    LocalFilterField(
+                        value = categoryFilter,
+                        onValueChange = { categoryFilter = it },
+                        modifier = Modifier.width(360.dp)
+                    )
+                }
+            }
             val needleCat = categoryFilter.trim().lowercase()
             val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
             val visibleCats = if (needleCat.isBlank()) sortedCats

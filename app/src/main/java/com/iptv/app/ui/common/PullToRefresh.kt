@@ -100,7 +100,12 @@ fun PullToRefreshBox(
         Box(modifier = Modifier.graphicsLayer { translationY = offset.value }) {
             content()
         }
-        if (offset.value > 0f || isRefreshing) {
+        // Only draw the spinner row when this composable is actually driving
+        // the refresh (i.e. pull gesture is enabled). On TV we pass
+        // enabled=false; without this guard the 24dp progress indicator
+        // would still render through Row's children even though the Row
+        // itself has height=0, leaving a tiny dot above the grid.
+        if (enabled && (offset.value > 0f || isRefreshing)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

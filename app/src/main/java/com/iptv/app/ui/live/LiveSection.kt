@@ -89,12 +89,37 @@ fun LiveSection(
             com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
         if (selectedCat == null) {
-            Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
-            LocalFilterField(
-                value = categoryFilter,
-                onValueChange = { categoryFilter = it },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            // Header: title on the left, inline filter on the right (TV/Tablet).
+            // Phone keeps the stacked layout — narrow viewport can't share the row.
+            val isPhoneCats = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhoneCats) {
+                Text(
+                    stringResource(R.string.section_categories),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                LocalFilterField(
+                    value = categoryFilter,
+                    onValueChange = { categoryFilter = it },
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            } else {
+                Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.section_categories),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    LocalFilterField(
+                        value = categoryFilter,
+                        onValueChange = { categoryFilter = it },
+                        modifier = Modifier.width(360.dp)
+                    )
+                }
+            }
             val needleCat = categoryFilter.trim().lowercase()
             val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
             val visibleCats = if (needleCat.isBlank()) sortedCats
