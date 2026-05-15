@@ -35,8 +35,15 @@ data class AppSettings(
     val activeProfileId: String? = null,
     val searchHistory: List<String> = emptyList(),
     /** BCP-47 tag (e.g. "pt-BR", "en", "es"). Null = follow system locale. */
-    val appLocale: String? = null
+    val appLocale: String? = null,
+    /**
+     * Manual override do form factor escolhido pelo usuário no onboarding.
+     * Null = auto-detect (uiMode + smallestScreenWidthDp).
+     */
+    val deviceProfile: DeviceProfile? = null
 )
+
+enum class DeviceProfile { TV, TABLET, PHONE }
 
 enum class RefreshInterval(val ttlMs: Long, val labelRes: Int) {
     HOURS_1(1L * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_1h),
@@ -77,6 +84,7 @@ class SettingsStore @Inject constructor(
         val SEARCH_HISTORY = stringPreferencesKey("search_history_v1")
         val SKIPPED_UPDATE = stringPreferencesKey("skipped_update_version")
         val APP_LOCALE = stringPreferencesKey("app_locale")
+        val DEVICE_PROFILE = stringPreferencesKey("device_profile")
     }
 
     // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
@@ -105,8 +113,18 @@ class SettingsStore @Inject constructor(
             profiles = Profile.listFromJson(secure.getProfilesJson()),
             activeProfileId = secure.getActiveProfileId(),
             searchHistory = decodeHistory(p[Keys.SEARCH_HISTORY]),
-            appLocale = p[Keys.APP_LOCALE]
+            appLocale = p[Keys.APP_LOCALE],
+            deviceProfile = p[Keys.DEVICE_PROFILE]?.let {
+                runCatching { DeviceProfile.valueOf(it) }.getOrNull()
+            }
         )
+    }
+
+    suspend fun setDeviceProfile(profile: DeviceProfile?) {
+        context.dataStore.edit {
+            if (profile == null) it.remove(Keys.DEVICE_PROFILE)
+            else it[Keys.DEVICE_PROFILE] = profile.name
+        }
     }
 
     suspend fun setAppLocale(tag: String?) {

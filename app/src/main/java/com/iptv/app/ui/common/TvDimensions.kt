@@ -5,12 +5,14 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iptv.app.data.prefs.DeviceProfile
 
 enum class FormFactor { Phone, Tablet, Tv }
 
@@ -91,18 +93,33 @@ private val PhoneDefaults = TvDimensions(
 )
 
 /**
+ * Manual override do form factor escolhido pelo usuário no onboarding.
+ * Quando null, cai na auto-detecção (uiMode + smallestScreenWidthDp).
+ * Provido lá em [com.iptv.app.MainActivity] a partir de [SettingsStore].
+ */
+val LocalDeviceProfile = compositionLocalOf<DeviceProfile?> { null }
+
+/**
  * Compose-aware dimensions that adapt to the current form factor.
  *
- * The user-facing bug here: several Android TVs (especially PS5's HDMI Out
- * and some TCL panels) report `smallestScreenWidthDp` below 600 even though
- * they're clearly TVs. Falling back to PhoneDefaults made the whole app
- * look and behave like a phone — grid of 2 columns, no EPG side panel,
- * mini-player visible, etc. We now check `UiModeManager.currentModeType`
- * first: when the system says we're on a TV, trust it over the width.
+ * Ordem de precedência:
+ *  1. Override manual do usuário (LocalDeviceProfile) — escolhido no onboarding.
+ *  2. UiModeManager.UI_MODE_TYPE_TELEVISION — alguns Android TVs (PS5 HDMI,
+ *     TCLs) reportam smallestScreenWidthDp <600 e cairiam em phone sem este
+ *     check.
+ *  3. smallestScreenWidthDp como heurística final.
  */
 @Composable
 @ReadOnlyComposable
 fun rememberTvDim(): TvDimensions {
+    val override = LocalDeviceProfile.current
+    if (override != null) {
+        return when (override) {
+            DeviceProfile.TV -> TvDefaults
+            DeviceProfile.TABLET -> TabletDefaults
+            DeviceProfile.PHONE -> PhoneDefaults
+        }
+    }
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
     val sw = configuration.smallestScreenWidthDp

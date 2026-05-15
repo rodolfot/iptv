@@ -254,6 +254,11 @@
     <!-- Onboarding / acceptance -->
     <string name="settings_language">Idioma do aplicativo</string>
     <string name="onboarding_language_title">Escolha o idioma</string>
+    <string name="onboarding_device_title">Tipo de dispositivo</string>
+    <string name="onboarding_device_auto">Detectar automaticamente</string>
+    <string name="onboarding_device_tv">Android TV / Smart TV</string>
+    <string name="onboarding_device_tablet">Tablet</string>
+    <string name="onboarding_device_phone">Celular</string>
     <string name="onboarding_title">Bem-vindo ao TartaTV</string>
     <string name="onboarding_message">Para usar o aplicativo, você precisa concordar com os Termos de Uso e a Política de Privacidade.</string>
     <string name="onboarding_read_terms">Ler Termos de Uso</string>

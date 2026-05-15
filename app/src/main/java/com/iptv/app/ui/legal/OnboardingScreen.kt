@@ -57,6 +57,10 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
+    fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
+        viewModelScope.launch { settings.setDeviceProfile(profile) }
+    }
+
     fun accept(onDone: () -> Unit) {
         viewModelScope.launch {
             settings.acceptTerms()
@@ -154,6 +158,50 @@ fun OnboardingScreen(
                     onSelect = {
                         val tag = if (it.id == "__system__") null else it.id
                         vm.setLocale(tag)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Tipo de dispositivo: detecção automática às vezes erra
+            // (TVs reportando smallestScreenWidthDp baixo, etc.). Deixar o
+            // usuário escolher é o jeito mais confiável.
+            Text(
+                stringResource(R.string.onboarding_device_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            run {
+                val autoLabel = stringResource(R.string.onboarding_device_auto)
+                val tvLabel = stringResource(R.string.onboarding_device_tv)
+                val tabletLabel = stringResource(R.string.onboarding_device_tablet)
+                val phoneLabel = stringResource(R.string.onboarding_device_phone)
+                val options = listOf(
+                    com.iptv.app.ui.common.ComboOption(id = "__auto__", label = autoLabel),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.TV.name,
+                        label = tvLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.TABLET.name,
+                        label = tabletLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.PHONE.name,
+                        label = phoneLabel
+                    )
+                )
+                val currentKey = settingsState.deviceProfile?.name ?: "__auto__"
+                val current = options.firstOrNull { it.id == currentKey }
+                com.iptv.app.ui.common.ComboBox(
+                    selected = current,
+                    options = options,
+                    onSelect = {
+                        val profile = if (it.id == "__auto__") null
+                            else com.iptv.app.data.prefs.DeviceProfile.valueOf(it.id)
+                        vm.setDeviceProfile(profile)
                     },
                     modifier = Modifier.fillMaxWidth()
                 )

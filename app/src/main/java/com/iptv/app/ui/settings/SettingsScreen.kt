@@ -91,6 +91,10 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
+        viewModelScope.launch { settings.setDeviceProfile(profile) }
+    }
+
     fun setRefreshInterval(interval: RefreshInterval) {
         viewModelScope.launch {
             settings.setRefreshInterval(interval)
@@ -382,6 +386,44 @@ fun SettingsScreen(
                             val tag = if (it.id == "__system__") null else it.id
                             settingsVm.setAppLocale(tag)
                             snackbar?.show(localeSavedMsg)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            run {
+                val autoLabel = stringResource(R.string.onboarding_device_auto)
+                val tvLabel = stringResource(R.string.onboarding_device_tv)
+                val tabletLabel = stringResource(R.string.onboarding_device_tablet)
+                val phoneLabel = stringResource(R.string.onboarding_device_phone)
+                val options = listOf(
+                    com.iptv.app.ui.common.ComboOption(id = "__auto__", label = autoLabel),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.TV.name,
+                        label = tvLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.TABLET.name,
+                        label = tabletLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.PHONE.name,
+                        label = phoneLabel
+                    )
+                )
+                val currentKey = s.deviceProfile?.name ?: "__auto__"
+                val current = options.firstOrNull { it.id == currentKey }
+                com.iptv.app.ui.common.ComboColumn(
+                    label = stringResource(R.string.onboarding_device_title)
+                ) {
+                    com.iptv.app.ui.common.ComboBox(
+                        selected = current,
+                        options = options,
+                        onSelect = {
+                            val profile = if (it.id == "__auto__") null
+                                else com.iptv.app.data.prefs.DeviceProfile.valueOf(it.id)
+                            settingsVm.setDeviceProfile(profile)
                         },
                         modifier = Modifier.fillMaxWidth()
                     )

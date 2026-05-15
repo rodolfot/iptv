@@ -128,14 +128,24 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-data class RootState(val termsAccepted: Boolean = false, val loggedIn: Boolean = false)
+data class RootState(
+    val termsAccepted: Boolean = false,
+    val loggedIn: Boolean = false,
+    val deviceProfile: com.iptv.app.data.prefs.DeviceProfile? = null
+)
 
 @HiltViewModel
 class RootViewModel @Inject constructor(
     settings: SettingsStore
 ) : ViewModel() {
     val state = settings.flow
-        .map { RootState(termsAccepted = it.termsAccepted, loggedIn = it.isLoggedIn && it.host.isNotBlank()) }
+        .map {
+            RootState(
+                termsAccepted = it.termsAccepted,
+                loggedIn = it.isLoggedIn && it.host.isNotBlank(),
+                deviceProfile = it.deviceProfile
+            )
+        }
         .stateIn(viewModelScope, SharingStarted.Eagerly, RootState())
 }
 
@@ -143,6 +153,16 @@ class RootViewModel @Inject constructor(
 fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
     val nav = rememberNavController()
     val state by vm.state.collectAsState()
+    // Override do form factor escolhido no onboarding aplica em toda a árvore.
+    CompositionLocalProvider(
+        com.iptv.app.ui.common.LocalDeviceProfile provides state.deviceProfile
+    ) {
+        AppNavRoutes(state, nav)
+    }
+}
+
+@Composable
+private fun AppNavRoutes(state: RootState, nav: androidx.navigation.NavHostController) {
     val start = when {
         !state.termsAccepted -> "onboarding"
         state.loggedIn -> "home"
