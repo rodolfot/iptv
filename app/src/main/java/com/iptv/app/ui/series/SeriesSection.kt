@@ -143,11 +143,19 @@ class SeriesDetailViewModel @Inject constructor(
                         }
                         .groupBy { it.seasonNumber }
                         .mapValues { (_, eps) -> eps.sortedBy { it.episodeNum } }
-                    val mergedSeasons = if (seasons.isEmpty()) {
+                    // Hide season "shells" that have zero real episodes — the
+                    // provider sometimes advertises a season in `seasons[]` but
+                    // never returns it under `episodes`. Showing an empty card
+                    // labelled "(vazia)" was confusing; better to omit the
+                    // season entirely.
+                    val rawSeasons = if (seasons.isEmpty()) {
                         episodesMap.keys.sorted().map { sn ->
                             Season(sn, "Temporada $sn", null, episodesMap[sn]?.size ?: 0)
                         }
                     } else seasons.sortedBy { it.seasonNumber }
+                    val mergedSeasons = rawSeasons.filter { s ->
+                        (episodesMap[s.seasonNumber]?.size ?: 0) > 0
+                    }
 
                     val pid = currentProfile.id()
                     val progressBySeries = episodeProgressDao.getBySeries(pid, id)
@@ -570,11 +578,6 @@ fun SeriesDetailScreen(
         com.iptv.app.ui.common.FormFactor.Tablet -> 3
         com.iptv.app.ui.common.FormFactor.Tv -> 4
     }
-    val episodeCols = when (dim.formFactor) {
-        com.iptv.app.ui.common.FormFactor.Phone -> 2
-        com.iptv.app.ui.common.FormFactor.Tablet -> 3
-        com.iptv.app.ui.common.FormFactor.Tv -> 4
-    }
 
     val playFocus = remember { FocusRequester() }
     val seasonsBringIntoView = remember { BringIntoViewRequester() }
@@ -750,12 +753,10 @@ fun SeriesDetailScreen(
                     ) {
                         rowItems.forEach { s ->
                             val realCount = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
-                            val unavailable = realCount == 0
-                            val displayName = if (unavailable) "${s.name} (vazia)" else s.name
                             Box(modifier = Modifier.weight(1f)) {
                                 CategoryCard(
-                                    title = displayName,
-                                    count = if (unavailable) null else realCount,
+                                    title = s.name,
+                                    count = realCount,
                                     locked = false
                                 ) {
                                     selectedSeason = s.seasonNumber
@@ -799,8 +800,17 @@ fun SeriesDetailScreen(
                     icon = Icons.Filled.Tv
                 )
             } else {
+                // Same Adaptive grid + fillWidth pattern as Filmes/Séries
+                // categorias, para os cards de episódio respeitarem o
+                // tamanho padrão dos pôsteres em vez de virar dois blocos
+                // gigantes em TV.
+                val posterMinWidth = when (dim.formFactor) {
+                    com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
+                    com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
+                    com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
+                }
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(episodeCols),
+                    columns = GridCells.Adaptive(posterMinWidth),
                     horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
                     verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
                 ) {
@@ -812,7 +822,8 @@ fun SeriesDetailScreen(
                             title = "${titlePrefix}T${e.seasonNumber}E${e.episodeNum} • ${e.title}" +
                                 (if (pct in 1..99) "  (${pct}%)" else ""),
                             imageUrl = e.poster,
-                            fallbackIcon = Icons.Filled.Tv
+                            fallbackIcon = Icons.Filled.Tv,
+                            fillWidth = true
                         ) {
                             onPlay(
                                 PlayerArgs(
