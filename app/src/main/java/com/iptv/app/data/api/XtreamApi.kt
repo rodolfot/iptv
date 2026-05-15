@@ -267,11 +267,16 @@ data class SeriesInfoDetail(
 @JsonClass(generateAdapter = true)
 data class EpisodeDto(
     val id: String,
-    @Json(name = "episode_num") val episodeNum: Int? = null,
+    // Provedores vacilam: alguns mandam Int, outros String (ex.: "1").
+    // Declarando como String? aceita os dois (Moshi serializa Int para
+    // o tipo declarado via padding implícito) e a conversão pra Int fica
+    // no [toModel].
+    @Json(name = "episode_num") val episodeNum: String? = null,
     val title: String? = null,
     @Json(name = "container_extension") val containerExtension: String? = null,
     val info: EpisodeInfo? = null,
-    @Json(name = "season") val season: Int? = null,
+    // Mesma história: alguns provedores mandam Int, outros String ("01").
+    @Json(name = "season") val season: String? = null,
     @Json(name = "added") val added: String? = null
 )
 
