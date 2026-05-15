@@ -331,16 +331,21 @@ private fun TopBar(
             stringResource(com.iptv.app.R.string.app_name),
             style = MaterialTheme.typography.headlineMedium
         )
-        TabRow(selectedTabIndex = selectedIndex, modifier = Modifier.padding(start = 16.dp)) {
-            tabs.forEach { spec ->
+        // Visualmente a pílula indicadora segue o foco do D-pad (para o
+        // usuário ver onde está). Mas o conteúdo abaixo só troca quando ele
+        // aperta OK (onClick). Antes o onFocus chamava onSelected direto e
+        // qualquer foco que passasse pela TabRow voltava o conteúdo para
+        // "Início".
+        var focusedIndex by remember(selectedIndex) { mutableStateOf(selectedIndex) }
+        TabRow(
+            selectedTabIndex = focusedIndex,
+            modifier = Modifier.padding(start = 16.dp)
+        ) {
+            tabs.forEachIndexed { index, spec ->
                 val isSelected = spec.key == selectedKey
                 Tab(
                     selected = isSelected,
-                    // onFocus no-op: navegar com o D-pad sobre a TabRow não
-                    // pode disparar troca de aba — antes, qualquer foco que
-                    // passasse pela TabRow voltava o conteúdo para "Início" e
-                    // o OK no card embaixo nunca chegava a abrir.
-                    onFocus = {},
+                    onFocus = { focusedIndex = index },
                     onClick = { onSelected(spec.key) },
                     // Cores explícitas para impedir o caso "texto branco sobre
                     // fundo branco" do estado focado default do tv.material3.
