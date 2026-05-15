@@ -421,13 +421,21 @@ fun PlayerScreen(
         if (!controlsVisible) overlayHasFocus = false
     }
     // ExoPlayer's built-in timeout doesn't fire while the player is paused or
-    // buffering, so the chrome can linger forever in those states. Force-hide
-    // 5s after each appearance unless the user is interacting via the overlay.
+    // buffering, and didn't fire either when the focus parked on one of the
+    // overlay buttons. Force-hide after a longer idle so Voltar/Faixas don't
+    // linger forever. When the user is interacting with the overlay we wait
+    // longer (8s vs 5s), but we still eventually hide and steal focus back to
+    // the root so the buttons disappear.
     val playerViewRef = remember { mutableStateOf<PlayerView?>(null) }
     LaunchedEffect(controlsVisible, overlayHasFocus) {
-        if (controlsVisible && !overlayHasFocus) {
-            kotlinx.coroutines.delay(5000)
+        if (controlsVisible) {
+            val timeoutMs = if (overlayHasFocus) 8000L else 5000L
+            kotlinx.coroutines.delay(timeoutMs)
             playerViewRef.value?.hideController()
+            if (overlayHasFocus) {
+                overlayHasFocus = false
+                runCatching { focusRequester.requestFocus() }
+            }
         }
     }
     val playerView = remember(isPhone) {
@@ -471,16 +479,28 @@ fun PlayerScreen(
                 }
                 when (evt.key) {
                     Key.DirectionLeft, Key.MediaRewind -> {
-                        playerView.showController()
-                        exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
-                        true
+                        // Quando um botão da overlay (Voltar/Faixas) está
+                        // focado, esquerda/direita deve mover entre os botões,
+                        // não fazer seek. Só as teclas físicas de mídia
+                        // (MediaRewind/MediaFastForward) sempre fazem seek.
+                        if (overlayHasFocus && evt.key == Key.DirectionLeft) {
+                            false
+                        } else {
+                            playerView.showController()
+                            exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
+                            true
+                        }
                     }
                     Key.DirectionRight, Key.MediaFastForward -> {
-                        playerView.showController()
-                        val target = exo.currentPosition + seekStepMs
-                        val dur = exo.duration
-                        exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
-                        true
+                        if (overlayHasFocus && evt.key == Key.DirectionRight) {
+                            false
+                        } else {
+                            playerView.showController()
+                            val target = exo.currentPosition + seekStepMs
+                            val dur = exo.duration
+                            exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
+                            true
+                        }
                     }
                     Key.DirectionCenter, Key.Enter, Key.Spacebar, Key.MediaPlayPause -> {
                         if (overlayHasFocus && evt.key != Key.MediaPlayPause) {
@@ -495,16 +515,24 @@ fun PlayerScreen(
                     }
                     else -> when (evt.key.nativeKeyCode) {
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            playerView.showController()
-                            exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
-                            true
+                            if (overlayHasFocus) {
+                                false
+                            } else {
+                                playerView.showController()
+                                exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
+                                true
+                            }
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            playerView.showController()
-                            val target = exo.currentPosition + seekStepMs
-                            val dur = exo.duration
-                            exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
-                            true
+                            if (overlayHasFocus) {
+                                false
+                            } else {
+                                playerView.showController()
+                                val target = exo.currentPosition + seekStepMs
+                                val dur = exo.duration
+                                exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
+                                true
+                            }
                         }
                         else -> false
                     }

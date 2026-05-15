@@ -196,6 +196,10 @@ fun HomeScreen(
                 else -> when (selectedKey) {
                     "home" -> ContinueWatchingScreen(
                         onPlay = onPlay,
+                        // Cards recomendados de filmes abrem a tela de
+                        // detalhe (sinopse + botão Assistir). Continue
+                        // Watching continua tocando direto.
+                        onOpenMovie = handlePlay,
                         onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
                     )
                     "search" -> SearchScreen(
@@ -332,7 +336,11 @@ private fun TopBar(
                 val isSelected = spec.key == selectedKey
                 Tab(
                     selected = isSelected,
-                    onFocus = { onSelected(spec.key) },
+                    // onFocus no-op: navegar com o D-pad sobre a TabRow não
+                    // pode disparar troca de aba — antes, qualquer foco que
+                    // passasse pela TabRow voltava o conteúdo para "Início" e
+                    // o OK no card embaixo nunca chegava a abrir.
+                    onFocus = {},
                     onClick = { onSelected(spec.key) },
                     // Cores explícitas para impedir o caso "texto branco sobre
                     // fundo branco" do estado focado default do tv.material3.

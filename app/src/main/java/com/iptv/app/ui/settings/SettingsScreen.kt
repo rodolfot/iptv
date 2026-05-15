@@ -37,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
@@ -83,12 +84,12 @@ class SettingsViewModel @Inject constructor(
 
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
     fun resetProgress() { viewModelScope.launch { progressDao.clearAll(currentProfile.id()) } }
+    /**
+     * Persiste a escolha; a aplicação efetiva do locale + recreate da Activity
+     * é feita pelo caller (precisa do Activity em mãos).
+     */
     fun setAppLocale(tag: String?) {
-        viewModelScope.launch {
-            settings.setAppLocale(tag)
-            if (tag.isNullOrBlank()) com.iptv.app.ui.common.LocaleManager.resetToSystem()
-            else com.iptv.app.ui.common.LocaleManager.apply(tag)
-        }
+        viewModelScope.launch { settings.setAppLocale(tag) }
     }
 
     fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
@@ -167,6 +168,7 @@ fun SettingsScreen(
     val refreshIntervalSavedMsg = stringResource(R.string.snack_refresh_interval_saved)
     val localeSavedMsg = stringResource(R.string.snack_locale_saved)
     val languageLabel = stringResource(R.string.settings_language_label)
+    val activity = LocalContext.current as? android.app.Activity
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
@@ -386,6 +388,13 @@ fun SettingsScreen(
                             val tag = if (it.id == "__system__") null else it.id
                             settingsVm.setAppLocale(tag)
                             snackbar?.show(localeSavedMsg)
+                            // Recreate da activity para a UI inteira recompor
+                            // no novo idioma. Sem isso, AppCompat apenas grava
+                            // o locale mas Compose continua usando o antigo
+                            // até o próximo cold-start.
+                            activity?.let {
+                                com.iptv.app.ui.common.LocaleManager.applyAndRecreate(it, tag)
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )

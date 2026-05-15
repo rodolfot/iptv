@@ -1,7 +1,10 @@
 package com.iptv.app.ui.common
 
+import android.app.Activity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.ConfigurationCompat
 import androidx.core.os.LocaleListCompat
+import java.util.Locale
 
 /**
  * Per-app locale switching. Uses the AppCompat support library so the same
@@ -31,6 +34,29 @@ object LocaleManager {
     /** Explicit "follow system" — used by the Settings → System option. */
     fun resetToSystem() {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+    }
+
+    /**
+     * Aplica o idioma e força a Activity a recriar **somente se** o locale
+     * efetivo mudou. AppCompat só dispara recreate automático em
+     * AppCompatActivity — como usamos ComponentActivity, recriamos manualmente
+     * para a UI refletir o novo idioma imediatamente.
+     */
+    fun applyAndRecreate(activity: Activity, tag: String?) {
+        val currentLocales: LocaleListCompat = ConfigurationCompat.getLocales(
+            activity.resources.configuration
+        )
+        val currentTag = if (currentLocales.isEmpty) null
+            else currentLocales[0]?.toLanguageTag()
+        val target = tag?.takeIf { it.isNotBlank() }
+        val targetEffective = target ?: Locale.getDefault().toLanguageTag()
+        if (currentTag == target || currentTag == targetEffective) {
+            // Nada mudou; evita um recreate à toa que zera scroll/foco.
+            if (target == null) resetToSystem() else apply(target)
+            return
+        }
+        if (target == null) resetToSystem() else apply(target)
+        activity.recreate()
     }
 
     /**

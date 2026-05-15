@@ -49,12 +49,9 @@ class OnboardingViewModel @Inject constructor(
 ) : ViewModel() {
     val state = settings.flow
 
+    /** Persiste; aplicação efetiva fica com o caller (que tem a Activity). */
     fun setLocale(tag: String?) {
-        viewModelScope.launch {
-            settings.setAppLocale(tag)
-            if (tag.isNullOrBlank()) com.iptv.app.ui.common.LocaleManager.resetToSystem()
-            else com.iptv.app.ui.common.LocaleManager.apply(tag)
-        }
+        viewModelScope.launch { settings.setAppLocale(tag) }
     }
 
     fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
@@ -161,6 +158,9 @@ fun OnboardingScreen(
                     onSelect = {
                         val tag = if (it.id == "__system__") null else it.id
                         vm.setLocale(tag)
+                        activity?.let { act ->
+                            com.iptv.app.ui.common.LocaleManager.applyAndRecreate(act, tag)
+                        }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )

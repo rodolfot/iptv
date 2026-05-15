@@ -101,6 +101,10 @@ class ContinueWatchingViewModel @Inject constructor(
 fun ContinueWatchingScreen(
     onPlay: (PlayerArgs) -> Unit,
     onOpenSeries: (id: Int, title: String, cover: String?) -> Unit = { _, _, _ -> },
+    // Callback separado para filmes recomendados (sem progresso). Em vez de
+    // tocar direto como Continue Watching, abre a tela de detalhe com sinopse
+    // — o usuário ainda não decidiu se quer ver.
+    onOpenMovie: (PlayerArgs) -> Unit = onPlay,
     vm: ContinueWatchingViewModel = hiltViewModel()
 ) {
     val movies by vm.movies.collectAsState()
@@ -174,7 +178,7 @@ fun ContinueWatchingScreen(
                 modifier = Modifier.padding(top = sectionTopPadding(), bottom = 12.dp)
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                items(row.items) { m -> RecommendedMovieCard(m, onPlay) }
+                items(row.items) { m -> RecommendedMovieCard(m, onOpenMovie) }
             }
             hasPriorSection = true
         }
