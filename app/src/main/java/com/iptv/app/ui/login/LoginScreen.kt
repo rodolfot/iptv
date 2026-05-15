@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -24,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -43,6 +49,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * Returns the host(s) to try when logging in. We used to probe a handful of
@@ -102,6 +109,7 @@ class LoginViewModel @Inject constructor(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun LoginScreen(
     onLogged: () -> Unit,
@@ -118,6 +126,12 @@ fun LoginScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val fieldsRequired = stringResource(R.string.login_fields_required)
 
+    val scrollState = rememberScrollState()
+    val hostBringIntoView = remember { BringIntoViewRequester() }
+    val userBringIntoView = remember { BringIntoViewRequester() }
+    val passBringIntoView = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+
     LaunchedEffect(Unit) {
         hostFocus.requestFocus()
         keyboard?.show()
@@ -131,11 +145,15 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeDrawingPadding(),
-        contentAlignment = Alignment.Center
+            .safeDrawingPadding()
+            .imePadding(),
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
-            modifier = Modifier.width(640.dp).padding(32.dp),
+            modifier = Modifier
+                .width(640.dp)
+                .verticalScroll(scrollState)
+                .padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(stringResource(R.string.login_brand), style = MaterialTheme.typography.displayMedium)
@@ -150,7 +168,11 @@ fun LoginScreen(
                     imeAction = ImeAction.Next
                 ),
                 keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(hostFocus)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(hostBringIntoView)
+                    .onFocusEvent { if (it.isFocused) coroutineScope.launch { hostBringIntoView.bringIntoView() } }
+                    .focusRequester(hostFocus)
             )
             OutlinedTextField(
                 value = user,
@@ -159,7 +181,11 @@ fun LoginScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
-                modifier = Modifier.fillMaxWidth().focusRequester(userFocus)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(userBringIntoView)
+                    .onFocusEvent { if (it.isFocused) coroutineScope.launch { userBringIntoView.bringIntoView() } }
+                    .focusRequester(userFocus)
             )
             OutlinedTextField(
                 value = pass,
@@ -175,7 +201,11 @@ fun LoginScreen(
                     keyboard?.hide()
                     vm.login(host, user, pass, fieldsRequired)
                 }),
-                modifier = Modifier.fillMaxWidth().focusRequester(passFocus)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(passBringIntoView)
+                    .onFocusEvent { if (it.isFocused) coroutineScope.launch { passBringIntoView.bringIntoView() } }
+                    .focusRequester(passFocus)
             )
             state.error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)

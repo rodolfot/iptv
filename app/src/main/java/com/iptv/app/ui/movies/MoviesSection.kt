@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.Category
+import com.iptv.app.domain.model.sortedForDisplay
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.CategoryCard
 import com.iptv.app.ui.common.ErrorState
@@ -57,8 +58,17 @@ fun MoviesSection(
     val movies by vm.movies.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
     val kidsAllowed by vm.kidsAllowedCategories.collectAsState()
-    val cats = if (kidsAllowed.isEmpty()) rawCats
-        else rawCats.copy(items = rawCats.items.filter { "movie:${it.id}" in kidsAllowed })
+    val kidsActive by vm.kidsMode.collectAsState()
+    val cats = when {
+        // No Kids mode → show everything.
+        !kidsActive -> rawCats
+        // Kids mode with an explicit allowlist → show only those.
+        kidsAllowed.isNotEmpty() -> rawCats.copy(
+            items = rawCats.items.filter { "movie:${it.id}" in kidsAllowed }
+        )
+        // Kids mode without an allowlist configured → at least hide adult.
+        else -> rawCats.copy(items = rawCats.items.filter { !it.isAdult })
+    }
     val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
@@ -84,7 +94,7 @@ fun MoviesSection(
         val catCols = when (dim.formFactor) {
             com.iptv.app.ui.common.FormFactor.Phone -> 2
             com.iptv.app.ui.common.FormFactor.Tablet -> 3
-            com.iptv.app.ui.common.FormFactor.Tv -> 3
+            com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
         if (selectedCat == null) {
             Text(stringResource(R.string.section_movie_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
@@ -97,8 +107,9 @@ fun MoviesSection(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             val needle = categoryFilter.trim().lowercase()
-            val visibleCats = if (needle.isBlank()) cats.items
-            else cats.items.filter { it.name.lowercase().contains(needle) }
+            val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+            val visibleCats = if (needle.isBlank()) sortedCats
+            else sortedCats.filter { it.name.lowercase().contains(needle) }
 
             // FTS lookup over titles so "pokemon" surfaces the movie even when
             // the user hasn't entered any category. Empty when the query is
@@ -236,8 +247,17 @@ fun MoviesSection(
                     yearOk && ratingOk
                 }
                 .toList()
+            // Adaptive grid: fits as many ~160dp-wide posters as the screen
+            // allows. Previously TV used GridCells.Fixed(5) with a fixed
+            // PosterCard width, which on some TVs ended up rendering oversized
+            // tiles (only 2 fit per row).
+            val posterMinWidth = when (dim.formFactor) {
+                com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
+                com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
+                com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
+            }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(dim.MoviesGridColumns),
+                columns = GridCells.Adaptive(posterMinWidth),
                 horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
                 verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
@@ -248,7 +268,8 @@ fun MoviesSection(
                         title = m.name,
                         imageUrl = m.posterUrl,
                         locked = locked,
-                        fallbackIcon = Icons.Filled.Movie
+                        fallbackIcon = Icons.Filled.Movie,
+                        fillWidth = true
                     ) {
                         val args = PlayerArgs(
                             kind = PlayerKind.MOVIE,

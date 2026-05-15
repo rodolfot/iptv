@@ -6,7 +6,34 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Painel lateral de EPG** nas listas de canais ao vivo (TV/Tablet): a lista virou coluna única; ao mover o foco, o painel direito mostra programa atual + próximos do canal focado. OK arma o canal (indicador ▶), OK de novo abre o player.
+- **Combo box D-pad friendly** (`ComboBox` + `ComboColumn`): botão que abre diálogo com lista de opções, usado em Config para Intervalo de atualização e Idioma do aplicativo (substituem linhas de botões que estouravam a largura da tela).
+- **`TvSafeTextField`** reutilizável: campo de texto que não abre o IME apenas porque recebeu foco pelo D-pad. OK entra em edição (teclado aparece), Voltar sai. Adotado em login e editor de perfis.
+- Botão **Favoritar** na tela de detalhe de séries (antes só existia o botão Lista, o que confundia o usuário a achar que estava favoritando).
+- Snackbars de confirmação ao trocar Intervalo de atualização e Idioma em Config.
+
+### Changed
+
+- **Categorias** (Live/Filmes/Séries): grade passou para 4 colunas em TV e cards mais compactos; categorias agora vêm ordenadas alfabeticamente com as marcadas como adultas no final.
+- **Filmes/Séries/Favoritos/Lista**: grids passaram a usar `GridCells.Adaptive` com pôsteres `fillWidth=true`, mantendo proporção 2:3. Em telas que reportavam tamanho de tablet, os pôsteres ficavam gigantes (2 por linha); agora se adaptam à largura disponível.
+- **Filtro inline nas listas dentro de categoria**: na TV/Tablet, o filtro fica na mesma linha do título e da ordenação, à direita.
+- **Filtro das listas** (`LocalFilterField`): foco do D-pad não abre mais o IME; só ao apertar OK. Voltar/Escape sai do modo edição mantendo o foco.
+- **Player**: tecla Back é interceptada antes do PlayerView para sair de primeira (antes ela primeiro fechava o controller e exigia um segundo Back). Auto-hide forçado de 5s mesmo com player pausado/buffering. Título do canal/filme some 5s após a abertura.
+- **Player na TV/Tablet**: voltar libera o playback ao invés de minimizar — o mini-player não é alcançável com D-pad. Em phone segue como antes.
+- **OK do controle no player** respeita o foco: se um botão da overlay (Voltar/Faixas) está focado, OK aciona o botão; senão, alterna play/pause.
+- **Tela de detalhe de filme/série**: foco inicial vai para o botão Assistir/Continuar. Sinopse virou focável + `BringIntoViewRequester` para o D-pad rolar até ela.
+- **Tela de detalhe de série**: usa o botão Voltar do top bar (`RegisterHeaderBack`) em vez do botão inline. Mostra poster + metadados ao lado do título, igual ao detalhe de filme.
+- **Config** virou layout de 2 colunas em TV/Tablet (Servidor/Parental/Catálogo à esquerda; Notificações/Idioma/Sobre/Sessão à direita) para reduzir scroll.
+- **Modo Kids** agora oculta categorias marcadas como adultas mesmo quando o adulto não configurou um allowlist explícito (antes Kids sem allowlist era um no-op).
+- **Tela de login**: rola e empurra o conteúdo com `imePadding` + `BringIntoViewRequester` — antes o teclado virtual cobria os campos.
+
+### Fixed
+
+- **Spinner fantasma** sobre o grid de categorias em TV: `PullToRefreshBox` ignorava o flag `enabled`, então refresh em background acionava o indicador mesmo em plataforma sem gesto de pull.
+- **Episódios de séries** caindo em temporadas vazias: alguns provedores Xtream enviam todos os episódios sob a chave `"0"` mas trazem o número da temporada no campo `season` de cada episódio. Agrupamento agora usa o `seasonNumber` do episódio.
+- **Episódios sem título/sinopse/poster**: `EpisodeInfo` aceita as variantes mais comuns dos provedores (`name`/`title`/`overview`/`cover_big`/`cover`/`image`).
 
 ## [1.0.0] — 2026-05-11
 

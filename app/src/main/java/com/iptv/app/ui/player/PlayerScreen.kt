@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -361,10 +362,17 @@ fun PlayerScreen(
         }
     }
 
+    // The mini-player overlay can't be reached with a D-pad, so on TV/Tablet
+    // back-from-player should fully release playback instead of leaving an
+    // unreachable strip (with audio still playing) at the bottom of the menu.
+    val backFormFactor = com.iptv.app.ui.common.rememberTvDim().formFactor
+    val keepAliveOnBack = backFormFactor == com.iptv.app.ui.common.FormFactor.Phone
+
     val onMinimize = {
-        // Keep the player alive and let it surface as the mini-player.
-        if (holder != null && state.items.isNotEmpty()) {
+        if (keepAliveOnBack && holder != null && state.items.isNotEmpty()) {
             holder.minimized.value = true
+        } else {
+            holder?.release()
         }
         onClose()
     }
@@ -382,14 +390,42 @@ fun PlayerScreen(
     // Tracks) appears/disappears together with the playback controls instead
     // of always sitting on top of the video.
     var controlsVisible by remember { mutableStateOf(true) }
+    // Title overlay fades out 5s after the player opens (and again 5s after
+    // controls reappear). The back button stays with the controls, but the
+    // title shouldn't linger over the picture.
+    var titleVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(controlsVisible, state.title) {
+        if (controlsVisible) {
+            titleVisible = true
+            kotlinx.coroutines.delay(5000)
+            titleVisible = false
+        }
+    }
+    // True when the user has the focus on one of the overlay buttons (Back,
+    // Tracks). Without this, the root `onPreviewKeyEvent` would swallow the OK
+    // press and toggle play/pause instead of letting the focused button fire.
+    var overlayHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(controlsVisible) {
+        if (!controlsVisible) overlayHasFocus = false
+    }
+    // ExoPlayer's built-in timeout doesn't fire while the player is paused or
+    // buffering, so the chrome can linger forever in those states. Force-hide
+    // 5s after each appearance unless the user is interacting via the overlay.
+    val playerViewRef = remember { mutableStateOf<PlayerView?>(null) }
+    LaunchedEffect(controlsVisible, overlayHasFocus) {
+        if (controlsVisible && !overlayHasFocus) {
+            kotlinx.coroutines.delay(5000)
+            playerViewRef.value?.hideController()
+        }
+    }
     val playerView = remember(isPhone) {
-        PlayerView(context).apply {
+        PlayerView(context).also { playerViewRef.value = it }.apply {
             player = exo
             useController = true
             controllerAutoShow = true
             // Phones expect tap to toggle controls; TV keeps them visible until D-pad fades them.
             controllerHideOnTouch = isPhone
-            controllerShowTimeoutMs = if (isPhone) 3000 else 4000
+            controllerShowTimeoutMs = if (isPhone) 3000 else 5000
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
             isFocusable = true
             isFocusableInTouchMode = true
@@ -413,6 +449,14 @@ fun PlayerScreen(
             .focusable()
             .onPreviewKeyEvent { evt ->
                 if (evt.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Intercept Back before the underlying PlayerView's controller
+                // can steal it (otherwise the first Back just dismisses the
+                // controller chrome and the user has to press Back twice).
+                if (evt.key == Key.Back || evt.key == Key.Escape ||
+                    evt.key.nativeKeyCode == KeyEvent.KEYCODE_BACK) {
+                    onMinimize()
+                    return@onPreviewKeyEvent true
+                }
                 when (evt.key) {
                     Key.DirectionLeft, Key.MediaRewind -> {
                         playerView.showController()
@@ -427,9 +471,15 @@ fun PlayerScreen(
                         true
                     }
                     Key.DirectionCenter, Key.Enter, Key.Spacebar, Key.MediaPlayPause -> {
-                        playerView.showController()
-                        if (exo.isPlaying) exo.pause() else exo.play()
-                        true
+                        if (overlayHasFocus && evt.key != Key.MediaPlayPause) {
+                            // Let the focused overlay button (Back, Tracks)
+                            // handle the OK press instead of toggling playback.
+                            false
+                        } else {
+                            playerView.showController()
+                            if (exo.isPlaying) exo.pause() else exo.play()
+                            true
+                        }
                     }
                     else -> when (evt.key.nativeKeyCode) {
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -492,7 +542,8 @@ fun PlayerScreen(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .safeDrawingPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .onFocusChanged { overlayHasFocus = it.hasFocus },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
             ) {
@@ -505,7 +556,9 @@ fun PlayerScreen(
                         tint = Color.White
                     )
                 }
-                Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                if (titleVisible) {
+                    Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                }
             }
         }
         if (currentTracks != null && controlsVisible) {
@@ -514,6 +567,7 @@ fun PlayerScreen(
                     .align(Alignment.TopEnd)
                     .safeDrawingPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .onFocusChanged { if (it.hasFocus) overlayHasFocus = true }
             ) {
                 TouchableButton(onClick = { trackPickerOpen = true }) {
                     Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_tracks))

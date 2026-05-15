@@ -412,6 +412,14 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { _lastUpdatedAt.value = cache.lastUpdatedAt() }
     }
 
+    /** Programa atual + próximos do canal, na ordem cronológica. */
+    suspend fun epgScheduleFor(epgChannelId: String?): List<EpgProgrammeEntity> {
+        if (epgChannelId.isNullOrBlank()) return emptyList()
+        val now = epg.currentForChannels(listOf(epgChannelId))[epgChannelId]
+        val rest = epg.upcoming(epgChannelId)
+        return listOfNotNull(now) + rest
+    }
+
     private fun refreshEpgNowFor(items: List<LiveChannel>) {
         val ids = items.mapNotNull { it.epgChannelId }.filter { it.isNotBlank() }.distinct()
         if (ids.isEmpty()) return

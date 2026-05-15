@@ -1,18 +1,38 @@
 package com.iptv.app.ui.series
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.material3.Icon
+import coil.compose.AsyncImage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -37,6 +57,8 @@ import com.iptv.app.data.api.SeriesInfoDetail
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
+import com.iptv.app.data.db.FavoriteDao
+import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.data.db.SeriesProgressDao
 import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.data.db.WatchlistDao
@@ -46,6 +68,7 @@ import com.iptv.app.data.prefs.SortScope
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.Season
+import com.iptv.app.domain.model.sortedForDisplay
 import com.iptv.app.domain.model.toModel
 import com.iptv.app.domain.sort.SortOption
 import com.iptv.app.ui.common.AdvancedFilters
@@ -79,6 +102,7 @@ data class SeriesDetail(
     val episodePercents: Map<String, Int> = emptyMap(),
     val info: SeriesInfoDetail? = null,
     val isInWatchlist: Boolean = false,
+    val isFavorite: Boolean = false,
     val coverUrl: String? = null
 )
 
@@ -94,6 +118,7 @@ class SeriesDetailViewModel @Inject constructor(
     private val episodeProgressDao: EpisodeProgressDao,
     private val seriesProgressDao: SeriesProgressDao,
     private val watchlistDao: WatchlistDao,
+    private val favoriteDao: FavoriteDao,
     private val currentProfile: CurrentProfile
 ) : ViewModel() {
     private val _state = MutableStateFlow<SeriesDetail?>(null)
@@ -104,10 +129,20 @@ class SeriesDetailViewModel @Inject constructor(
             runCatching { repo.seriesInfo(id) }
                 .onSuccess { resp ->
                     val seasons = resp.seasons?.map { it.toModel() } ?: emptyList()
-                    val episodesMap = resp.normalizedEpisodes().mapNotNull { (k, v) ->
-                        val sk = k.toIntOrNull() ?: return@mapNotNull null
-                        sk to v.sortedBy { it.episodeNum ?: 0 }.map { it.toModel(id, sk) }
-                    }.toMap()
+                    // Providers are inconsistent: some put each season under its
+                    // own key ("1" → S1 episodes, "5" → S5 episodes), others
+                    // dump everything under "0" or under a single key and rely
+                    // on the per-episode `season` field. Group by the episode's
+                    // own season number (falling back to the map key) so
+                    // misplaced episodes still land in the right bucket and
+                    // seasons stop appearing "empty".
+                    val episodesMap = resp.normalizedEpisodes()
+                        .flatMap { (key, list) ->
+                            val fallback = key.toIntOrNull() ?: 0
+                            list.map { it.toModel(id, fallback) }
+                        }
+                        .groupBy { it.seasonNumber }
+                        .mapValues { (_, eps) -> eps.sortedBy { it.episodeNum } }
                     val mergedSeasons = if (seasons.isEmpty()) {
                         episodesMap.keys.sorted().map { sn ->
                             Season(sn, "Temporada $sn", null, episodesMap[sn]?.size ?: 0)
@@ -126,6 +161,10 @@ class SeriesDetailViewModel @Inject constructor(
                         watchlistDao.observeAll(pid).first()
                             .any { it.type == ContentType.SERIES && it.itemId == id }
                     }.getOrDefault(false)
+                    val isFav = runCatching {
+                        favoriteDao.observeAll(pid).first()
+                            .any { it.type == ContentType.SERIES && it.itemId == id }
+                    }.getOrDefault(false)
 
                     _state.value = SeriesDetail(
                         seriesId = id,
@@ -137,6 +176,7 @@ class SeriesDetailViewModel @Inject constructor(
                         episodePercents = percents,
                         info = resp.info,
                         isInWatchlist = inWatchlist,
+                        isFavorite = isFav,
                         coverUrl = coverUrl
                     )
                 }
@@ -163,6 +203,29 @@ class SeriesDetailViewModel @Inject constructor(
                 )
             }
             _state.value = current.copy(isInWatchlist = !current.isInWatchlist)
+        }
+    }
+
+    fun toggleFavorite() {
+        val current = _state.value ?: return
+        viewModelScope.launch {
+            val pid = currentProfile.id()
+            if (current.isFavorite) {
+                favoriteDao.delete(pid, ContentType.SERIES, current.seriesId)
+            } else {
+                favoriteDao.insert(
+                    FavoriteEntity(
+                        profileId = pid,
+                        type = ContentType.SERIES,
+                        itemId = current.seriesId,
+                        name = current.title,
+                        logoUrl = current.coverUrl,
+                        categoryId = null,
+                        containerExtension = null
+                    )
+                )
+            }
+            _state.value = current.copy(isFavorite = !current.isFavorite)
         }
     }
 
@@ -224,8 +287,14 @@ fun SeriesSection(
     val series by vm.series.collectAsState()
     val settings by vm.settingsFlow.collectAsState()
     val kidsAllowed by vm.kidsAllowedCategories.collectAsState()
-    val cats = if (kidsAllowed.isEmpty()) rawCats
-        else rawCats.copy(items = rawCats.items.filter { "series:${it.id}" in kidsAllowed })
+    val kidsActive by vm.kidsMode.collectAsState()
+    val cats = when {
+        !kidsActive -> rawCats
+        kidsAllowed.isNotEmpty() -> rawCats.copy(
+            items = rawCats.items.filter { "series:${it.id}" in kidsAllowed }
+        )
+        else -> rawCats.copy(items = rawCats.items.filter { !it.isAdult })
+    }
     val dim = rememberTvDim()
     var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
@@ -259,7 +328,7 @@ fun SeriesSection(
         val catCols = when (dim.formFactor) {
             com.iptv.app.ui.common.FormFactor.Phone -> 2
             com.iptv.app.ui.common.FormFactor.Tablet -> 3
-            com.iptv.app.ui.common.FormFactor.Tv -> 3
+            com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
         if (selectedCat == null) {
             Text(stringResource(R.string.section_series_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
@@ -269,8 +338,9 @@ fun SeriesSection(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             val needleCat = categoryFilter.trim().lowercase()
-            val visibleCats = if (needleCat.isBlank()) cats.items
-            else cats.items.filter { it.name.lowercase().contains(needleCat) }
+            val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+            val visibleCats = if (needleCat.isBlank()) sortedCats
+            else sortedCats.filter { it.name.lowercase().contains(needleCat) }
 
             // FTS hits across all categories — surfaces "Pokemon" even when
             // the user hasn't entered the right category yet.
@@ -404,8 +474,13 @@ fun SeriesSection(
                     yearOk && ratingOk && genreOk
                 }
                 .toList()
+            val seriesMinWidth = when (dim.formFactor) {
+                com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
+                com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
+                com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
+            }
             LazyVerticalGrid(
-                columns = GridCells.Fixed(dim.SeriesGridColumns),
+                columns = GridCells.Adaptive(seriesMinWidth),
                 horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
                 verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
             ) {
@@ -413,7 +488,8 @@ fun SeriesSection(
                     PosterCard(
                         title = s.name,
                         imageUrl = s.coverUrl,
-                        fallbackIcon = Icons.Filled.Tv
+                        fallbackIcon = Icons.Filled.Tv,
+                        fillWidth = true
                     ) {
                         openSeries = Triple(s.id, s.name, s.coverUrl)
                     }
@@ -434,6 +510,7 @@ fun SeriesSection(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun SeriesDetailScreen(
     seriesId: Int,
@@ -448,10 +525,18 @@ fun SeriesDetailScreen(
     val snackbar = LocalSnackbar.current
     val watchlistAddedMsg = stringResource(R.string.snack_watchlist_added)
     val watchlistRemovedMsg = stringResource(R.string.snack_watchlist_removed)
+    val favoriteAddedMsg = stringResource(R.string.snack_favorite_added)
+    val favoriteRemovedMsg = stringResource(R.string.snack_favorite_removed)
     var selectedSeason by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(seriesId) { vm.load(seriesId, title, coverUrl) }
     androidx.activity.compose.BackHandler {
+        if (selectedSeason != null) selectedSeason = null else onBack()
+    }
+    // Same pattern as MovieDetailScreen: surface the back action up in the
+    // app top bar so this screen doesn't have its own inline Back button
+    // (which used to sit in front of the title and broke the visual rhythm).
+    com.iptv.app.ui.common.RegisterHeaderBack {
         if (selectedSeason != null) selectedSeason = null else onBack()
     }
 
@@ -466,121 +551,211 @@ fun SeriesDetailScreen(
         com.iptv.app.ui.common.FormFactor.Tv -> 4
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
-        val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
-        // Top row: Back + title (title is weighted so it ellipsizes instead
-        // of pushing the action icons off-screen).
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 4.dp)
+    val playFocus = remember { FocusRequester() }
+    val seasonsBringIntoView = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(state) {
+        if (state?.resume != null) runCatching { playFocus.requestFocus() }
+    }
+
+    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+
+    if (selectedSeason == null) {
+        // Header (poster + metadata) is scrollable so long synopses don't
+        // squeeze the seasons grid off-screen.
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TouchableButton(onClick = {
-                if (selectedSeason != null) selectedSeason = null else onBack()
-            }) { Text(stringResource(R.string.back)) }
-            Text(
-                title,
-                style = if (isPhone) MaterialTheme.typography.titleMedium
-                else MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            // Watchlist sits on the same row as Back/Title because it's tiny
-            // (icon-only). It used to live on the action row below where it
-            // had to share with the resume button — long series titles would
-            // push it past the right edge.
-            state?.let { detail ->
-                TouchableButton(onClick = {
-                    val wasInList = detail.isInWatchlist
-                    vm.toggleWatchlist()
-                    snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
-                }) {
-                    androidx.compose.material3.Icon(
-                        if (detail.isInWatchlist) Icons.Filled.Bookmark
-                        else Icons.Filled.BookmarkBorder,
-                        contentDescription = stringResource(
-                            if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
-                        )
-                    )
-                    if (!isPhone) {
-                        Text(
-                            "  " + stringResource(
-                                if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+            val detail = state
+            if (detail == null) {
+                Text(stringResource(R.string.loading))
+                return
+            }
+
+            val (posterW, posterH) = when (dim.formFactor) {
+                com.iptv.app.ui.common.FormFactor.Phone -> 140.dp to 210.dp
+                com.iptv.app.ui.common.FormFactor.Tablet -> 200.dp to 300.dp
+                com.iptv.app.ui.common.FormFactor.Tv -> 260.dp to 390.dp
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 24.dp)) {
+                Box(
+                    modifier = Modifier
+                        .width(posterW)
+                        .height(posterH)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val cover = detail.coverUrl ?: detail.info?.cover ?: coverUrl
+                    if (cover.isNullOrBlank()) {
+                        Icon(Icons.Filled.Tv, contentDescription = null)
+                    } else {
+                        AsyncImage(model = cover, contentDescription = title)
+                    }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.headlineMedium)
+                    detail.info?.let { info ->
+                        info.releaseDate?.takeIf { it.isNotBlank() }?.let {
+                            Text(stringResource(R.string.movie_release, it), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        info.rating?.takeIf { it.isNotBlank() }?.let {
+                            Text(stringResource(R.string.movie_rating, it), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        info.genre?.takeIf { it.isNotBlank() }?.let {
+                            Text(stringResource(R.string.movie_genre, it), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        info.director?.takeIf { it.isNotBlank() }?.let {
+                            Text(stringResource(R.string.movie_director, it), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        info.cast?.takeIf { it.isNotBlank() }?.let {
+                            Text(stringResource(R.string.movie_cast, it), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
+                        detail.resume?.let { resume ->
+                            val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
+                            TouchableButton(
+                                onClick = {
+                                    onPlay(
+                                        PlayerArgs(
+                                            kind = PlayerKind.EPISODE,
+                                            streamId = resume.episode.id.toIntOrNull() ?: 0,
+                                            title = resume.episode.title,
+                                            containerExtension = resume.episode.containerExtension,
+                                            seriesId = resume.episode.seriesId,
+                                            seasonNumber = resume.episode.seasonNumber,
+                                            episodeId = resume.episode.id,
+                                            startPositionMs = resume.positionMs
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.focusRequester(playFocus)
+                            ) {
+                                Text(stringResource(labelRes, resume.episode.seasonNumber, resume.episode.episodeNum))
+                            }
+                        }
+                        TouchableButton(onClick = {
+                            val wasFav = detail.isFavorite
+                            vm.toggleFavorite()
+                            snackbar?.show(if (wasFav) favoriteRemovedMsg else favoriteAddedMsg)
+                        }) {
+                            Icon(
+                                if (detail.isFavorite) Icons.Filled.Favorite
+                                else Icons.Filled.FavoriteBorder,
+                                contentDescription = stringResource(
+                                    if (detail.isFavorite) R.string.remove_favorite else R.string.add_favorite
+                                )
                             )
-                        )
+                            if (!isPhone) {
+                                Text(
+                                    "  " + stringResource(
+                                        if (detail.isFavorite) R.string.remove_favorite else R.string.add_favorite
+                                    )
+                                )
+                            }
+                        }
+                        TouchableButton(onClick = {
+                            val wasInList = detail.isInWatchlist
+                            vm.toggleWatchlist()
+                            snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
+                        }) {
+                            Icon(
+                                if (detail.isInWatchlist) Icons.Filled.Bookmark
+                                else Icons.Filled.BookmarkBorder,
+                                contentDescription = stringResource(
+                                    if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                                )
+                            )
+                            if (!isPhone) {
+                                Text(
+                                    "  " + stringResource(
+                                        if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            detail.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        stringResource(R.string.synopsis),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(plot, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(seasonsBringIntoView)
+                    .onFocusEvent { fs ->
+                        if (fs.hasFocus) coroutineScope.launch { seasonsBringIntoView.bringIntoView() }
+                    }
+            ) {
+                Text(
+                    stringResource(R.string.section_seasons),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                // Seasons grid uses a non-lazy Column-of-Rows: the parent
+                // scroll-state owns the scrolling. Embedding a LazyVerticalGrid
+                // inside a vertically-scrollable Column is unsupported by
+                // Compose ("Vertically scrollable component was measured with
+                // an infinity maximum height constraint").
+                val seasonRows = detail.seasons.chunked(seasonCols)
+                seasonRows.forEach { rowItems ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        rowItems.forEach { s ->
+                            val realCount = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
+                            val unavailable = realCount == 0
+                            val displayName = if (unavailable) "${s.name} (vazia)" else s.name
+                            Box(modifier = Modifier.weight(1f)) {
+                                CategoryCard(
+                                    title = displayName,
+                                    count = if (unavailable) null else realCount,
+                                    locked = false
+                                ) {
+                                    selectedSeason = s.seasonNumber
+                                }
+                            }
+                        }
+                        // Fill the trailing space when the row is shorter than seasonCols.
+                        repeat(seasonCols - rowItems.size) {
+                            Box(modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
         }
-        // Action row: Resume / Play next. Empty when there's nothing to resume.
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 8.dp)
-        ) {
-            state?.resume?.let { resume ->
-                val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
-                TouchableButton(onClick = {
-                    onPlay(
-                        PlayerArgs(
-                            kind = PlayerKind.EPISODE,
-                            streamId = resume.episode.id.toIntOrNull() ?: 0,
-                            title = resume.episode.title,
-                            containerExtension = resume.episode.containerExtension,
-                            seriesId = resume.episode.seriesId,
-                            seasonNumber = resume.episode.seasonNumber,
-                            episodeId = resume.episode.id,
-                            startPositionMs = resume.positionMs
-                        )
-                    )
-                }) {
-                    Text(stringResource(labelRes, resume.episode.seasonNumber, resume.episode.episodeNum))
-                }
-            }
-        }
+        return
+    }
+
+    // Episodes view of a chosen season (unchanged layout).
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         val detail = state
         if (detail == null) {
             Text(stringResource(R.string.loading))
             return
         }
-        if (selectedSeason == null) {
-            detail.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
-                Text(
-                    stringResource(R.string.synopsis),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-                Text(
-                    plot,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-            }
-            Text(stringResource(R.string.section_seasons), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(seasonCols),
-                horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
-            ) {
-                items(detail.seasons) { s ->
-                    // Trust the actual map size, not the provider's
-                    // `episode_count` field — providers commonly advertise
-                    // counts they then fail to return.
-                    val realCount = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
-                    val unavailable = realCount == 0
-                    val displayName = if (unavailable) "${s.name} (vazia)" else s.name
-                    CategoryCard(
-                        title = displayName,
-                        count = if (unavailable) null else realCount,
-                        locked = false
-                    ) {
-                        // Open even if empty so the user sees the explanation
-                        // empty-state instead of a silently dead tap.
-                        selectedSeason = s.seasonNumber
-                    }
-                }
-            }
-        } else {
+        run {
             val episodes = detail.episodesBySeason[selectedSeason] ?: emptyList()
             Text(
                 "Temporada $selectedSeason — ${episodes.size} ${stringResource(R.string.season_episodes_suffix)}",

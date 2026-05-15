@@ -1,14 +1,18 @@
 package com.iptv.app.ui.movies
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,11 +24,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -153,6 +163,7 @@ class MovieDetailViewModel @Inject constructor(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MovieDetailScreen(
     args: PlayerArgs,
@@ -169,6 +180,18 @@ fun MovieDetailScreen(
     val watchlistRemovedMsg = stringResource(R.string.snack_watchlist_removed)
     LaunchedEffect(args.streamId) { vm.load(args.streamId) }
     androidx.activity.compose.BackHandler(onBack = onBack)
+
+    val playFocus = remember { FocusRequester() }
+    val synopsisBringIntoView = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    // Pull focus to the primary action once data is in. Detail screens always
+    // open with the Back button as the natural first focusable; the user wants
+    // to start playback, not exit.
+    LaunchedEffect(state.info) {
+        if (state.info != null) {
+            runCatching { playFocus.requestFocus() }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -232,14 +255,20 @@ fun MovieDetailScreen(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
                     if (state.resumeMs > 0L) {
-                        TouchableButton(onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) }) {
+                        TouchableButton(
+                            onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) },
+                            modifier = Modifier.focusRequester(playFocus)
+                        ) {
                             Text(stringResource(R.string.movie_resume, formatTime(state.resumeMs)))
                         }
                         TouchableButton(onClick = { onPlay(args.copy(startPositionMs = 0L)) }) {
                             Text(stringResource(R.string.movie_restart))
                         }
                     } else {
-                        TouchableButton(onClick = { onPlay(args) }) {
+                        TouchableButton(
+                            onClick = { onPlay(args) },
+                            modifier = Modifier.focusRequester(playFocus)
+                        ) {
                             Text(stringResource(R.string.movie_play))
                         }
                     }
@@ -276,7 +305,21 @@ fun MovieDetailScreen(
         }
 
         state.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Sinopse precisa ser focável para o D-pad descer até aqui e levar
+            // o scroll junto — sem isso, em TV (sem touch) o usuário não tem
+            // como ler o texto inteiro.
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(synopsisBringIntoView)
+                    .onFocusEvent { focusState ->
+                        if (focusState.isFocused) {
+                            coroutineScope.launch { synopsisBringIntoView.bringIntoView() }
+                        }
+                    }
+                    .focusable()
+            ) {
                 Text(
                     stringResource(R.string.synopsis),
                     style = MaterialTheme.typography.titleMedium

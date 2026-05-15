@@ -67,13 +67,14 @@ fun PosterCard(
     imageUrl: String?,
     locked: Boolean = false,
     fallbackIcon: ImageVector = Icons.Filled.Movie,
+    fillWidth: Boolean = false,
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
-    val cardModifier = if (dim.formFactor == FormFactor.Phone) {
-        Modifier.fillMaxWidth().aspectRatio(2f / 3f)
-    } else {
-        Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
+    val cardModifier = when {
+        fillWidth -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+        dim.formFactor == FormFactor.Phone -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+        else -> Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
     }
     TouchableCard(
         onClick = onClick,
@@ -228,8 +229,8 @@ fun CategoryCard(
         // Smaller, denser tiles on phone — caller asked to see more categories
         // per viewport without horizontal scroll.
         FormFactor.Phone -> Triple(170.dp, 68.dp, 10.dp)
-        FormFactor.Tablet -> Triple(280.dp, 120.dp, 16.dp)
-        FormFactor.Tv -> Triple(360.dp, 140.dp, 20.dp)
+        FormFactor.Tablet -> Triple(220.dp, 88.dp, 14.dp)
+        FormFactor.Tv -> Triple(280.dp, 96.dp, 16.dp)
     }
     val categoryModifier = if (isPhone) {
         Modifier.fillMaxWidth().height(h)
@@ -244,8 +245,11 @@ fun CategoryCard(
             Column(modifier = Modifier.align(Alignment.CenterStart)) {
                 Text(
                     title,
-                    style = if (isPhone) MaterialTheme.typography.titleSmall
-                    else MaterialTheme.typography.titleLarge,
+                    style = when (dim.formFactor) {
+                        FormFactor.Phone -> MaterialTheme.typography.titleSmall
+                        FormFactor.Tablet -> MaterialTheme.typography.titleMedium
+                        FormFactor.Tv -> MaterialTheme.typography.titleMedium
+                    },
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )

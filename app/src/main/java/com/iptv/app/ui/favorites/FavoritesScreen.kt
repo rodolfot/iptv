@@ -80,8 +80,13 @@ fun FavoritesScreen(
             )
             return
         }
+        val posterMinWidth = when (dim.formFactor) {
+            com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
+            com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
+            com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
+        }
         LazyVerticalGrid(
-            columns = GridCells.Fixed(dim.SeriesGridColumns),
+            columns = GridCells.Adaptive(posterMinWidth),
             horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
             verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
         ) {
@@ -94,7 +99,8 @@ fun FavoritesScreen(
                 PosterCard(
                     title = f.name,
                     imageUrl = f.logoUrl,
-                    fallbackIcon = icon
+                    fallbackIcon = icon,
+                    fillWidth = true
                 ) {
                     val args = when (f.type) {
                         ContentType.LIVE -> PlayerArgs(PlayerKind.LIVE, f.itemId, f.name, null)

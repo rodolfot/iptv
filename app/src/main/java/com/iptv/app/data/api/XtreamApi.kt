@@ -277,9 +277,19 @@ data class EpisodeDto(
 
 @JsonClass(generateAdapter = true)
 data class EpisodeInfo(
+    // Provider variance for the poster URL — different panels expose it under
+    // different keys. Fall through the list in toModel().
     @Json(name = "movie_image") val movieImage: String? = null,
+    @Json(name = "cover_big") val coverBig: String? = null,
+    val cover: String? = null,
+    val image: String? = null,
+    val name: String? = null,
+    val title: String? = null,
     val plot: String? = null,
+    val overview: String? = null,
     val duration: String? = null,
     @Json(name = "duration_secs") val durationSecs: Int? = null,
-    val rating: Double? = null
+    val rating: Double? = null,
+    @Json(name = "releasedate") val releaseDate: String? = null,
+    val release_date: String? = null
 )
