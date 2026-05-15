@@ -22,12 +22,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -62,10 +63,9 @@ import java.util.Locale
  * channel. UX:
  *  - Move the focus through the list -> the right panel updates with the
  *    schedule of the highlighted channel (current programme + upcoming).
- *  - Press OK once -> the row becomes "armed" (still no playback) so the user
- *    can read the EPG.
- *  - Press OK again on the same row -> opens the player.
- *  - Pressing OK on a different row arms that row instead.
+ *  - Press OK -> opens the player immediately (canais ao vivo não têm tela
+ *    intermediária de detalhe — o usuário só quer assistir).
+ *  - Long-press OK -> toggles favorite for the focused channel.
  */
 @Composable
 fun ChannelListWithEpg(
@@ -78,9 +78,12 @@ fun ChannelListWithEpg(
     modifier: Modifier = Modifier
 ) {
     var focusedIndex by remember(channels) { mutableStateOf(0) }
-    var armedChannelId by remember(channels) { mutableStateOf<Int?>(null) }
     val listState = rememberLazyListState()
     val firstFocus = remember { FocusRequester() }
+    val favorites by vm.favorites.collectAsState()
+    val snackbar = com.iptv.app.ui.common.LocalSnackbar.current
+    val favoriteAddedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.snack_favorite_added)
+    val favoriteRemovedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.snack_favorite_removed)
 
     LaunchedEffect(channels) {
         if (channels.isNotEmpty()) {
@@ -103,6 +106,9 @@ fun ChannelListWithEpg(
                 val index = channels.indexOf(channel)
                 val locked = isCategoryAdult && !isParentalUnlocked
                 val now = channel.epgChannelId?.let { epgNow[it] }
+                val isFavorite = favorites.any {
+                    it.type == com.iptv.app.domain.model.ContentType.LIVE && it.itemId == channel.id
+                }
                 ChannelRow(
                     channel = channel,
                     nowPlaying = now?.title,
@@ -112,16 +118,25 @@ fun ChannelListWithEpg(
                             .coerceIn(0f, 1f)
                     },
                     locked = locked,
-                    armed = armedChannelId == channel.id,
+                    isFavorite = isFavorite,
                     modifier = Modifier
                         .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier)
                         .onFocusChanged { if (it.isFocused) focusedIndex = index },
-                    onClick = {
-                        if (armedChannelId == channel.id) {
-                            onPlay(channel)
-                        } else {
-                            armedChannelId = channel.id
-                        }
+                    onClick = { onPlay(channel) },
+                    onLongClick = {
+                        val wasFavorite = isFavorite
+                        vm.toggleFavorite(
+                            com.iptv.app.data.db.FavoriteEntity(
+                                profileId = "",
+                                type = com.iptv.app.domain.model.ContentType.LIVE,
+                                itemId = channel.id,
+                                name = channel.name,
+                                logoUrl = channel.logoUrl,
+                                categoryId = channel.categoryId,
+                                containerExtension = null
+                            )
+                        )
+                        snackbar?.show(if (wasFavorite) favoriteRemovedMsg else favoriteAddedMsg)
                     }
                 )
             }
@@ -143,12 +158,14 @@ private fun ChannelRow(
     nowPlaying: String?,
     nowProgress: Float?,
     locked: Boolean,
-    armed: Boolean,
+    isFavorite: Boolean,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     Card(
         onClick = onClick,
+        onLongClick = onLongClick,
         shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
         modifier = modifier.fillMaxWidth().height(76.dp)
     ) {
@@ -196,9 +213,9 @@ private fun ChannelRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    if (armed) {
+                    if (isFavorite) {
                         Icon(
-                            Icons.Filled.PlayArrow,
+                            Icons.Filled.Favorite,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)

@@ -315,9 +315,9 @@ private fun TopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = dim.ScreenPadding, vertical = 16.dp),
+            .padding(horizontal = dim.ScreenPadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (onBack != null) {
             com.iptv.app.ui.common.TouchableButton(onClick = onBack) {
@@ -329,7 +329,7 @@ private fun TopBar(
         }
         Text(
             stringResource(com.iptv.app.R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.titleLarge
         )
         // Visualmente a pílula indicadora segue o foco do D-pad (para o
         // usuário ver onde está). Mas o conteúdo abaixo só troca quando ele

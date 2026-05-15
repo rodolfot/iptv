@@ -1,6 +1,8 @@
 package com.iptv.app.ui.search
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +15,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.runtime.remember
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -213,11 +224,32 @@ fun SearchScreen(
 
 @Composable
 private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: Boolean) {
+    // Mesmo padrão D-pad friendly do LocalFilterField/PinField: o foco
+    // sozinho NÃO abre o IME. Só ao apertar OK/Enter no controle é que
+    // entramos em modo edição (e o teclado aparece). Antes, ao entrar em
+    // Buscar o BasicTextField já recebia foco e disparava o teclado.
+    var editing by remember { mutableStateOf(false) }
+    val editorFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(editing) {
+        if (editing) {
+            editorFocus.requestFocus()
+            keyboard?.show()
+        } else {
+            keyboard?.hide()
+        }
+    }
+
+    val shape = RoundedCornerShape(12.dp)
+    val borderColor = if (editing) MaterialTheme.colorScheme.primary else Color.Transparent
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
+            .border(2.dp, borderColor, shape)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -226,24 +258,55 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: B
             contentDescription = null,
             modifier = Modifier.padding(end = 12.dp)
         )
-        BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            enabled = enabled,
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 22.sp),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
-                    Text(
-                        stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog),
-                        color = Color(0x99FFFFFF),
-                        style = MaterialTheme.typography.titleMedium
-                    )
+        if (editing) {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                enabled = enabled,
+                singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 22.sp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(editorFocus)
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Back, Key.Escape -> { editing = false; true }
+                            else -> false
+                        }
+                    },
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text(
+                            stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog),
+                            color = Color(0x99FFFFFF),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    inner()
                 }
-                inner()
-            }
-        )
+            )
+        } else {
+            Text(
+                text = query.ifEmpty {
+                    stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog)
+                },
+                color = if (query.isEmpty()) Color(0x99FFFFFF) else Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                                if (enabled) { editing = true; true } else false
+                            }
+                            else -> false
+                        }
+                    }
+                    .clickable(enabled = enabled) { editing = true }
+            )
+        }
     }
 }
 

@@ -37,9 +37,9 @@ data class TvDimensions(
 
 private val TvDefaults = TvDimensions(
     formFactor = FormFactor.Tv,
-    ScreenPadding = 64.dp,
-    SectionSpacing = 32.dp,
-    CardSpacing = 24.dp,
+    ScreenPadding = 32.dp,
+    SectionSpacing = 24.dp,
+    CardSpacing = 20.dp,
     PosterCardW = 220.dp,
     PosterCardH = 330.dp,
     ChannelCardW = 320.dp,
