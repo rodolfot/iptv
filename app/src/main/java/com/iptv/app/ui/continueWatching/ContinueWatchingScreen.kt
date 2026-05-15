@@ -156,8 +156,11 @@ fun ContinueWatchingScreen(
         }
 
         movieReco?.let { row ->
+            val header = row.seedTitle?.let {
+                stringResource(R.string.recommended_because_movie, it)
+            } ?: stringResource(R.string.recommended_top_movies)
             Text(
-                stringResource(R.string.recommended_because_movie, row.seedTitle),
+                header,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
             )
@@ -167,8 +170,11 @@ fun ContinueWatchingScreen(
         }
 
         seriesReco?.let { row ->
+            val header = row.seedTitle?.let {
+                stringResource(R.string.recommended_because_series, it)
+            } ?: stringResource(R.string.recommended_top_series)
             Text(
-                stringResource(R.string.recommended_because_series, row.seedTitle),
+                header,
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
             )

@@ -36,8 +36,17 @@ class Recommender @Inject constructor(
     private val favoriteDao: FavoriteDao,
     private val currentProfile: CurrentProfile
 ) {
-    data class MovieRow(val seedTitle: String, val items: List<MovieCacheEntity>)
-    data class SeriesRow(val seedTitle: String, val items: List<SeriesCacheEntity>)
+    /**
+     * [seedTitle] é null quando a linha veio do fallback (sem histórico do
+     * usuário). A UI usa esse sinal para mostrar um cabeçalho genérico
+     * ("Em alta", "Você pode gostar") em vez de mentir "Porque você viu X"
+     * — usuário no primeiro acesso nunca viu nada.
+     */
+    data class MovieRow(val seedTitle: String?, val items: List<MovieCacheEntity>)
+    data class SeriesRow(val seedTitle: String?, val items: List<SeriesCacheEntity>)
+
+    private data class MovieSeed(val item: MovieCacheEntity, val fromHistory: Boolean)
+    private data class SeriesSeed(val item: SeriesCacheEntity, val fromHistory: Boolean)
 
     suspend fun moviesFor(limit: Int = 12): MovieRow? {
         val pid = currentProfile.id()
@@ -52,8 +61,9 @@ class Recommender @Inject constructor(
         val watched = runCatching { movieProgress.observeInProgress(pid, limit = 50).first() }
             .getOrDefault(emptyList())
 
-        val seed: MovieCacheEntity = pickSeed(all, favIds, watched.map { it.movieId }.toSet())
+        val seedInfo = pickSeed(all, favIds, watched.map { it.movieId }.toSet())
             ?: return null
+        val seed = seedInfo.item
 
         val seedTokens = movieTokens(seed)
         if (seedTokens.isEmpty()) return null
@@ -68,7 +78,10 @@ class Recommender @Inject constructor(
             .take(limit)
             .toList()
         if (scored.isEmpty()) return null
-        return MovieRow(seedTitle = seed.name, items = scored)
+        return MovieRow(
+            seedTitle = if (seedInfo.fromHistory) seed.name else null,
+            items = scored
+        )
     }
 
     suspend fun seriesFor(limit: Int = 12): SeriesRow? {
@@ -84,8 +97,9 @@ class Recommender @Inject constructor(
         val recent = runCatching { seriesProgress.observeRecent(pid, limit = 20).first() }
             .getOrDefault(emptyList())
 
-        val seed = pickSeriesSeed(all, favIds, recent.map { it.seriesId }.toSet())
+        val seedInfo = pickSeriesSeed(all, favIds, recent.map { it.seriesId }.toSet())
             ?: return null
+        val seed = seedInfo.item
         val seedTokens = seriesTokens(seed)
         if (seedTokens.isEmpty()) return null
 
@@ -99,30 +113,34 @@ class Recommender @Inject constructor(
             .take(limit)
             .toList()
         if (scored.isEmpty()) return null
-        return SeriesRow(seedTitle = seed.name, items = scored)
+        return SeriesRow(
+            seedTitle = if (seedInfo.fromHistory) seed.name else null,
+            items = scored
+        )
     }
 
     private fun pickSeed(
         all: List<MovieCacheEntity>,
         favIds: Set<Int>,
         watchedIds: Set<Int>
-    ): MovieCacheEntity? {
-        // Prefer the most recent watched/in-progress movie, else the latest favorite,
-        // else fall back to the highest-rated movie so a brand-new install still shows
-        // a meaningful row.
-        return all.firstOrNull { it.streamId in watchedIds }
-            ?: all.firstOrNull { it.streamId in favIds }
-            ?: all.maxByOrNull { it.rating }
+    ): MovieSeed? {
+        // Prefer the most recent watched/in-progress movie, else the latest
+        // favorite (both count as "real history"). Fall back to the highest
+        // rated movie so first-run users still see *something*, but flag the
+        // row so the UI doesn't claim the user has watched anything yet.
+        all.firstOrNull { it.streamId in watchedIds }?.let { return MovieSeed(it, true) }
+        all.firstOrNull { it.streamId in favIds }?.let { return MovieSeed(it, true) }
+        return all.maxByOrNull { it.rating }?.let { MovieSeed(it, false) }
     }
 
     private fun pickSeriesSeed(
         all: List<SeriesCacheEntity>,
         favIds: Set<Int>,
         recentIds: Set<Int>
-    ): SeriesCacheEntity? {
-        return all.firstOrNull { it.seriesId in recentIds }
-            ?: all.firstOrNull { it.seriesId in favIds }
-            ?: all.maxByOrNull { it.rating }
+    ): SeriesSeed? {
+        all.firstOrNull { it.seriesId in recentIds }?.let { return SeriesSeed(it, true) }
+        all.firstOrNull { it.seriesId in favIds }?.let { return SeriesSeed(it, true) }
+        return all.maxByOrNull { it.rating }?.let { SeriesSeed(it, false) }
     }
 
     private fun movieTokens(m: MovieCacheEntity): Set<String> = buildSet {

@@ -104,6 +104,8 @@
     <string name="continue_movies">Continuar filmes</string>
     <string name="recommended_because_movie">Porque você viu %1$s</string>
     <string name="recommended_because_series">Porque você viu %1$s</string>
+    <string name="recommended_top_movies">Filmes em destaque</string>
+    <string name="recommended_top_series">Séries em destaque</string>
 
     <!-- Movie detail -->
     <string name="movie_play">Assistir</string>

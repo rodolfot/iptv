@@ -92,6 +92,11 @@ fun PosterCard(
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = title,
+                    // Crop instead of the default Fit so posters always fill
+                    // the card. Providers ship images at unpredictable aspect
+                    // ratios; Fit leaves dark bands on the sides that made the
+                    // recommendation row look ragged.
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
                 )
             }
