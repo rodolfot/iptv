@@ -329,10 +329,20 @@ private fun TopBar(
         )
         TabRow(selectedTabIndex = selectedIndex, modifier = Modifier.padding(start = 16.dp)) {
             tabs.forEach { spec ->
+                val isSelected = spec.key == selectedKey
                 Tab(
-                    selected = spec.key == selectedKey,
+                    selected = isSelected,
                     onFocus = { onSelected(spec.key) },
-                    onClick = { onSelected(spec.key) }
+                    onClick = { onSelected(spec.key) },
+                    // Cores explícitas para impedir o caso "texto branco sobre
+                    // fundo branco" do estado focado default do tv.material3.
+                    colors = androidx.tv.material3.TabDefaults.pillIndicatorTabColors(
+                        contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+                        inactiveContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        focusedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
                     Text(
                         stringResource(spec.label),

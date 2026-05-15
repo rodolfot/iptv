@@ -196,6 +196,8 @@ fun ContinueWatchingScreen(
     }
 }
 
+private val HomePosterWidth = 150.dp
+
 @Composable
 private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) -> Unit) {
     val percent = if (item.durationMs > 0) (item.positionMs * 100 / item.durationMs).toInt().coerceIn(0, 100) else 0
@@ -203,7 +205,8 @@ private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) ->
         PosterCard(
             title = item.title,
             imageUrl = item.posterUrl,
-            fallbackIcon = Icons.Filled.Movie
+            fallbackIcon = Icons.Filled.Movie,
+            overrideWidth = HomePosterWidth
         ) {
             onPlay(
                 PlayerArgs(
@@ -237,7 +240,8 @@ private fun SeriesContinueCard(
         PosterCard(
             title = "${item.title}\nT${item.lastSeasonNumber}E${item.lastEpisodeNum}",
             imageUrl = item.coverUrl,
-            fallbackIcon = Icons.Filled.Tv
+            fallbackIcon = Icons.Filled.Tv,
+            overrideWidth = HomePosterWidth
         ) {
             onPlay(
                 PlayerArgs(
@@ -261,7 +265,8 @@ private fun RecommendedMovieCard(item: MovieCacheEntity, onPlay: (PlayerArgs) ->
     PosterCard(
         title = item.name,
         imageUrl = item.posterUrl,
-        fallbackIcon = Icons.Filled.Movie
+        fallbackIcon = Icons.Filled.Movie,
+        overrideWidth = HomePosterWidth
     ) {
         onPlay(
             PlayerArgs(
@@ -284,7 +289,8 @@ private fun RecommendedSeriesCard(
     PosterCard(
         title = item.name,
         imageUrl = item.coverUrl,
-        fallbackIcon = Icons.Filled.Tv
+        fallbackIcon = Icons.Filled.Tv,
+        overrideWidth = HomePosterWidth
     ) {
         onOpenSeries(item.seriesId, item.name, item.coverUrl)
     }

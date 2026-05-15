@@ -71,11 +71,13 @@ fun PosterCard(
     fallbackIcon: ImageVector = Icons.Filled.Movie,
     fillWidth: Boolean = false,
     rating: Double? = null,
+    overrideWidth: androidx.compose.ui.unit.Dp? = null,
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
     val cardModifier = when {
         fillWidth -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+        overrideWidth != null -> Modifier.width(overrideWidth).aspectRatio(2f / 3f)
         dim.formFactor == FormFactor.Phone -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
         else -> Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
     }
