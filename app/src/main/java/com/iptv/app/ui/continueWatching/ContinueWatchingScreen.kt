@@ -130,22 +130,30 @@ fun ContinueWatchingScreen(
             return
         }
 
+        // Track whether we've already drawn a section so the first one hugs
+        // the top of the page (no leading 24.dp). Without this, when the
+        // "Continue Watching" rows are empty the recommendation header
+        // floats with a wide gap below the tab bar.
+        var hasPriorSection = false
+        val sectionTopPadding = { if (hasPriorSection) 24.dp else 0.dp }
+
         if (series.isNotEmpty()) {
             Text(
                 stringResource(R.string.continue_series),
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 12.dp)
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                 items(series) { s -> SeriesContinueCard(s, vm, onPlay) }
             }
+            hasPriorSection = true
         }
 
         if (movies.isNotEmpty()) {
             Text(
                 stringResource(R.string.continue_movies),
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
+                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 12.dp)
             )
             // Continue Watching for movies tops out around 20 items, so we render
             // them as a horizontal row instead of a grid: keeps the screen
@@ -153,6 +161,7 @@ fun ContinueWatchingScreen(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                 items(movies) { m -> MovieContinueCard(m, onPlay) }
             }
+            hasPriorSection = true
         }
 
         movieReco?.let { row ->
@@ -162,11 +171,12 @@ fun ContinueWatchingScreen(
             Text(
                 header,
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
+                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 12.dp)
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                 items(row.items) { m -> RecommendedMovieCard(m, onPlay) }
             }
+            hasPriorSection = true
         }
 
         seriesReco?.let { row ->
@@ -176,11 +186,12 @@ fun ContinueWatchingScreen(
             Text(
                 header,
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
+                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 12.dp)
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
                 items(row.items) { s -> RecommendedSeriesCard(s, onOpenSeries) }
             }
+            hasPriorSection = true
         }
     }
 }
