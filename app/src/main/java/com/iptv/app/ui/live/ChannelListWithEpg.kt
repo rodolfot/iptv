@@ -326,12 +326,32 @@ private fun ChannelPreviewPlayer(channel: LiveChannel, vm: HomeViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val exo = androidx.compose.runtime.remember {
         androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
-            volume = 0f // silencioso por padrão; o canal focado é só prévia
+            volume = 1f // áudio habilitado: o painel é prévia funcional
             playWhenReady = true
         }
     }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { exo.release() }
+    // Retry automático até 5x quando o stream falha (provedores Xtream
+    // frequentemente cortam ao trocar de canal rápido demais). Listener
+    // re-prepara após backoff incremental.
+    androidx.compose.runtime.DisposableEffect(exo) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            private var attempts = 0
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                if (attempts >= 5) return
+                attempts++
+                exo.prepare()
+            }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == androidx.media3.common.Player.STATE_READY) {
+                    attempts = 0
+                }
+            }
+        }
+        exo.addListener(listener)
+        onDispose {
+            exo.removeListener(listener)
+            exo.release()
+        }
     }
     // Debounce: só carrega a stream após 600ms parado no canal — D-pad
     // rápido não desperdiça requests.

@@ -567,15 +567,11 @@ fun SeriesDetailScreen(
     var selectedSeason by rememberSaveable { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(seriesId) { vm.load(seriesId, title, coverUrl) }
-    androidx.activity.compose.BackHandler {
-        if (selectedSeason != null) selectedSeason = null else onBack()
-    }
-    // Same pattern as MovieDetailScreen: surface the back action up in the
-    // app top bar so this screen doesn't have its own inline Back button
-    // (which used to sit in front of the title and broke the visual rhythm).
-    com.iptv.app.ui.common.RegisterHeaderBack {
-        if (selectedSeason != null) selectedSeason = null else onBack()
-    }
+    // Agora a tela mostra detalhes + combo de temporadas + episódios na
+    // mesma view — não há mais "sub-tela" de episódios. Voltar sai direto
+    // da tela de detalhe para a lista de séries.
+    androidx.activity.compose.BackHandler { onBack() }
+    com.iptv.app.ui.common.RegisterHeaderBack { onBack() }
 
     val seasonCols = when (dim.formFactor) {
         com.iptv.app.ui.common.FormFactor.Phone -> 2
@@ -592,16 +588,14 @@ fun SeriesDetailScreen(
 
     val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
 
-    if (selectedSeason == null) {
-        // Header (poster + metadata) is scrollable so long synopses don't
-        // squeeze the seasons grid off-screen.
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    // Tela única: poster + metadados + combo de temporadas + grid de episódios.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
             val detail = state
             if (detail == null) {
                 Text(stringResource(R.string.loading))
@@ -816,13 +810,11 @@ fun SeriesDetailScreen(
                             if (rowItems.size == 1) {
                                 Box(modifier = Modifier.weight(1f))
                             }
-                            }
                         }
                     }
                 }
             }
         }
-        return
     }
 }
 
