@@ -61,14 +61,23 @@ fun TouchableButton(
             }
         }
     } else {
+        // Cores explícitas: o default do tv.material3.Button deixa o
+        // texto branco sobre fundo branco quando focado, ficando ilegível.
+        // Aqui fixamos contraste em todos os 4 estados (default/focused/
+        // pressed/disabled).
+        val tvScheme = androidx.tv.material3.MaterialTheme.colorScheme
         if (selected) {
             androidx.tv.material3.Button(
                 onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
                 colors = androidx.tv.material3.ButtonDefaults.colors(
-                    containerColor = androidx.tv.material3.MaterialTheme.colorScheme.primary,
-                    contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                    containerColor = tvScheme.primary,
+                    contentColor = tvScheme.onPrimary,
+                    focusedContainerColor = tvScheme.primary,
+                    focusedContentColor = tvScheme.onPrimary,
+                    pressedContainerColor = tvScheme.primary,
+                    pressedContentColor = tvScheme.onPrimary
                 ),
                 content = content
             )
@@ -77,6 +86,14 @@ fun TouchableButton(
                 onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
+                colors = androidx.tv.material3.ButtonDefaults.colors(
+                    containerColor = tvScheme.secondaryContainer,
+                    contentColor = tvScheme.onSecondaryContainer,
+                    focusedContainerColor = tvScheme.primary,
+                    focusedContentColor = tvScheme.onPrimary,
+                    pressedContainerColor = tvScheme.primary,
+                    pressedContentColor = tvScheme.onPrimary
+                ),
                 content = content
             )
         }

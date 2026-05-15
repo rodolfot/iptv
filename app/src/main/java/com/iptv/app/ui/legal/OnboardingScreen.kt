@@ -110,7 +110,10 @@ fun OnboardingScreen(
             .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState()),
-        contentAlignment = Alignment.Center
+        // TopCenter (em vez de Center) garante que o topo da página fica
+        // sempre visível em telas curtas — antes o título "Bem-vindo ao
+        // TartaTV" era cortado pelo Center quando o conteúdo crescia.
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
             modifier = Modifier
