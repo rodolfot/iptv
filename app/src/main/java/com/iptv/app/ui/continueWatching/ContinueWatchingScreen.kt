@@ -41,6 +41,7 @@ import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.data.prefs.SettingsStore
 import com.iptv.app.data.reco.Recommender
+import com.iptv.app.domain.model.toModel
 import com.iptv.app.ui.common.EmptyState
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.rememberTvDim
@@ -65,6 +66,7 @@ class ContinueWatchingViewModel @Inject constructor(
     private val episodeProgressDao: EpisodeProgressDao,
     private val currentProfile: CurrentProfile,
     private val recommender: Recommender,
+    private val xtream: com.iptv.app.data.api.XtreamRepository,
     settings: SettingsStore
 ) : ViewModel() {
     private val profileIdFlow = settings.flow
@@ -94,6 +96,67 @@ class ContinueWatchingViewModel @Inject constructor(
         val ep = episodeProgressDao.getById(currentProfile.id(), episodeId) ?: return 0
         if (ep.durationMs <= 0L || ep.watched) return 0
         return ((ep.positionMs * 100L) / ep.durationMs).toInt().coerceIn(0, 100)
+    }
+
+    /**
+     * Decide qual episódio tocar a partir do card "Continuar séries":
+     *  - se o último visto NÃO foi 100% concluído → continua nele;
+     *  - se foi concluído → busca o próximo episódio da série (próximo
+     *    número na mesma temporada; se acabou, primeiro da próxima);
+     *  - fallback: o próprio último episódio.
+     */
+    suspend fun resolveNextEpisode(item: SeriesProgressEntity): PlayerArgs {
+        val pid = currentProfile.id()
+        val last = episodeProgressDao.getById(pid, item.lastEpisodeId)
+        val needsNext = last?.watched == true
+        if (!needsNext) {
+            return PlayerArgs(
+                kind = PlayerKind.EPISODE,
+                streamId = item.lastEpisodeId.toIntOrNull() ?: 0,
+                title = item.title,
+                containerExtension = null,
+                seriesId = item.seriesId,
+                seasonNumber = item.lastSeasonNumber,
+                episodeId = item.lastEpisodeId,
+                posterUrl = item.coverUrl
+            )
+        }
+        // Concluído: buscar o próximo via seriesInfo.
+        val next = runCatching {
+            val resp = xtream.seriesInfo(item.seriesId)
+            val all = resp.normalizedEpisodes()
+                .flatMap { (key, list) ->
+                    val fb = key.toIntOrNull() ?: 0
+                    list.map { it.toModel(item.seriesId, fb) }
+                }
+                .sortedWith(compareBy({ it.seasonNumber }, { it.episodeNum }))
+            val idx = all.indexOfFirst { it.id == item.lastEpisodeId }
+            all.getOrNull(idx + 1)
+        }.getOrNull()
+        return if (next != null) {
+            PlayerArgs(
+                kind = PlayerKind.EPISODE,
+                streamId = next.id.toIntOrNull() ?: 0,
+                title = next.title,
+                containerExtension = next.containerExtension,
+                seriesId = next.seriesId,
+                seasonNumber = next.seasonNumber,
+                episodeId = next.id,
+                posterUrl = item.coverUrl
+            )
+        } else {
+            // Sem próximo (série terminou) — toca o último mesmo.
+            PlayerArgs(
+                kind = PlayerKind.EPISODE,
+                streamId = item.lastEpisodeId.toIntOrNull() ?: 0,
+                title = item.title,
+                containerExtension = null,
+                seriesId = item.seriesId,
+                seasonNumber = item.lastSeasonNumber,
+                episodeId = item.lastEpisodeId,
+                posterUrl = item.coverUrl
+            )
+        }
     }
 }
 
@@ -239,6 +302,7 @@ private fun SeriesContinueCard(
     androidx.compose.runtime.LaunchedEffect(item.lastEpisodeId) {
         percent = vm.episodePercent(item.lastEpisodeId)
     }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     Column {
         PosterCard(
             title = "${item.title}\nT${item.lastSeasonNumber}E${item.lastEpisodeNum}",
@@ -246,18 +310,9 @@ private fun SeriesContinueCard(
             fallbackIcon = Icons.Filled.Tv,
             overrideWidth = HomePosterWidth
         ) {
-            onPlay(
-                PlayerArgs(
-                    kind = PlayerKind.EPISODE,
-                    streamId = item.lastEpisodeId.toIntOrNull() ?: 0,
-                    title = item.title,
-                    containerExtension = null,
-                    seriesId = item.seriesId,
-                    seasonNumber = item.lastSeasonNumber,
-                    episodeId = item.lastEpisodeId,
-                    posterUrl = item.coverUrl
-                )
-            )
+            // Resolve em background para não bloquear a UI — se o último
+            // episódio foi 100% concluído, vai para o próximo da série.
+            scope.launch { onPlay(vm.resolveNextEpisode(item)) }
         }
         ProgressStripe(percent)
     }
