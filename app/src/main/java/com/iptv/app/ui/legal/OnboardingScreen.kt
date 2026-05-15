@@ -116,22 +116,20 @@ fun OnboardingScreen(
             modifier = Modifier
                 .widthIn(max = 560.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 32.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 stringResource(R.string.onboarding_title),
-                style = MaterialTheme.typography.headlineLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
                 stringResource(R.string.onboarding_message),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(Modifier.height(8.dp))
 
             // First-run language picker. Tapping a row immediately swaps the
             // app locale, so the rest of this very screen re-renders in the
@@ -140,7 +138,7 @@ fun OnboardingScreen(
             // primary CTAs below the fold.
             Text(
                 stringResource(R.string.onboarding_language_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
             run {
@@ -166,14 +164,12 @@ fun OnboardingScreen(
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
-
             // Tipo de dispositivo: detecção automática às vezes erra
             // (TVs reportando smallestScreenWidthDp baixo, etc.). Deixar o
             // usuário escolher é o jeito mais confiável.
             Text(
                 stringResource(R.string.onboarding_device_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
             run {
@@ -210,8 +206,6 @@ fun OnboardingScreen(
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
-
             // Stack vertically on phones (narrow viewport) so labels never wrap
             // into the next button. TV/tablet still gets the side-by-side row.
             if (isPhone) {
@@ -242,10 +236,9 @@ fun OnboardingScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-
             // Primary CTA is full-width and prominent. The "Decline" sits below
             // as a less-emphatic option — kept reachable but not the focus.
+            Spacer(Modifier.height(4.dp))
             FullWidthButton(
                 label = stringResource(R.string.onboarding_accept),
                 onClick = { vm.accept(onAccepted) },
@@ -273,7 +266,7 @@ private fun FullWidthButton(
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )

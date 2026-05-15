@@ -37,10 +37,14 @@ object LocaleManager {
     }
 
     /**
-     * Aplica o idioma e força a Activity a recriar **somente se** o locale
-     * efetivo mudou. AppCompat só dispara recreate automático em
-     * AppCompatActivity — como usamos ComponentActivity, recriamos manualmente
-     * para a UI refletir o novo idioma imediatamente.
+     * Aplica o idioma. No Android 13+ o sistema recria a Activity sozinho
+     * via `setApplicationLocales`. Em versões anteriores, AppCompat só
+     * recria automaticamente em AppCompatActivity — como usamos
+     * ComponentActivity, recriamos manualmente nessa faixa.
+     *
+     * IMPORTANTE: nunca chamamos `recreate()` no Android 13+. Combinar o
+     * recreate manual com o auto-recreate do sistema gerava double-recreate,
+     * que crashava o app levando o usuário de volta à launcher.
      */
     fun applyAndRecreate(activity: Activity, tag: String?) {
         val currentLocales: LocaleListCompat = ConfigurationCompat.getLocales(
@@ -50,13 +54,14 @@ object LocaleManager {
             else currentLocales[0]?.toLanguageTag()
         val target = tag?.takeIf { it.isNotBlank() }
         val targetEffective = target ?: Locale.getDefault().toLanguageTag()
-        if (currentTag == target || currentTag == targetEffective) {
-            // Nada mudou; evita um recreate à toa que zera scroll/foco.
-            if (target == null) resetToSystem() else apply(target)
-            return
-        }
+        val noChange = currentTag == target || currentTag == targetEffective
         if (target == null) resetToSystem() else apply(target)
-        activity.recreate()
+        if (noChange) return
+        val isAndroid13OrLater = android.os.Build.VERSION.SDK_INT >=
+            android.os.Build.VERSION_CODES.TIRAMISU
+        if (!isAndroid13OrLater) {
+            activity.recreate()
+        }
     }
 
     /**
