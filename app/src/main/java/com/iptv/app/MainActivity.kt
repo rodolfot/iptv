@@ -62,6 +62,18 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // On TV there's no PiP and no mini-player overlay to host playback
+        // when the app goes to background. Leaving the ExoPlayer rolling
+        // means audio keeps leaking out of the launcher. Detect PiP and
+        // skip the pause only when we're already in PiP (phone use-case).
+        val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode
+        if (!inPip) {
+            playbackHolder.player?.pause()
+        }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (!pipEnabled) return

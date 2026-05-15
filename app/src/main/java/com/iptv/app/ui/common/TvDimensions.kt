@@ -1,8 +1,12 @@
 package com.iptv.app.ui.common
 
+import android.app.UiModeManager
+import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -86,12 +90,28 @@ private val PhoneDefaults = TvDimensions(
     BodyFont = 14.sp
 )
 
-/** Compose-aware dimensions that adapt to the current form factor. */
+/**
+ * Compose-aware dimensions that adapt to the current form factor.
+ *
+ * The user-facing bug here: several Android TVs (especially PS5's HDMI Out
+ * and some TCL panels) report `smallestScreenWidthDp` below 600 even though
+ * they're clearly TVs. Falling back to PhoneDefaults made the whole app
+ * look and behave like a phone — grid of 2 columns, no EPG side panel,
+ * mini-player visible, etc. We now check `UiModeManager.currentModeType`
+ * first: when the system says we're on a TV, trust it over the width.
+ */
 @Composable
 @ReadOnlyComposable
 fun rememberTvDim(): TvDimensions {
-    val sw = LocalConfiguration.current.smallestScreenWidthDp
+    val configuration = LocalConfiguration.current
+    val context = LocalContext.current
+    val sw = configuration.smallestScreenWidthDp
+    val uiModeType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+    val isLeanback = uiModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+        (context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
+            ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
     return when {
+        isLeanback -> TvDefaults
         sw < 600 -> PhoneDefaults
         sw < 840 -> TabletDefaults
         else -> TvDefaults
