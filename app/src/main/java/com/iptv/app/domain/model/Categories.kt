@@ -9,4 +9,13 @@ package com.iptv.app.domain.model
  * other instead of in different buckets.
  */
 fun List<Category>.sortedForDisplay(): List<Category> =
-    sortedWith(compareBy({ it.isAdult }, { it.name.lowercase() }))
+    sortedWith(
+        compareBy(
+            { it.isAdult },
+            // Normaliza espaços múltiplos antes de comparar — alguns
+            // provedores enviam "Canais |  Turquia" com dois espaços, o que
+            // jogava esses nomes na frente de "Canais | 24 Horas" na ordem
+            // lexicográfica padrão.
+            { it.name.lowercase().replace(Regex("\\s+"), " ").trim() }
+        )
+    )

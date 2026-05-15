@@ -349,12 +349,16 @@ private fun TopBar(
                     onClick = { onSelected(spec.key) },
                     // Cores explícitas para impedir o caso "texto branco sobre
                     // fundo branco" do estado focado default do tv.material3.
+                    // A pílula focada do pillIndicator é BRANCA por default,
+                    // então o texto focado precisa ser escuro para ter
+                    // contraste. Inverso para selecionado (não focado) e
+                    // inativo, que ficam sobre o fundo escuro do tab bar.
                     colors = androidx.tv.material3.TabDefaults.pillIndicatorTabColors(
                         contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
                         inactiveContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
-                        focusedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
-                        focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                        selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+                        focusedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.surface,
+                        focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.surface
                     )
                 ) {
                     Text(

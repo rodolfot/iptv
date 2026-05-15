@@ -160,13 +160,12 @@ class SearchViewModel @Inject constructor(
             else emptyList()
             val results = SearchResults(channels, movies, series)
             _state.value = _state.value.copy(results = results)
-            // Persist the term once it produced something useful, then debounce more
-            // so transient typings don't stack the history.
-            val hasResults = channels.isNotEmpty() || movies.isNotEmpty() || series.isNotEmpty()
-            if (hasResults) {
-                delay(600)
-                settings.pushSearchHistory(q)
-            }
+            // NÃO salvamos no histórico aqui. Antes, persistir a cada
+            // letra digitada com 600ms de debounce ainda gravava todos
+            // os prefixos curtos ("tr", "tra", "tran", "tran"...) porque
+            // o cancel da coroutine não desfaz writes já feitos. Agora a
+            // tela chama rememberSearch quando o usuário "submete" o
+            // termo (sai do modo de edição do campo).
         }
     }
 }
@@ -196,7 +195,17 @@ fun SearchScreen(
         SearchBar(
             query = query,
             onQueryChange = { query = it },
-            enabled = state.catalogReady
+            enabled = state.catalogReady,
+            onSubmit = {
+                // Só registra a palavra completa quando ela produziu
+                // algum resultado real — evita poluir o histórico com
+                // erros de digitação.
+                val term = query.trim()
+                val hasResults = state.results.channels.isNotEmpty() ||
+                    state.results.movies.isNotEmpty() ||
+                    state.results.series.isNotEmpty()
+                if (term.length >= 2 && hasResults) vm.rememberSearch(term)
+            }
         )
         Row(
             modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
@@ -223,7 +232,12 @@ fun SearchScreen(
 }
 
 @Composable
-private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: Boolean) {
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    enabled: Boolean,
+    onSubmit: () -> Unit = {}
+) {
     // Mesmo padrão D-pad friendly do LocalFilterField/PinField: o foco
     // sozinho NÃO abre o IME. Só ao apertar OK/Enter no controle é que
     // entramos em modo edição (e o teclado aparece). Antes, ao entrar em
@@ -238,6 +252,10 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: B
             keyboard?.show()
         } else {
             keyboard?.hide()
+            // Saiu do modo de edição: o usuário "finalizou" o termo.
+            // Avisa a tela para persistir a palavra inteira no histórico
+            // (a palavra inteira, não cada prefixo digitado).
+            onSubmit()
         }
     }
 

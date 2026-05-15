@@ -78,8 +78,14 @@ class HomeViewModel @Inject constructor(
     private val favoriteDao: FavoriteDao,
     private val watchlistDao: WatchlistDao,
     private val settings: SettingsStore,
-    private val currentProfile: CurrentProfile
+    private val currentProfile: CurrentProfile,
+    private val xtream: com.iptv.app.data.api.XtreamRepository
 ) : ViewModel() {
+
+    /** URL HLS para preview do canal ao vivo no painel lateral. */
+    suspend fun previewUrl(channelId: Int): String? = runCatching {
+        xtream.liveStreamUrl(channelId, hls = false)
+    }.getOrNull()
 
     private val _epgNow = MutableStateFlow<Map<String, EpgProgrammeEntity>>(emptyMap())
     val epgNow = _epgNow.asStateFlow()

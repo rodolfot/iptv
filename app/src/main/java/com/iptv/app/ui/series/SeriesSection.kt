@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -143,18 +144,21 @@ class SeriesDetailViewModel @Inject constructor(
                         }
                         .groupBy { it.seasonNumber }
                         .mapValues { (_, eps) -> eps.sortedBy { it.episodeNum } }
-                    // Hide season "shells" that have zero real episodes — the
-                    // provider sometimes advertises a season in `seasons[]` but
-                    // never returns it under `episodes`. Showing an empty card
-                    // labelled "(vazia)" was confusing; better to omit the
-                    // season entirely.
-                    val rawSeasons = if (seasons.isEmpty()) {
-                        episodesMap.keys.sorted().map { sn ->
-                            Season(sn, "Temporada $sn", null, episodesMap[sn]?.size ?: 0)
-                        }
-                    } else seasons.sortedBy { it.seasonNumber }
-                    val mergedSeasons = rawSeasons.filter { s ->
-                        (episodesMap[s.seasonNumber]?.size ?: 0) > 0
+                    // Mantém todas as temporadas declaradas pelo provedor,
+                    // mesmo quando ele não devolveu os episódios. O usuário
+                    // viu na lista do provedor que a temporada existe — se
+                    // escondemos, parece um bug. O card mostra "sem
+                    // episódios disponíveis" quando ela está vazia.
+                    val declaredSeasonNumbers = (seasons.map { it.seasonNumber } +
+                        episodesMap.keys).distinct().sorted()
+                    val mergedSeasons = declaredSeasonNumbers.map { sn ->
+                        val fromApi = seasons.firstOrNull { it.seasonNumber == sn }
+                        Season(
+                            seasonNumber = sn,
+                            name = fromApi?.name ?: "Temporada $sn",
+                            coverUrl = fromApi?.coverUrl,
+                            episodeCount = episodesMap[sn]?.size ?: (fromApi?.episodeCount ?: 0)
+                        )
                     }
 
                     val pid = currentProfile.id()
@@ -727,8 +731,12 @@ fun SeriesDetailScreen(
                 }
             }
 
+            // Seleção de temporada via combo (em vez de grid de cards). Os
+            // episódios da temporada selecionada aparecem na mesma tela,
+            // logo abaixo — sem precisar de navegação extra ou scroll
+            // grande.
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .bringIntoViewRequester(seasonsBringIntoView)
@@ -738,34 +746,77 @@ fun SeriesDetailScreen(
             ) {
                 Text(
                     stringResource(R.string.section_seasons),
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleSmall
                 )
-                // Seasons grid uses a non-lazy Column-of-Rows: the parent
-                // scroll-state owns the scrolling. Embedding a LazyVerticalGrid
-                // inside a vertically-scrollable Column is unsupported by
-                // Compose ("Vertically scrollable component was measured with
-                // an infinity maximum height constraint").
-                val seasonRows = detail.seasons.chunked(seasonCols)
-                seasonRows.forEach { rowItems ->
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        rowItems.forEach { s ->
-                            val realCount = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
-                            Box(modifier = Modifier.weight(1f)) {
-                                CategoryCard(
-                                    title = s.name,
-                                    count = realCount,
-                                    locked = false
-                                ) {
-                                    selectedSeason = s.seasonNumber
+                // Pre-selecionar a primeira temporada que tem episódios.
+                LaunchedEffect(detail.seriesId) {
+                    if (selectedSeason == null) {
+                        selectedSeason = detail.seasons.firstOrNull {
+                            (detail.episodesBySeason[it.seasonNumber]?.size ?: 0) > 0
+                        }?.seasonNumber ?: detail.seasons.firstOrNull()?.seasonNumber
+                    }
+                }
+                val seasonOptions = detail.seasons.map { s ->
+                    val count = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
+                    val label = if (count > 0) "${s.name} ($count)"
+                        else "${s.name} (sem episódios)"
+                    com.iptv.app.ui.common.ComboOption(id = s.seasonNumber, label = label)
+                }
+                val currentSeason = seasonOptions.firstOrNull { it.id == selectedSeason }
+                com.iptv.app.ui.common.ComboBox(
+                    selected = currentSeason,
+                    options = seasonOptions,
+                    onSelect = { selectedSeason = it.id },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                val episodes = detail.episodesBySeason[selectedSeason] ?: emptyList()
+                if (episodes.isEmpty()) {
+                    Text(
+                        stringResource(R.string.season_empty_message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // Grid de 2 colunas de episódios — cabe pelo menos
+                    // duas linhas sem scroll. Usamos Column de Rows porque
+                    // estamos dentro de um parent verticalScroll (não dá
+                    // pra aninhar LazyVerticalGrid).
+                    val seriesCover = detail.coverUrl ?: detail.info?.cover
+                    val rows = episodes.chunked(2)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        rows.forEach { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                            rowItems.forEach { e ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    EpisodeRow(
+                                        episode = e,
+                                        watched = e.id in detail.watchedEpisodes,
+                                        percent = detail.episodePercents[e.id] ?: 0,
+                                        fallbackPoster = seriesCover,
+                                        onClick = {
+                                            onPlay(
+                                                PlayerArgs(
+                                                    kind = PlayerKind.EPISODE,
+                                                    streamId = e.id.toIntOrNull() ?: 0,
+                                                    title = e.title,
+                                                    containerExtension = e.containerExtension,
+                                                    seriesId = e.seriesId,
+                                                    seasonNumber = e.seasonNumber,
+                                                    episodeId = e.id
+                                                )
+                                            )
+                                        }
+                                    )
                                 }
                             }
-                        }
-                        // Fill the trailing space when the row is shorter than seasonCols.
-                        repeat(seasonCols - rowItems.size) {
-                            Box(modifier = Modifier.weight(1f))
+                            if (rowItems.size == 1) {
+                                Box(modifier = Modifier.weight(1f))
+                            }
+                            }
                         }
                     }
                 }
@@ -773,72 +824,77 @@ fun SeriesDetailScreen(
         }
         return
     }
+}
 
-    // Episodes view of a chosen season (unchanged layout).
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
-        val detail = state
-        if (detail == null) {
-            Text(stringResource(R.string.loading))
-            return
-        }
-        run {
-            val episodes = detail.episodesBySeason[selectedSeason] ?: emptyList()
-            Text(
-                "Temporada $selectedSeason — ${episodes.size} ${stringResource(R.string.season_episodes_suffix)}",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            if (episodes.isEmpty()) {
-                // The Xtream `seasons[].episode_count` told us there are episodes,
-                // but the provider didn't return them in `episodes` (different
-                // payload shape or behind a "load more" call we don't implement).
-                // Surface this honestly instead of dropping the user on a blank
-                // screen.
-                com.iptv.app.ui.common.EmptyState(
-                    title = stringResource(R.string.season_empty_title),
-                    message = stringResource(R.string.season_empty_message),
-                    icon = Icons.Filled.Tv
+@OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
+@Composable
+private fun EpisodeRow(
+    episode: Episode,
+    watched: Boolean,
+    percent: Int,
+    fallbackPoster: String? = null,
+    onClick: () -> Unit
+) {
+    // Título sintetizado se o provedor não enviou um — alguns servidores
+    // entregam só id/episodeNum sem o nome real do episódio. Cair em
+    // "Episódio X" deixa pelo menos algo legível.
+    val displayTitle = episode.title.takeIf { it.isNotBlank() && it != "Episódio ${episode.episodeNum}" }
+        ?: "Episódio ${episode.episodeNum}"
+    // Quando o episódio não tem poster próprio, usa a capa da série para
+    // não deixar um quadrado cinza com ícone genérico.
+    val poster = episode.poster?.takeIf { it.isNotBlank() } ?: fallbackPoster
+    androidx.tv.material3.Card(
+        onClick = onClick,
+        shape = androidx.tv.material3.CardDefaults.shape(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Capa pequena à esquerda. Como agora são duas colunas, cada
+            // metade da tela acomoda só ~400dp — manter compacto.
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!poster.isNullOrBlank()) {
+                    AsyncImage(
+                        model = poster,
+                        contentDescription = displayTitle,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        Icons.Filled.Tv,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp)
+            ) {
+                Text(
+                    "T${episode.seasonNumber}E${episode.episodeNum}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            } else {
-                // Same Adaptive grid + fillWidth pattern as Filmes/Séries
-                // categorias, para os cards de episódio respeitarem o
-                // tamanho padrão dos pôsteres em vez de virar dois blocos
-                // gigantes em TV.
-                val posterMinWidth = when (dim.formFactor) {
-                    com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
-                    com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
-                    com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
-                }
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(posterMinWidth),
-                    horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-                    verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
-                ) {
-                    items(episodes) { e ->
-                        val isWatched = e.id in detail.watchedEpisodes
-                        val pct = detail.episodePercents[e.id] ?: 0
-                        val titlePrefix = if (isWatched) "✓ " else ""
-                        PosterCard(
-                            title = "${titlePrefix}T${e.seasonNumber}E${e.episodeNum} • ${e.title}" +
-                                (if (pct in 1..99) "  (${pct}%)" else ""),
-                            imageUrl = e.poster,
-                            fallbackIcon = Icons.Filled.Tv,
-                            fillWidth = true
-                        ) {
-                            onPlay(
-                                PlayerArgs(
-                                    kind = PlayerKind.EPISODE,
-                                    streamId = e.id.toIntOrNull() ?: 0,
-                                    title = e.title,
-                                    containerExtension = e.containerExtension,
-                                    seriesId = e.seriesId,
-                                    seasonNumber = e.seasonNumber,
-                                    episodeId = e.id
-                                )
-                            )
-                        }
-                    }
-                }
+                Text(
+                    (if (watched) "✓ " else "") + displayTitle +
+                        (if (percent in 1..99) " ($percent%)" else ""),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
         }
     }

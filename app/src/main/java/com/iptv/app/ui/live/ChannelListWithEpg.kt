@@ -4,6 +4,7 @@ package com.iptv.app.ui.live
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -85,10 +86,16 @@ fun ChannelListWithEpg(
     val favoriteAddedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.snack_favorite_added)
     val favoriteRemovedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.snack_favorite_removed)
 
-    LaunchedEffect(channels) {
-        if (channels.isNotEmpty()) {
-            // Restore focus to the top of the list when the dataset changes
-            // (e.g. user typed in the filter).
+    // Dispara quando a lista passa de vazia para preenchida. Sem isso, o
+    // primeiro LaunchedEffect(channels) acontecia com a lista ainda vazia
+    // (recompôs antes do ViewModel emitir) e o foco caia no primeiro
+    // focusable da árvore — a TabRow (Início).
+    val channelsReady = channels.isNotEmpty()
+    LaunchedEffect(channelsReady) {
+        if (channelsReady) {
+            // Aguarda um frame para garantir que o FocusRequester já foi
+            // anexado ao composable da primeira linha.
+            kotlinx.coroutines.delay(50)
             runCatching { firstFocus.requestFocus() }
         }
     }
@@ -96,11 +103,14 @@ fun ChannelListWithEpg(
     val focusedChannel = channels.getOrNull(focusedIndex)
 
     Row(modifier = modifier.fillMaxSize()) {
+        // Lista compacta à esquerda; player grande à direita (padrão dos
+        // apps de IPTV como o Smarters Player). Antes a proporção estava
+        // invertida — lista enorme e player apertado.
         LazyColumn(
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(end = 12.dp, bottom = 12.dp),
-            modifier = Modifier.weight(1f).fillMaxHeight()
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            contentPadding = PaddingValues(end = 8.dp, bottom = 12.dp),
+            modifier = Modifier.width(340.dp).fillMaxHeight()
         ) {
             items(items = channels, key = { it.id }) { channel ->
                 val index = channels.indexOf(channel)
@@ -146,7 +156,7 @@ fun ChannelListWithEpg(
             channel = focusedChannel,
             vm = vm,
             modifier = Modifier
-                .width(380.dp)
+                .weight(1f)
                 .fillMaxHeight()
         )
     }
@@ -163,102 +173,79 @@ private fun ChannelRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    // Linha compacta no estilo dos apps de IPTV: número | logo | nome.
+    // EPG completo aparece no painel grande à direita.
     Card(
         onClick = onClick,
         onLongClick = onLongClick,
-        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        modifier = modifier.fillMaxWidth().height(76.dp)
+        shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
+        modifier = modifier.fillMaxWidth().height(52.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (channel.num != null) {
+                Text(
+                    channel.num.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(40.dp)
+                )
+            }
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(6.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
                 if (channel.logoUrl.isNullOrBlank()) {
-                    Icon(Icons.Filled.LiveTv, contentDescription = null)
+                    Icon(
+                        Icons.Filled.LiveTv,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
                 } else {
                     AsyncImage(
                         model = channel.logoUrl,
                         contentDescription = channel.name,
-                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                        modifier = Modifier.fillMaxSize().padding(4.dp)
                     )
                 }
             }
-            Column(
+            Text(
+                channel.name,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (channel.num != null) {
-                        Text(
-                            "${channel.num}  ",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        channel.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (isFavorite) {
-                        Icon(
-                            Icons.Filled.Favorite,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                if (!nowPlaying.isNullOrBlank()) {
-                    Text(
-                        nowPlaying,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (nowProgress != null && nowProgress in 0f..1f) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp)
-                                .height(2.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(nowProgress)
-                                    .background(MaterialTheme.colorScheme.primary)
-                                    .height(2.dp)
-                            )
-                        }
-                    }
-                }
+                    .padding(horizontal = 8.dp)
+            )
+            if (isFavorite) {
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
             }
             if (locked) {
                 Icon(
                     Icons.Filled.Lock,
                     contentDescription = null,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.size(16.dp).padding(start = 4.dp)
                 )
             }
         }
     }
 }
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun EpgPanel(
     channel: LiveChannel?,
@@ -270,35 +257,49 @@ private fun EpgPanel(
     }
 
     Box(
-        modifier = modifier
-            .padding(start = 12.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp)
+        modifier = modifier.padding(start = 12.dp)
     ) {
         if (channel == null) {
             Text(
                 "Sem canal selecionado",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(12.dp)
             )
             return@Box
         }
         Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                channel.name,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            channel.num?.let {
+            // Player de prévia ocupa todo o topo do painel (16:9).
+            ChannelPreviewPlayer(channel = channel, vm = vm)
+
+            // Faixa abaixo do player: nome do canal + LIVE badge.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "Canal $it",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    channel.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        "LIVE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
-            Box(modifier = Modifier.height(12.dp))
+
             if (schedule.isEmpty()) {
                 Text(
                     "Sem programação disponível",
@@ -307,7 +308,7 @@ private fun EpgPanel(
                 )
                 return@Column
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items(schedule.take(20)) { p ->
                     EpgEntry(
                         programme = p,
@@ -316,6 +317,51 @@ private fun EpgPanel(
                 }
             }
         }
+    }
+}
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun ChannelPreviewPlayer(channel: LiveChannel, vm: HomeViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val exo = androidx.compose.runtime.remember {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            volume = 0f // silencioso por padrão; o canal focado é só prévia
+            playWhenReady = true
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { exo.release() }
+    }
+    // Debounce: só carrega a stream após 600ms parado no canal — D-pad
+    // rápido não desperdiça requests.
+    androidx.compose.runtime.LaunchedEffect(channel.id) {
+        kotlinx.coroutines.delay(600)
+        val url = vm.previewUrl(channel.id) ?: return@LaunchedEffect
+        exo.setMediaItem(androidx.media3.common.MediaItem.fromUri(url))
+        exo.prepare()
+        exo.playWhenReady = true
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(androidx.compose.ui.graphics.Color.Black)
+    ) {
+        androidx.compose.ui.viewinterop.AndroidView(
+            factory = { ctx ->
+                androidx.media3.ui.PlayerView(ctx).apply {
+                    player = exo
+                    useController = false
+                    layoutParams = android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
 
