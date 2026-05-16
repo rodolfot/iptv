@@ -75,10 +75,23 @@ fun LiveSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadLiveCategories()
     }
-    androidx.activity.compose.BackHandler(enabled = selectedCat != null) {
+    // Em TV/Tablet, pula a tela de "grid de categorias" e abre direto a
+    // primeira (que já tem categorias no drawer lateral do LiveChannelsScreen).
+    // Em phone segue mostrando o grid (não tem espaço para drawer).
+    val isTvLike = dim.formFactor != com.iptv.app.ui.common.FormFactor.Phone
+    LaunchedEffect(cats.items, isTvLike) {
+        if (isTvLike && selectedCat == null && cats.items.isNotEmpty()) {
+            val first = cats.items.sortedForDisplay()
+                .firstOrNull { !it.isAdult || parental.isUnlocked() }
+                ?: cats.items.first()
+            selectedCat = first.id
+            vm.loadChannels(first.id)
+        }
+    }
+    androidx.activity.compose.BackHandler(enabled = !isTvLike && selectedCat != null) {
         selectedCat = null
     }
-    if (selectedCat != null) {
+    if (!isTvLike && selectedCat != null) {
         com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
     }
 

@@ -237,7 +237,16 @@ data class SeriesInfoResponse(
         return map.entries.mapNotNull { (k, v) ->
             val key = k.toString()
             val json = mapAdapter.toJson(v) ?: return@mapNotNull null
-            val list = runCatching { listAdapter.fromJson(json) }.getOrNull() ?: return@mapNotNull null
+            val result = runCatching { listAdapter.fromJson(json) }
+            val list = result.getOrNull()
+            if (list == null) {
+                android.util.Log.w(
+                    "XtreamApi",
+                    "normalizedEpisodes: season key '$key' falhou parse: ${result.exceptionOrNull()?.message}"
+                )
+                return@mapNotNull null
+            }
+            android.util.Log.d("XtreamApi", "normalizedEpisodes: key='$key' -> ${list.size} eps")
             key to list
         }.toMap()
     }

@@ -363,7 +363,7 @@ private fun ChannelPreviewPip(channel: LiveChannel, vm: HomeViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val exo = remember {
         androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
-            volume = 0f // PIP é silencioso para não competir com o que estiver tocando
+            volume = 1f
             playWhenReady = true
         }
     }

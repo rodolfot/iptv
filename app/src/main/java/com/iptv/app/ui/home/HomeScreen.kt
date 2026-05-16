@@ -337,9 +337,24 @@ private fun TopBar(
         // qualquer foco que passasse pela TabRow voltava o conteúdo para
         // "Início".
         var focusedIndex by remember(selectedIndex) { mutableStateOf(selectedIndex) }
+        // Pílula focada AZUL com texto BRANCO. O default do
+        // pillIndicatorTabColors é uma pílula branca, deixando texto
+        // branco sobre branco — sobrescrevemos o indicator com um Box
+        // pintado de primary.
+        val primary = androidx.tv.material3.MaterialTheme.colorScheme.primary
         TabRow(
             selectedTabIndex = focusedIndex,
-            modifier = Modifier.padding(start = 16.dp)
+            modifier = Modifier.padding(start = 16.dp),
+            indicator = { tabPositions, doesTabRowHaveFocus ->
+                tabPositions.getOrNull(focusedIndex)?.let { pos ->
+                    androidx.tv.material3.TabRowDefaults.PillIndicator(
+                        currentTabPosition = pos,
+                        activeColor = primary,
+                        inactiveColor = primary.copy(alpha = 0.6f),
+                        doesTabRowHaveFocus = doesTabRowHaveFocus
+                    )
+                }
+            }
         ) {
             tabs.forEachIndexed { index, spec ->
                 val isSelected = spec.key == selectedKey
@@ -347,18 +362,15 @@ private fun TopBar(
                     selected = isSelected,
                     onFocus = { focusedIndex = index },
                     onClick = { onSelected(spec.key) },
-                    // Cores explícitas para impedir o caso "texto branco sobre
-                    // fundo branco" do estado focado default do tv.material3.
-                    // A pílula focada do pillIndicator é BRANCA por default,
-                    // então o texto focado precisa ser escuro para ter
-                    // contraste. Inverso para selecionado (não focado) e
-                    // inativo, que ficam sobre o fundo escuro do tab bar.
+                    // Como a pílula é AZUL, todos os estados precisam de
+                    // texto BRANCO/claro para contraste. Inativos (não
+                    // focados, sem pílula) ficam em onSurfaceVariant.
                     colors = androidx.tv.material3.TabDefaults.pillIndicatorTabColors(
-                        contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+                        contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
                         inactiveContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
-                        focusedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.surface,
-                        focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.surface
+                        selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        focusedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     Text(
