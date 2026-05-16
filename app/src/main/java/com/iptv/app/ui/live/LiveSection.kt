@@ -247,41 +247,27 @@ fun LiveSection(
                     }
                 }
             } else {
-                // TV/Tablet: title + sort on the left, filter inline on the
-                // right. Channels render as a vertical list with an EPG side
-                // panel for the focused row.
-                Row(
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                ) {
-                    Text(
-                        categoryName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                    Box(modifier = Modifier.padding(start = 12.dp)) {
-                        SortMenuButton(
-                            current = settings.liveSort,
-                            options = SortOption.LIVE_OPTIONS
-                        ) { vm.setSort(SortScope.LIVE, it) }
-                    }
-                    Box(modifier = Modifier.weight(1f))
-                    LocalFilterField(
-                        value = localFilter,
-                        onValueChange = { localFilter = it },
-                        modifier = Modifier.width(360.dp)
-                    )
-                }
-                if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
-                channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
+                // TV/Tablet: layout inspirado no Smarters Player Lite —
+                // categorias permanentes à esquerda, grid de canais com
+                // logos grandes à direita, PIP do canal focado no canto.
                 val cat = cats.items.firstOrNull { it.id == selectedCat }
-                ChannelListWithEpg(
+                val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+                LiveChannelsScreen(
                     vm = vm,
+                    categories = sortedCats,
+                    selectedCategoryId = selectedCat!!,
                     channels = filteredChannels,
-                    epgNow = epgNow,
                     isCategoryAdult = cat?.isAdult == true,
                     isParentalUnlocked = parental.isUnlocked(),
+                    onCategorySelected = { catId ->
+                        val nextCat = cats.items.firstOrNull { it.id == catId }
+                        if (nextCat?.isAdult == true && !parental.isUnlocked()) {
+                            pendingCategory = nextCat
+                        } else {
+                            selectedCat = catId
+                            vm.loadChannels(catId)
+                        }
+                    },
                     onPlay = { ch ->
                         val locked = (cat?.isAdult == true) && !parental.isUnlocked()
                         if (locked) {
@@ -294,7 +280,9 @@ fun LiveSection(
                         } else {
                             onOpenChannel(ch)
                         }
-                    }
+                    },
+                    onClose = { selectedCat = null },
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

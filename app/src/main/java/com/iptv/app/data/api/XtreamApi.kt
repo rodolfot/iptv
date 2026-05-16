@@ -219,7 +219,14 @@ data class SeriesInfoResponse(
         // The inner lists arrive as `List<Map<String, Any?>>` because Moshi
         // decodes JSON objects into Maps when the field type is Any. Re-encode
         // each entry through the Moshi adapter to get EpisodeDto back.
+        //
+        // IMPORTANTE: registramos LooseStringAdapter para que `season` e
+        // `episode_num` aceitem tanto Int quanto String — vimos providers que
+        // misturam os dois formatos. Sem isso, temporadas inteiras eram
+        // descartadas silenciosamente (ex.: The Boys T5 retornava 0 episódios
+        // no app mas existia no provedor).
         val moshi = com.squareup.moshi.Moshi.Builder()
+            .add(LooseStringAdapter())
             .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
             .build()
         val listType = com.squareup.moshi.Types.newParameterizedType(
@@ -234,6 +241,46 @@ data class SeriesInfoResponse(
             key to list
         }.toMap()
     }
+}
+
+/**
+ * Aceita um valor JSON como Int, Long, Double ou String e devolve String.
+ * Necessário para campos de providers Xtream que oscilam o tipo entre
+ * versões (ex.: episode_num, season). Use anotando o field com [LooseString].
+ */
+@JvmInline
+value class LooseString(val value: String)
+
+/** Marca um field para usar o LooseStringAdapter. */
+@com.squareup.moshi.JsonQualifier
+@Retention(AnnotationRetention.RUNTIME)
+annotation class Loose
+
+class LooseStringAdapter {
+    @com.squareup.moshi.FromJson
+    @Loose
+    fun fromJson(reader: com.squareup.moshi.JsonReader): String? {
+        return when (reader.peek()) {
+            com.squareup.moshi.JsonReader.Token.NULL -> {
+                reader.nextNull<Any>()
+                null
+            }
+            com.squareup.moshi.JsonReader.Token.NUMBER -> {
+                // Trata como Long quando dá (evita virar "5.0" para temporadas).
+                val s = reader.nextString()
+                if (s.endsWith(".0")) s.dropLast(2) else s
+            }
+            com.squareup.moshi.JsonReader.Token.STRING -> reader.nextString()
+            com.squareup.moshi.JsonReader.Token.BOOLEAN -> reader.nextBoolean().toString()
+            else -> {
+                reader.skipValue()
+                null
+            }
+        }
+    }
+
+    @com.squareup.moshi.ToJson
+    fun toJson(@Loose value: String?): String? = value
 }
 
 @JsonClass(generateAdapter = true)
@@ -267,16 +314,13 @@ data class SeriesInfoDetail(
 @JsonClass(generateAdapter = true)
 data class EpisodeDto(
     val id: String,
-    // Provedores vacilam: alguns mandam Int, outros String (ex.: "1").
-    // Declarando como String? aceita os dois (Moshi serializa Int para
-    // o tipo declarado via padding implícito) e a conversão pra Int fica
-    // no [toModel].
-    @Json(name = "episode_num") val episodeNum: String? = null,
+    // Provedores vacilam: alguns mandam Int, outros String. @Loose aceita
+    // os dois via LooseStringAdapter. Conversão pra Int fica no toModel.
+    @Loose @Json(name = "episode_num") val episodeNum: String? = null,
     val title: String? = null,
     @Json(name = "container_extension") val containerExtension: String? = null,
     val info: EpisodeInfo? = null,
-    // Mesma história: alguns provedores mandam Int, outros String ("01").
-    @Json(name = "season") val season: String? = null,
+    @Loose @Json(name = "season") val season: String? = null,
     @Json(name = "added") val added: String? = null
 )
 
