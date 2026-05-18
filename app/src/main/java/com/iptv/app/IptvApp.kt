@@ -29,6 +29,13 @@ class IptvApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // Forçar dark mode em toda a stack do AppCompat: garante que dialogs
+        // do sistema (Toast nativo, picker de teclado) também respeitem o
+        // tema do app — caso contrário em TVs/launchers com light theme
+        // padrão eles apareciam brancos no meio da nossa UI escura.
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+        )
         CrashLog.install(this)
         Notifications.ensureChannels(this)
         // Locale is applied via AppCompatDelegate inside the Compose tree once

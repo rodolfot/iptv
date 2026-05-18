@@ -154,11 +154,25 @@ class HomeViewModel @Inject constructor(
             val seriesCount = seriesDao.observeAll().firstOrEmpty().size
             val liveCount = liveDao.observeAll().firstOrEmpty().size
             val empty = movieCount == 0 && seriesCount == 0 && liveCount == 0
-            if (!empty && !force) return@launch
-            _initialLoading.value = true
-            cache.refreshAll()
-            _initialLoading.value = false
-            _lastUpdatedAt.value = cache.lastUpdatedAt()
+            if (empty || force) {
+                _initialLoading.value = true
+                cache.refreshAll()
+                _initialLoading.value = false
+                _lastUpdatedAt.value = cache.lastUpdatedAt()
+                return@launch
+            }
+            // Não está vazio: verifica se já passou do TTL do intervalo
+            // configurado pelo usuário. Se sim, faz refresh em background
+            // (sem bloquear a UI). O Worker periódico só roda quando o
+            // sistema permite — aqui garantimos que abrir o app também
+            // dispara o refresh.
+            val last = cache.lastUpdatedAt()
+            val ttl = settings.flow.first().refreshInterval.ttlMs
+            val stale = last == null || (System.currentTimeMillis() - last) > ttl
+            if (stale) {
+                runCatching { cache.refreshAll() }
+                _lastUpdatedAt.value = cache.lastUpdatedAt()
+            }
         }
     }
 
@@ -405,6 +419,19 @@ class HomeViewModel @Inject constructor(
         loadLiveCategories(forceRefresh = true)
         loadMovieCategories(forceRefresh = true)
         loadSeriesCategories(forceRefresh = true)
+    }
+
+    /**
+     * Refresh manual disparado pelo botão "Atualizar catálogo" das Configurações.
+     * Não bloqueia a UI com a tela de loading inteira — o usuário reclamou de
+     * travar por 90s; cada seção tem seu próprio loader (stale-while-revalidate).
+     */
+    fun refreshAllInBackground(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            runCatching { cache.refreshAll() }
+            _lastUpdatedAt.value = cache.lastUpdatedAt()
+            onDone()
+        }
     }
 
     private val _lastUpdatedAt = MutableStateFlow<Long?>(null)

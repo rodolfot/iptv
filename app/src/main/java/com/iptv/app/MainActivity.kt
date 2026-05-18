@@ -136,7 +136,11 @@ class MainActivity : ComponentActivity() {
 data class RootState(
     val termsAccepted: Boolean = false,
     val loggedIn: Boolean = false,
-    val deviceProfile: com.iptv.app.data.prefs.DeviceProfile? = null
+    val deviceProfile: com.iptv.app.data.prefs.DeviceProfile? = null,
+    /** Falso até o primeiro emit do DataStore. Sem isso, o NavHost arranca em
+     *  "onboarding" com base no estado default e dá um flash da tela de
+     *  boas-vindas antes do estado real chegar (termos já aceitos). */
+    val loaded: Boolean = false
 )
 
 @HiltViewModel
@@ -148,7 +152,8 @@ class RootViewModel @Inject constructor(
             RootState(
                 termsAccepted = it.termsAccepted,
                 loggedIn = it.isLoggedIn && it.host.isNotBlank(),
-                deviceProfile = it.deviceProfile
+                deviceProfile = it.deviceProfile,
+                loaded = true
             )
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, RootState())
@@ -156,12 +161,23 @@ class RootViewModel @Inject constructor(
 
 @Composable
 fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
-    val nav = rememberNavController()
     val state by vm.state.collectAsState()
     // Override do form factor escolhido no onboarding aplica em toda a árvore.
     CompositionLocalProvider(
         com.iptv.app.ui.common.LocalDeviceProfile provides state.deviceProfile
     ) {
+        // Espera o primeiro emit do DataStore antes de montar o NavHost. Caso
+        // contrário, com termos já aceitos numa instalação anterior, o app
+        // pisca a tela de boas-vindas antes de saltar pro Home.
+        if (!state.loaded) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            )
+            return@CompositionLocalProvider
+        }
+        val nav = rememberNavController()
         AppNavRoutes(state, nav)
     }
 }

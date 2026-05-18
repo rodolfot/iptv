@@ -165,12 +165,14 @@ fun SettingsScreen(
     val pinSavedMsg = stringResource(R.string.snack_pin_saved)
     val credsSavedMsg = stringResource(R.string.snack_credentials_saved)
     val refreshingMsg = stringResource(R.string.snack_catalog_refreshing)
+    val refreshedMsg = stringResource(R.string.snack_catalog_refreshed)
     val refreshIntervalSavedMsg = stringResource(R.string.snack_refresh_interval_saved)
     val localeSavedMsg = stringResource(R.string.snack_locale_saved)
     val languageLabel = stringResource(R.string.settings_language_label)
     val activity = LocalContext.current as? android.app.Activity
     var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
     var aboutOpen by remember { mutableStateOf(false) }
+    var crashLogOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
     var editingServer by remember { mutableStateOf(false) }
     var editHost by remember { mutableStateOf(s.host) }
@@ -184,6 +186,10 @@ fun SettingsScreen(
         }
     }
 
+    if (crashLogOpen) {
+        CrashLogScreen(onClose = { crashLogOpen = false })
+        return
+    }
     if (aboutOpen) {
         AboutScreen(onClose = { aboutOpen = false })
         return
@@ -357,8 +363,11 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall
         )
         TouchableButton(onClick = {
-            vm.bootstrapCatalog(force = true)
+            // Background — não bloqueia a UI nem mostra a tela cheia de
+            // loading. As seções fazem stale-while-revalidate; o usuário
+            // pode continuar navegando enquanto isso roda.
             snackbar?.show(refreshingMsg)
+            vm.refreshAllInBackground { snackbar?.show(refreshedMsg) }
         }) {
             Text(stringResource(R.string.settings_refresh_now))
         }
@@ -371,6 +380,13 @@ fun SettingsScreen(
             NotificationsPermissionSection()
 
             Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            // Confirmação + restart: trocar idioma "no quente" causava crash
+            // (Activity recreate + applicationLocales colidindo no Android
+            // <13). Salvamos a preferência, perguntamos se o usuário quer
+            // reiniciar e fazemos o restart com `Process.killProcess` —
+            // limpo, sem ApplicationLifecycle quebrado no meio.
+            var pendingLocaleTag by remember { mutableStateOf<String?>(null) }
+            var localeDialogOpen by remember { mutableStateOf(false) }
             run {
                 val localeOptions = com.iptv.app.ui.common.LocaleManager.available.map {
                     com.iptv.app.ui.common.ComboOption(
@@ -388,17 +404,39 @@ fun SettingsScreen(
                             val tag = if (it.id == "__system__") null else it.id
                             settingsVm.setAppLocale(tag)
                             snackbar?.show(localeSavedMsg)
-                            // Recreate da activity para a UI inteira recompor
-                            // no novo idioma. Sem isso, AppCompat apenas grava
-                            // o locale mas Compose continua usando o antigo
-                            // até o próximo cold-start.
-                            activity?.let {
-                                com.iptv.app.ui.common.LocaleManager.applyAndRecreate(it, tag)
-                            }
+                            pendingLocaleTag = tag
+                            localeDialogOpen = true
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+            }
+            if (localeDialogOpen) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { localeDialogOpen = false },
+                    title = { Text(stringResource(R.string.locale_restart_title)) },
+                    text = { Text(stringResource(R.string.locale_restart_message)) },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            localeDialogOpen = false
+                            val tag = pendingLocaleTag
+                            // Persiste no AppCompat e recria a activity. Antes
+                            // fazíamos Process.killProcess + Intent — funciona,
+                            // mas é agressivo: mata workers, conexões abertas
+                            // e em TVs lentas demora segundos pra reabrir.
+                            // recreate() reaplica todos os recursos (strings,
+                            // layouts) sem perder o processo.
+                            if (tag == null) com.iptv.app.ui.common.LocaleManager.resetToSystem()
+                            else com.iptv.app.ui.common.LocaleManager.apply(tag)
+                            activity?.recreate()
+                        }) { Text(stringResource(R.string.locale_restart_confirm)) }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            localeDialogOpen = false
+                        }) { Text(stringResource(R.string.exit_no)) }
+                    }
+                )
             }
 
             run {
@@ -440,8 +478,23 @@ fun SettingsScreen(
             }
 
         Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
-        TouchableButton(onClick = { aboutOpen = true }) {
-            Text(stringResource(R.string.settings_open_about))
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+        ) {
+            TouchableButton(onClick = { aboutOpen = true }) {
+                Text(stringResource(R.string.settings_open_about))
+            }
+            // Log de crash local — só visível quando há registros. Sem
+            // dependência externa (Firebase/Sentry); o usuário pode copiar e
+            // mandar pro suporte se quiser.
+            val hasCrashLog = remember(activity) {
+                activity?.let { com.iptv.app.diag.CrashLog.read(it).isNotBlank() } ?: false
+            }
+            if (hasCrashLog) {
+                TouchableButton(onClick = { crashLogOpen = true }) {
+                    Text(stringResource(R.string.crash_log_title))
+                }
+            }
         }
 
             Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleMedium)
