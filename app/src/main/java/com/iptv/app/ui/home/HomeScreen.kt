@@ -1,6 +1,7 @@
 package com.iptv.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +10,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -25,6 +31,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -107,6 +115,12 @@ fun HomeScreen(
     var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
     var openMovie by remember { mutableStateOf<PlayerArgs?>(null) }
     var openChannel by remember { mutableStateOf<com.iptv.app.domain.model.LiveChannel?>(null) }
+    // Elevado para sobreviver à entrada/saída do MovieDetailScreen e do player.
+    // Antes ficava dentro de MoviesSection com rememberSaveable, mas o `when` de
+    // detail/aba desmontava o composable e o estado se perdia ao voltar do
+    // player — o usuário caía no grid de categorias.
+    var moviesSelectedCat by rememberSaveable { mutableStateOf<String?>(null) }
+    var seriesSelectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     val initialLoading by vm.initialLoading.collectAsState()
     val playbackHolder = LocalPlaybackHolder.current
     val miniPlayerFormFactor = com.iptv.app.ui.common.rememberTvDim().formFactor
@@ -228,7 +242,9 @@ fun HomeScreen(
                         title = title,
                         coverUrl = cover,
                         onBack = { openSeries = null },
-                        onPlay = onPlay
+                        // Fecha o detalhe antes de navegar pro player — ao
+                        // voltar, o usuário retorna à origem (Início/etc.).
+                        onPlay = { args -> openSeries = null; onPlay(args) }
                     )
                 }
                 else -> when (selectedKey) {
@@ -248,11 +264,22 @@ fun HomeScreen(
                     "live" -> LiveSection(
                         vm = vm,
                         parental = parental,
-                        onPlay = onPlay,
-                        onOpenChannel = { ch -> openChannel = ch }
+                        onPlay = onPlay
                     )
-                    "movies" -> MoviesSection(vm = vm, parental = parental, onPlay = handlePlay)
-                    "series" -> SeriesSection(vm = vm, onPlay = onPlay)
+                    "movies" -> MoviesSection(
+                        vm = vm,
+                        parental = parental,
+                        onPlay = handlePlay,
+                        onPlayDirect = onPlay,
+                        selectedCat = moviesSelectedCat,
+                        onSelectedCatChange = { moviesSelectedCat = it }
+                    )
+                    "series" -> SeriesSection(
+                        vm = vm,
+                        onPlay = onPlay,
+                        selectedCat = seriesSelectedCat,
+                        onSelectedCatChange = { seriesSelectedCat = it }
+                    )
                     "favorites" -> FavoritesScreen(vm = vm, parental = parental, onPlay = handlePlay)
                     "watchlist" -> WatchlistScreen(
                         vm = vm,
@@ -369,22 +396,37 @@ private fun TopBar(
             stringResource(com.iptv.app.R.string.app_name),
             style = MaterialTheme.typography.titleLarge
         )
-        // Visualmente a pílula indicadora segue o foco do D-pad (para o
-        // usuário ver onde está). Mas o conteúdo abaixo só troca quando ele
-        // aperta OK (onClick). Antes o onFocus chamava onSelected direto e
-        // qualquer foco que passasse pela TabRow voltava o conteúdo para
-        // "Início".
+        // Dois indicadores distintos:
+        //  - Selecionado (após OK): pílula azul preenchida (mostra qual menu
+        //    está realmente ativo, mesmo quando o foco está em outro lugar).
+        //  - Focado (navegando com D-pad, ainda não confirmou): contorno
+        //    azul vazado, fundo transparente.
+        // Antes só o foco era destacado e a seleção real ficava invisível.
         var focusedIndex by remember(selectedIndex) { mutableStateOf(selectedIndex) }
-        // Pílula focada AZUL com texto BRANCO. O default do
-        // pillIndicatorTabColors é uma pílula branca, deixando texto
-        // branco sobre branco — sobrescrevemos o indicator com um Box
-        // pintado de primary.
+        // Quando o TabRow recebe foco vindo do conteúdo abaixo (D-pad pra
+        // cima), o sistema cai no último Tab focado anteriormente — não no
+        // selecionado. Forçamos o foco a voltar para o Tab ativo via
+        // FocusRequester, reentrando no menu correto.
+        val tabRequesters = remember(tabs.size) {
+            List(tabs.size) { androidx.compose.ui.focus.FocusRequester() }
+        }
+        var tabRowHadFocus by remember { mutableStateOf(false) }
         val primary = androidx.tv.material3.MaterialTheme.colorScheme.primary
         TabRow(
-            selectedTabIndex = focusedIndex,
-            modifier = Modifier.padding(start = 16.dp),
+            selectedTabIndex = selectedIndex,
+            modifier = Modifier
+                .padding(start = 16.dp)
+                .onFocusChanged { state ->
+                    if (state.hasFocus && !tabRowHadFocus) {
+                        // Reentrando: alinha o foco visual no selecionado.
+                        focusedIndex = selectedIndex
+                        runCatching { tabRequesters[selectedIndex].requestFocus() }
+                    }
+                    tabRowHadFocus = state.hasFocus
+                },
             indicator = { tabPositions, doesTabRowHaveFocus ->
-                tabPositions.getOrNull(focusedIndex)?.let { pos ->
+                // Camada 1: pílula preenchida no item REALMENTE selecionado.
+                tabPositions.getOrNull(selectedIndex)?.let { pos ->
                     androidx.tv.material3.TabRowDefaults.PillIndicator(
                         currentTabPosition = pos,
                         activeColor = primary,
@@ -392,22 +434,47 @@ private fun TopBar(
                         doesTabRowHaveFocus = doesTabRowHaveFocus
                     )
                 }
+                // Camada 2: contorno no item em FOCO quando difere do
+                // selecionado. Quando coincidem a pílula já dá o feedback.
+                if (doesTabRowHaveFocus && focusedIndex != selectedIndex) {
+                    tabPositions.getOrNull(focusedIndex)?.let { pos ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentSize(Alignment.BottomStart)
+                                .offset(x = pos.left, y = pos.top)
+                                .width(pos.width)
+                                .height(pos.height)
+                                .border(
+                                    width = 2.dp,
+                                    color = primary,
+                                    shape = RoundedCornerShape(50)
+                                )
+                        )
+                    }
+                }
             }
         ) {
             tabs.forEachIndexed { index, spec ->
                 val isSelected = spec.key == selectedKey
+                val isFocusedOnly = focusedIndex == index && !isSelected
                 Tab(
                     selected = isSelected,
                     onFocus = { focusedIndex = index },
                     onClick = { onSelected(spec.key) },
-                    // Como a pílula é AZUL, todos os estados precisam de
-                    // texto BRANCO/claro para contraste. Inativos (não
-                    // focados, sem pílula) ficam em onSurfaceVariant.
+                    modifier = Modifier.focusRequester(tabRequesters[index]),
+                    // Contraste de texto por estado:
+                    //  - selecionado (pílula azul preenchida) → branco;
+                    //  - apenas focado (contorno) → azul;
+                    //  - inativo → cinza.
                     colors = androidx.tv.material3.TabDefaults.pillIndicatorTabColors(
-                        contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        contentColor = if (isFocusedOnly) primary
+                            else androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                         inactiveContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                         selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
-                        focusedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        focusedContentColor = if (isSelected)
+                            androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                            else primary,
                         focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
