@@ -46,20 +46,23 @@ private val IptvColors = darkColorScheme(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val IptvTypography = Typography(
-    displayLarge = TextStyle(fontSize = 56.sp, fontWeight = FontWeight.Bold),
-    displayMedium = TextStyle(fontSize = 48.sp, fontWeight = FontWeight.Bold),
-    headlineLarge = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.SemiBold),
-    headlineSmall = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Medium),
-    titleSmall = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 22.sp),
-    bodyMedium = TextStyle(fontSize = 18.sp),
-    bodySmall = TextStyle(fontSize = 16.sp),
-    labelLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    labelMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    // Tipografia compactada: -4sp em cada nível (mínimo 10sp). O usuário
+    // reclamou que tudo estava grande demais — antes labelSmall=14sp; agora
+    // 10sp. Headlines/displays também caem proporcionalmente.
+    displayLarge = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Bold),
+    displayMedium = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold),
+    headlineLarge = TextStyle(fontSize = 36.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
+    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 18.sp),
+    bodyMedium = TextStyle(fontSize = 14.sp),
+    bodySmall = TextStyle(fontSize = 12.sp),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium)
 )
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -95,20 +98,20 @@ private val IptvColorsM3 = m3DarkColorScheme(
 )
 
 private val IptvTypographyM3 = M3Typography(
-    displayLarge = TextStyle(fontSize = 56.sp, fontWeight = FontWeight.Bold),
-    displayMedium = TextStyle(fontSize = 48.sp, fontWeight = FontWeight.Bold),
-    headlineLarge = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 32.sp, fontWeight = FontWeight.SemiBold),
-    headlineSmall = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 26.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Medium),
-    titleSmall = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 22.sp),
-    bodyMedium = TextStyle(fontSize = 18.sp),
-    bodySmall = TextStyle(fontSize = 16.sp),
-    labelLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    labelMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    displayLarge = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Bold),
+    displayMedium = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold),
+    headlineLarge = TextStyle(fontSize = 36.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
+    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 18.sp),
+    bodyMedium = TextStyle(fontSize = 14.sp),
+    bodySmall = TextStyle(fontSize = 12.sp),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium)
 )
 
 private val IptvShapesM3 = M3Shapes(

@@ -163,7 +163,10 @@ class MovieDetailViewModel @Inject constructor(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 @Composable
 fun MovieDetailScreen(
     args: PlayerArgs,
@@ -272,7 +275,14 @@ fun MovieDetailScreen(
                     Text(stringResource(R.string.error_prefix, it), color = MaterialTheme.colorScheme.error)
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                // FlowRow quebra para a próxima linha quando faltam pixels —
+                // antes em TV com Continuar (texto longo) + Reiniciar +
+                // Favorito + bandeirinha, o último era empurrado pra fora.
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
                     if (state.resumeMs > 0L) {
                         TouchableButton(
                             onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) },
@@ -300,7 +310,9 @@ fun MovieDetailScreen(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
                     }
-                    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+                    // Bandeirinha sempre apenas ícone — usuário pediu para
+                    // manter só o ícone (estava sumindo do layout em algumas
+                    // configurações por falta de espaço).
                     TouchableButton(onClick = {
                         val wasInList = state.isInWatchlist
                         vm.toggleWatchlist(args)
@@ -313,11 +325,6 @@ fun MovieDetailScreen(
                                 if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
                             )
                         )
-                        if (!isPhone) {
-                            Text("  " + stringResource(
-                                if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
-                            ))
-                        }
                     }
                 }
             }
@@ -343,7 +350,12 @@ fun MovieDetailScreen(
                     stringResource(R.string.synopsis),
                     style = MaterialTheme.typography.titleSmall
                 )
-                Text(plot, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    plot,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 5,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
         }
     }

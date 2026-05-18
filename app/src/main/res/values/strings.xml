@@ -102,6 +102,7 @@
     <string name="continue_empty">Nada em andamento ainda. Comece a assistir um filme ou episódio para vê-lo aqui.</string>
     <string name="continue_series">Continuar séries</string>
     <string name="continue_movies">Continuar filmes</string>
+    <string name="recent_channels">Canais recentes</string>
     <string name="recommended_because_movie">Porque você viu %1$s</string>
     <string name="recommended_because_series">Porque você viu %1$s</string>
     <string name="recommended_top_movies">Filmes em destaque</string>
@@ -308,6 +309,11 @@
     <string name="snack_pin_saved">PIN parental salvo.</string>
     <string name="snack_catalog_refreshing">Atualizando catálogo…</string>
     <string name="snack_catalog_refreshed">Catálogo atualizado.</string>
+    <string name="player_next_in">Próximo em %1$ds</string>
+    <string name="player_reconnecting">Reconectando (tentativa %1$d/3)…</string>
+    <string name="player_cannot_play_title">Não foi possível reproduzir</string>
+    <string name="player_contact_provider">Tente novamente em instantes ou contate o dono da lista.</string>
+    <string name="player_retry">Tentar novamente</string>
     <string name="snack_undo">Desfazer</string>
 
     <!-- Exit confirmation -->
@@ -315,4 +321,9 @@
     <string name="exit_message">Deseja realmente sair do TartaTV?</string>
     <string name="exit_yes">Sim</string>
     <string name="exit_no">Não</string>
+
+    <!-- Locale change restart confirmation -->
+    <string name="locale_restart_title">Reiniciar para aplicar idioma</string>
+    <string name="locale_restart_message">A mudança de idioma só é aplicada após reiniciar o app. Reiniciar agora?</string>
+    <string name="locale_restart_confirm">Reiniciar</string>
 </resources>

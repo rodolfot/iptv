@@ -47,9 +47,22 @@ import com.iptv.app.ui.player.PlayerKind
 fun LiveSection(
     vm: HomeViewModel,
     parental: ParentalSession,
-    onPlay: (PlayerArgs) -> Unit,
-    onOpenChannel: (com.iptv.app.domain.model.LiveChannel) -> Unit = {}
+    onPlay: (PlayerArgs) -> Unit
 ) {
+    // Helper local: clicar num canal toca direto. A tela de detalhe (EPG +
+    // favoritos) deixou de ser usada via Ao Vivo — preview no painel da
+    // grade já dá feedback suficiente. SearchScreen ainda chama
+    // ChannelDetailScreen para preservar o caminho de detalhe lá.
+    fun playChannelDirect(ch: com.iptv.app.domain.model.LiveChannel) {
+        onPlay(
+            PlayerArgs(
+                kind = PlayerKind.LIVE,
+                streamId = ch.id,
+                title = ch.name,
+                containerExtension = null
+            )
+        )
+    }
     val rawCats by vm.liveCategories.collectAsState()
     val channels by vm.channels.collectAsState()
     val epgNow by vm.epgNow.collectAsState()
@@ -101,7 +114,15 @@ fun LiveSection(
             com.iptv.app.ui.common.FormFactor.Tablet -> 3
             com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
-        if (selectedCat == null) {
+        // Em TV/Tablet, o grid de categorias é um estado transitório (some
+        // assim que a primeira categoria é auto-selecionada). Renderizá-lo
+        // causava um flash visível antes do LiveChannelsScreen aparecer.
+        // Substituímos pelo loading enquanto a auto-seleção não ocorre.
+        if (selectedCat == null && isTvLike) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Text(stringResource(R.string.loading))
+            }
+        } else if (selectedCat == null) {
             // Header: title on the left, inline filter on the right (TV/Tablet).
             // Phone keeps the stacked layout — narrow viewport can't share the row.
             val isPhoneCats = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
@@ -162,7 +183,7 @@ fun LiveSection(
                             title = ch.name,
                             number = ch.num,
                             logoUrl = ch.logoUrl
-                        ) { onOpenChannel(ch) }
+                        ) { playChannelDirect(ch) }
                     }
                 }
             }
@@ -254,7 +275,7 @@ fun LiveSection(
                                     containerExtension = null
                                 )
                             } else {
-                                onOpenChannel(ch)
+                                playChannelDirect(ch)
                             }
                         }
                     }
@@ -291,7 +312,7 @@ fun LiveSection(
                                 containerExtension = null
                             )
                         } else {
-                            onOpenChannel(ch)
+                            playChannelDirect(ch)
                         }
                     },
                     onClose = { selectedCat = null },

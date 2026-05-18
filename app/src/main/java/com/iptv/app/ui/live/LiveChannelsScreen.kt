@@ -3,6 +3,7 @@
 package com.iptv.app.ui.live
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -87,13 +88,22 @@ fun LiveChannelsScreen(
 
     var focusedChannel by remember(selectedCategoryId) { mutableStateOf<LiveChannel?>(null) }
     val firstChannelFocus = remember { FocusRequester() }
-
-    LaunchedEffect(channels.isNotEmpty()) {
-        if (channels.isNotEmpty()) {
-            kotlinx.coroutines.delay(50)
-            runCatching { firstChannelFocus.requestFocus() }
-        }
+    val drawerSelectedRequester = remember { FocusRequester() }
+    // Sem key: a busca persiste ao voltar de um canal e ao trocar de categoria.
+    var localFilter by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf("")
     }
+
+    // Foco inicial na 1ª categoria selecionada do drawer ao entrar — antes
+    // o foco caía direto no primeiro canal do grid.
+    LaunchedEffect(selectedCategoryId) {
+        kotlinx.coroutines.delay(50)
+        runCatching { drawerSelectedRequester.requestFocus() }
+    }
+
+    val needle = localFilter.trim().lowercase()
+    val filteredChannels = if (needle.isBlank()) channels
+    else channels.filter { it.name.lowercase().contains(needle) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxSize()) {
@@ -103,40 +113,58 @@ fun LiveChannelsScreen(
                 selectedId = selectedCategoryId,
                 onSelect = onCategorySelected,
                 onClose = onClose,
+                selectedRequester = drawerSelectedRequester,
                 modifier = Modifier.width(280.dp).fillMaxHeight()
             )
 
-            // Painel direito: grid de canais com logos grandes.
-            ChannelsGrid(
-                channels = channels,
-                isCategoryAdult = isCategoryAdult,
-                isParentalUnlocked = isParentalUnlocked,
-                favoriteIds = favorites
-                    .filter { it.type == com.iptv.app.domain.model.ContentType.LIVE }
-                    .map { it.itemId }
-                    .toSet(),
-                firstFocusRequester = firstChannelFocus,
-                onFocusedChannelChanged = { focusedChannel = it },
-                onClick = onPlay,
-                onLongClick = { ch ->
-                    val isFav = favorites.any {
-                        it.type == com.iptv.app.domain.model.ContentType.LIVE && it.itemId == ch.id
-                    }
-                    vm.toggleFavorite(
-                        com.iptv.app.data.db.FavoriteEntity(
-                            profileId = "",
-                            type = com.iptv.app.domain.model.ContentType.LIVE,
-                            itemId = ch.id,
-                            name = ch.name,
-                            logoUrl = ch.logoUrl,
-                            categoryId = ch.categoryId,
-                            containerExtension = null
-                        )
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                // Header com campo de busca — espelha o de Filmes/Séries.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    com.iptv.app.ui.common.LocalFilterField(
+                        value = localFilter,
+                        onValueChange = { localFilter = it },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    snackbar?.show(if (isFav) favRemovedMsg else favAddedMsg)
-                },
-                modifier = Modifier.weight(1f).fillMaxHeight()
-            )
+                }
+
+                // Grid de canais com logos grandes.
+                ChannelsGrid(
+                    channels = filteredChannels,
+                    isCategoryAdult = isCategoryAdult,
+                    isParentalUnlocked = isParentalUnlocked,
+                    favoriteIds = favorites
+                        .filter { it.type == com.iptv.app.domain.model.ContentType.LIVE }
+                        .map { it.itemId }
+                        .toSet(),
+                    firstFocusRequester = firstChannelFocus,
+                    onFocusedChannelChanged = { focusedChannel = it },
+                    onClick = onPlay,
+                    onLongClick = { ch ->
+                        val isFav = favorites.any {
+                            it.type == com.iptv.app.domain.model.ContentType.LIVE && it.itemId == ch.id
+                        }
+                        vm.toggleFavorite(
+                            com.iptv.app.data.db.FavoriteEntity(
+                                profileId = "",
+                                type = com.iptv.app.domain.model.ContentType.LIVE,
+                                itemId = ch.id,
+                                name = ch.name,
+                                logoUrl = ch.logoUrl,
+                                categoryId = ch.categoryId,
+                                containerExtension = null
+                            )
+                        )
+                        snackbar?.show(if (isFav) favRemovedMsg else favAddedMsg)
+                    },
+                    scrollKey = "live-grid:$selectedCategoryId",
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            } // end Column
         }
 
         // PIP de preview no canto inferior direito.
@@ -166,6 +194,7 @@ private fun CategoriesDrawer(
     selectedId: String,
     onSelect: (String) -> Unit,
     onClose: () -> Unit,
+    selectedRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -203,12 +232,14 @@ private fun CategoriesDrawer(
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             lazyListItems(categories) { cat ->
                 val isSelected = cat.id == selectedId
+                val itemModifier = if (isSelected)
+                    Modifier.fillMaxWidth().padding(vertical = 1.dp).focusRequester(selectedRequester)
+                else
+                    Modifier.fillMaxWidth().padding(vertical = 1.dp)
                 Card(
                     onClick = { onSelect(cat.id) },
                     shape = CardDefaults.shape(RoundedCornerShape(0.dp)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 1.dp)
+                    modifier = itemModifier
                 ) {
                     Row(
                         modifier = Modifier
@@ -253,14 +284,38 @@ private fun ChannelsGrid(
     onFocusedChannelChanged: (LiveChannel?) -> Unit,
     onClick: (LiveChannel) -> Unit,
     onLongClick: (LiveChannel) -> Unit,
+    scrollKey: String,
     modifier: Modifier = Modifier
 ) {
     val locked = isCategoryAdult && !isParentalUnlocked
+    // Preserva scroll por categoria — usuário volta do player Live e cai onde
+    // estava na lista, não no topo.
+    var savedFirstIndex by androidx.compose.runtime.saveable.rememberSaveable(scrollKey) {
+        androidx.compose.runtime.mutableStateOf(0)
+    }
+    var savedFirstOffset by androidx.compose.runtime.saveable.rememberSaveable(scrollKey) {
+        androidx.compose.runtime.mutableStateOf(0)
+    }
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(
+        initialFirstVisibleItemIndex = savedFirstIndex,
+        initialFirstVisibleItemScrollOffset = savedFirstOffset,
+    )
+    androidx.compose.runtime.LaunchedEffect(gridState) {
+        androidx.compose.runtime.snapshotFlow {
+            gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset
+        }.collect { (idx, off) ->
+            savedFirstIndex = idx
+            savedFirstOffset = off
+        }
+    }
+    // Densidade igual à de Filmes/Séries (95dp, gap 6) — antes Live tinha
+    // tiles bem maiores (140dp) e quebrava a paridade visual.
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(140.dp),
+        state = gridState,
+        columns = GridCells.Adaptive(95.dp),
         contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
     ) {
         items(items = channels, key = { it.id }) { channel ->
@@ -279,6 +334,7 @@ private fun ChannelsGrid(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelTile(
     channel: LiveChannel,
@@ -288,23 +344,25 @@ private fun ChannelTile(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    var focused by remember { mutableStateOf(false) }
+    // Mesmo formato dos cards de Filmes/Séries: aspect 2:3 com nome em barra
+    // preta na base. Marquee quando focado (canais como "Globo SP HD ★").
     Card(
         onClick = onClick,
         onLongClick = onLongClick,
         shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
         modifier = modifier
             .fillMaxWidth()
-            .height(150.dp)
+            .aspectRatio(2f / 3f)
+            .onFocusChanged { focused = it.isFocused }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+            // Logo centralizada na metade superior. Mantenho padding generoso
+            // — logos vêm em formatos heterogêneos e cortar fica feio.
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+                    .fillMaxSize()
+                    .padding(bottom = 36.dp)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
@@ -321,38 +379,46 @@ private fun ChannelTile(
                         modifier = Modifier.fillMaxSize().padding(12.dp)
                     )
                 }
-                if (isFavorite) {
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(18.dp)
-                    )
-                }
-                if (locked) {
-                    Icon(
-                        Icons.Filled.Lock,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .size(18.dp)
-                    )
-                }
             }
-            Text(
-                channel.name,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
+            if (isFavorite) {
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(18.dp)
+                )
+            }
+            if (locked) {
+                Icon(
+                    Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .size(18.dp)
+                )
+            }
+            // Barra preta com nome — espelha a do PosterCard.
+            Box(
                 modifier = Modifier
+                    .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp)
-            )
+                    .background(androidx.compose.ui.graphics.Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    channel.name,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    else Modifier
+                )
+            }
         }
     }
 }

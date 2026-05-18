@@ -3,12 +3,15 @@ package com.iptv.app.ui.watchlist
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyRowItems
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
@@ -20,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.iptv.app.R
+import com.iptv.app.data.db.WatchlistEntity
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.ui.common.EmptyState
 import com.iptv.app.ui.common.PosterCard
@@ -37,12 +41,19 @@ fun WatchlistScreen(
     val items by vm.watchlist.collectAsState()
     val dim = rememberTvDim()
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
-        Text(
-            stringResource(R.string.watchlist_title),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+    val channels = items.filter { it.type == ContentType.LIVE }
+    val movies = items.filter { it.type == ContentType.MOVIE }
+    val series = items.filter { it.type == ContentType.SERIES }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(stringResource(R.string.watchlist_title), style = MaterialTheme.typography.titleLarge)
+
         if (items.isEmpty()) {
             EmptyState(
                 title = stringResource(R.string.empty_watchlist_title),
@@ -51,49 +62,66 @@ fun WatchlistScreen(
             )
             return
         }
-        val posterMinWidth = when (dim.formFactor) {
-            com.iptv.app.ui.common.FormFactor.Phone -> 150.dp
-            com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
-            com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
-        }
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(posterMinWidth),
-            horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing),
-            verticalArrangement = Arrangement.spacedBy(dim.CardSpacing)
-        ) {
-            items(items) { entry ->
-                val icon = when (entry.type) {
+
+        if (channels.isNotEmpty()) WatchlistSection(
+            label = stringResource(R.string.filter_channels),
+            items = channels,
+            onPick = { entry ->
+                onPlay(PlayerArgs(PlayerKind.LIVE, entry.itemId, entry.name, null))
+            }
+        )
+        if (movies.isNotEmpty()) WatchlistSection(
+            label = stringResource(R.string.filter_movies),
+            items = movies,
+            onPick = { entry ->
+                onPlay(
+                    PlayerArgs(
+                        kind = PlayerKind.MOVIE,
+                        streamId = entry.itemId,
+                        title = entry.name,
+                        containerExtension = entry.containerExtension,
+                        posterUrl = entry.logoUrl,
+                        categoryId = entry.categoryId
+                    )
+                )
+            }
+        )
+        if (series.isNotEmpty()) WatchlistSection(
+            label = stringResource(R.string.filter_series),
+            items = series,
+            onPick = { entry ->
+                onOpenSeries(entry.itemId, entry.name, entry.logoUrl)
+            }
+        )
+    }
+}
+
+@Composable
+private fun WatchlistSection(
+    label: String,
+    items: List<WatchlistEntity>,
+    onPick: (WatchlistEntity) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "$label (${items.size})",
+            style = MaterialTheme.typography.titleSmall
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            lazyRowItems(items, key = { "${it.type}-${it.itemId}" }) { w ->
+                val icon = when (w.type) {
+                    ContentType.LIVE -> Icons.Filled.LiveTv
                     ContentType.MOVIE -> Icons.Filled.Movie
                     ContentType.SERIES -> Icons.Filled.Tv
-                    ContentType.LIVE -> Icons.Filled.Tv
                 }
                 PosterCard(
-                    title = entry.name,
-                    imageUrl = entry.logoUrl,
+                    title = w.name,
+                    imageUrl = w.logoUrl,
                     fallbackIcon = icon,
-                    fillWidth = true
+                    overrideWidth = 110.dp,
+                    compactTitle = true
                 ) {
-                    when (entry.type) {
-                        ContentType.MOVIE -> onPlay(
-                            PlayerArgs(
-                                kind = PlayerKind.MOVIE,
-                                streamId = entry.itemId,
-                                title = entry.name,
-                                containerExtension = entry.containerExtension,
-                                posterUrl = entry.logoUrl,
-                                categoryId = entry.categoryId
-                            )
-                        )
-                        ContentType.SERIES -> onOpenSeries(entry.itemId, entry.name, entry.logoUrl)
-                        ContentType.LIVE -> onPlay(
-                            PlayerArgs(
-                                kind = PlayerKind.LIVE,
-                                streamId = entry.itemId,
-                                title = entry.name,
-                                containerExtension = null
-                            )
-                        )
-                    }
+                    onPick(w)
                 }
             }
         }

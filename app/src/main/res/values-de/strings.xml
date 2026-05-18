@@ -53,6 +53,7 @@
     <string name="continue_empty">Noch nichts begonnen. Starte einen Film oder eine Folge, damit sie hier erscheint.</string>
     <string name="continue_series">Serien fortsetzen</string>
     <string name="continue_movies">Filme fortsetzen</string>
+    <string name="recent_channels">Zuletzt gesehene Sender</string>
     <string name="recommended_because_movie">Weil du %1$s gesehen hast</string>
     <string name="recommended_because_series">Weil du %1$s gesehen hast</string>
 
@@ -298,10 +299,18 @@
     <string name="snack_catalog_refreshing">Katalog wird aktualisiert…</string>
     <string name="snack_catalog_refreshed">Katalog aktualisiert.</string>
     <string name="snack_undo">Rückgängig</string>
+    <string name="player_next_in">Nächstes in %1$ds</string>
+    <string name="player_reconnecting">Verbindung wird wiederhergestellt (Versuch %1$d/3)…</string>
+    <string name="player_cannot_play_title">Wiedergabe nicht möglich</string>
+    <string name="player_contact_provider">Versuchen Sie es später erneut oder kontaktieren Sie den Listeninhaber.</string>
+    <string name="player_retry">Erneut versuchen</string>
 
     <!-- Exit confirmation -->
     <string name="exit_title">App beenden</string>
     <string name="exit_message">Möchten Sie TartaTV wirklich beenden?</string>
     <string name="exit_yes">Ja</string>
     <string name="exit_no">Nein</string>
+    <string name="locale_restart_title">Neustart zum Anwenden der Sprache</string>
+    <string name="locale_restart_message">Die Sprachänderung wird erst nach einem Neustart wirksam. Jetzt neu starten?</string>
+    <string name="locale_restart_confirm">Neu starten</string>
 </resources>

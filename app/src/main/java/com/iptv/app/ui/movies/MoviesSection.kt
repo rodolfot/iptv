@@ -53,7 +53,10 @@ import com.iptv.app.ui.player.PlayerKind
 fun MoviesSection(
     vm: HomeViewModel,
     parental: ParentalSession,
-    onPlay: (PlayerArgs) -> Unit
+    onPlay: (PlayerArgs) -> Unit,
+    onPlayDirect: (PlayerArgs) -> Unit = onPlay,
+    selectedCat: String?,
+    onSelectedCatChange: (String?) -> Unit
 ) {
     val rawCats by vm.movieCategories.collectAsState()
     val movies by vm.movies.collectAsState()
@@ -71,7 +74,6 @@ fun MoviesSection(
         else -> rawCats.copy(items = rawCats.items.filter { !it.isAdult })
     }
     val dim = rememberTvDim()
-    var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingMovie by remember { mutableStateOf<PlayerArgs?>(null) }
     var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
@@ -82,13 +84,126 @@ fun MoviesSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadMovieCategories()
     }
-    androidx.activity.compose.BackHandler(enabled = selectedCat != null) {
-        selectedCat = null
+    // TV/Tablet: pula o grid de categorias e abre direto a primeira (assim
+    // como o menu Ao Vivo). Em phone mantém o grid.
+    val isTvLike = dim.formFactor != com.iptv.app.ui.common.FormFactor.Phone
+    LaunchedEffect(cats.items, isTvLike) {
+        if (isTvLike && selectedCat == null && cats.items.isNotEmpty()) {
+            val first = cats.items.sortedForDisplay()
+                .firstOrNull { !it.isAdult || parental.isUnlocked() }
+                ?: cats.items.first()
+            onSelectedCatChange(first.id)
+            vm.loadMovies(first.id)
+        }
+    }
+    androidx.activity.compose.BackHandler(enabled = !isTvLike && selectedCat != null) {
+        onSelectedCatChange(null)
     }
     // Surface the "back to categories" action up in the app top bar while the
-    // user is browsing inside one category.
-    if (selectedCat != null) {
-        com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
+    // user is browsing inside one category (phone only — TV/Tablet usa drawer).
+    if (!isTvLike && selectedCat != null) {
+        com.iptv.app.ui.common.RegisterHeaderBack { onSelectedCatChange(null) }
+    }
+
+    // TV/Tablet: layout drawer (categorias) + grid (filmes), igual ao Ao Vivo.
+    if (isTvLike) {
+        if (selectedCat == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.loading))
+            }
+        } else {
+            val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+            val cat = cats.items.firstOrNull { it.id == selectedCat }
+            MoviesCategoriesScreen(
+                categories = sortedCats,
+                selectedCategoryId = selectedCat,
+                movies = movies.items,
+                isCategoryAdult = cat?.isAdult == true,
+                isParentalUnlocked = parental.isUnlocked(),
+                loading = movies.loading,
+                error = movies.error,
+                advancedFilters = advancedFilters,
+                onAdvancedFiltersClick = { filtersDialogOpen = true },
+                sort = settings.moviesSort,
+                onSortChange = { vm.setSort(SortScope.MOVIES, it) },
+                onCategorySelected = { catId ->
+                    val nextCat = cats.items.firstOrNull { it.id == catId }
+                    if (nextCat?.isAdult == true && !parental.isUnlocked()) {
+                        pendingCategory = nextCat
+                    } else {
+                        onSelectedCatChange(catId)
+                        vm.loadMovies(catId)
+                    }
+                },
+                onMovieClick = { m ->
+                    val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                    val args = PlayerArgs(
+                        kind = PlayerKind.MOVIE,
+                        streamId = m.id,
+                        title = m.name,
+                        containerExtension = m.containerExtension,
+                        posterUrl = m.posterUrl,
+                        categoryId = m.categoryId
+                    )
+                    if (locked) pendingMovie = args else onPlay(args)
+                },
+                onMovieDirectPlay = { m ->
+                    val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                    if (!locked) {
+                        onPlayDirect(
+                            PlayerArgs(
+                                kind = PlayerKind.MOVIE,
+                                streamId = m.id,
+                                title = m.name,
+                                containerExtension = m.containerExtension,
+                                posterUrl = m.posterUrl,
+                                categoryId = m.categoryId
+                            )
+                        )
+                    }
+                },
+                onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        pendingCategory?.let { c ->
+            ParentalPinDialog(
+                expectedPin = settings.parentalPin,
+                onUnlocked = {
+                    parental.unlock()
+                    pendingCategory = null
+                    onSelectedCatChange(c.id)
+                    vm.loadMovies(c.id)
+                },
+                onCancel = { pendingCategory = null },
+                onPinCreated = { vm.setParentalPin(it) }
+            )
+        }
+        pendingMovie?.let { args ->
+            ParentalPinDialog(
+                expectedPin = settings.parentalPin,
+                onUnlocked = {
+                    parental.unlock()
+                    pendingMovie = null
+                    onPlay(args)
+                },
+                onCancel = { pendingMovie = null },
+                onPinCreated = { vm.setParentalPin(it) }
+            )
+        }
+        if (filtersDialogOpen) {
+            AdvancedFiltersDialog(
+                initial = advancedFilters,
+                availableGenres = emptyList(),
+                onDismiss = { filtersDialogOpen = false },
+                onApply = {
+                    advancedFilters = it
+                    filtersDialogOpen = false
+                }
+            )
+        }
+        return
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
@@ -194,7 +309,7 @@ fun MoviesSection(
                             if (cat.isAdult && !parental.isUnlocked()) {
                                 pendingCategory = cat
                             } else {
-                                selectedCat = cat.id
+                                onSelectedCatChange(cat.id)
                                 vm.loadMovies(cat.id)
                             }
                         }
@@ -316,7 +431,7 @@ fun MoviesSection(
             onUnlocked = {
                 parental.unlock()
                 pendingCategory = null
-                selectedCat = cat.id
+                onSelectedCatChange(cat.id)
                 vm.loadMovies(cat.id)
             },
             onCancel = { pendingCategory = null },

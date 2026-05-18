@@ -293,7 +293,9 @@ class SeriesDetailViewModel @Inject constructor(
 @Composable
 fun SeriesSection(
     vm: HomeViewModel,
-    onPlay: (PlayerArgs) -> Unit
+    onPlay: (PlayerArgs) -> Unit,
+    selectedCat: String? = null,
+    onSelectedCatChange: (String?) -> Unit = {}
 ) {
     val rawCats by vm.seriesCategories.collectAsState()
     val series by vm.series.collectAsState()
@@ -308,7 +310,6 @@ fun SeriesSection(
         else -> rawCats.copy(items = rawCats.items.filter { !it.isAdult })
     }
     val dim = rememberTvDim()
-    var selectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
     var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
     var categoryFilter by rememberSaveable { mutableStateOf("") }
@@ -318,11 +319,20 @@ fun SeriesSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadSeriesCategories()
     }
-    androidx.activity.compose.BackHandler(enabled = selectedCat != null && openSeries == null) {
-        selectedCat = null
+    // TV/Tablet: pula o grid de categorias e abre direto a primeira.
+    val isTvLike = dim.formFactor != com.iptv.app.ui.common.FormFactor.Phone
+    LaunchedEffect(cats.items, isTvLike) {
+        if (isTvLike && selectedCat == null && cats.items.isNotEmpty()) {
+            val first = cats.items.sortedForDisplay().firstOrNull() ?: cats.items.first()
+            onSelectedCatChange(first.id)
+            vm.loadSeries(first.id)
+        }
     }
-    if (selectedCat != null && openSeries == null) {
-        com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
+    androidx.activity.compose.BackHandler(enabled = !isTvLike && selectedCat != null && openSeries == null) {
+        onSelectedCatChange(null)
+    }
+    if (!isTvLike && selectedCat != null && openSeries == null) {
+        com.iptv.app.ui.common.RegisterHeaderBack { onSelectedCatChange(null) }
     }
 
     if (openSeries != null) {
@@ -331,8 +341,61 @@ fun SeriesSection(
             title = openSeries!!.second,
             coverUrl = openSeries!!.third,
             onBack = { openSeries = null },
-            onPlay = onPlay
+            // Fecha o detalhe ANTES de navegar pro player — assim, ao voltar
+            // do player, o usuário cai direto na lista de séries (origem),
+            // não no detalhe. Mesmo padrão do filme.
+            onPlay = { args -> openSeries = null; onPlay(args) }
         )
+        return
+    }
+
+    // TV/Tablet: drawer + grid no mesmo padrão de Filmes.
+    if (isTvLike) {
+        if (selectedCat == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.loading))
+            }
+        } else {
+            val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+            SeriesCategoriesScreen(
+                categories = sortedCats,
+                selectedCategoryId = selectedCat,
+                series = series.items,
+                loading = series.loading,
+                error = series.error,
+                advancedFilters = advancedFilters,
+                onAdvancedFiltersClick = { filtersDialogOpen = true },
+                sort = settings.seriesSort,
+                onSortChange = { vm.setSort(SortScope.SERIES, it) },
+                onCategorySelected = { catId ->
+                    onSelectedCatChange(catId)
+                    vm.loadSeries(catId)
+                },
+                onSeriesClick = { s -> openSeries = Triple(s.id, s.name, s.coverUrl) },
+                onRetry = { vm.loadSeries(selectedCat, forceRefresh = true) },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        if (filtersDialogOpen) {
+            val availableGenres = remember(series.items) {
+                series.items
+                    .mapNotNull { it.genre }
+                    .flatMap { it.split(',', '/', ';') }
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                    .sorted()
+            }
+            AdvancedFiltersDialog(
+                initial = advancedFilters,
+                availableGenres = availableGenres,
+                onDismiss = { filtersDialogOpen = false },
+                onApply = {
+                    advancedFilters = it
+                    filtersDialogOpen = false
+                }
+            )
+        }
         return
     }
 
@@ -422,7 +485,7 @@ fun SeriesSection(
                 ) {
                     items(visibleCats) { cat ->
                         CategoryCard(title = cat.name, count = null, locked = false) {
-                            selectedCat = cat.id
+                            onSelectedCatChange(cat.id)
                             vm.loadSeries(cat.id)
                         }
                     }
@@ -547,7 +610,10 @@ fun SeriesSection(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 @Composable
 fun SeriesDetailScreen(
     seriesId: Int,
@@ -573,12 +639,6 @@ fun SeriesDetailScreen(
     androidx.activity.compose.BackHandler { onBack() }
     com.iptv.app.ui.common.RegisterHeaderBack { onBack() }
 
-    val seasonCols = when (dim.formFactor) {
-        com.iptv.app.ui.common.FormFactor.Phone -> 2
-        com.iptv.app.ui.common.FormFactor.Tablet -> 3
-        com.iptv.app.ui.common.FormFactor.Tv -> 4
-    }
-
     val playFocus = remember { FocusRequester() }
     val seasonsBringIntoView = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
@@ -588,13 +648,14 @@ fun SeriesDetailScreen(
 
     val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
 
-    // Tela única: poster + metadados + combo de temporadas + grid de episódios.
+    // Tela única: poster + metadados + botão de temporada (abre dialog com
+    // a lista de episódios). Tudo compacto para caber sem scroll.
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 8.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
             val detail = state
             if (detail == null) {
@@ -602,17 +663,20 @@ fun SeriesDetailScreen(
                 return
             }
 
+            // Poster + fontes compactos para a tela inteira caber sem scroll.
+            // Antes o poster ocupava ~1/3 da largura e os metadados eram bodyMedium —
+            // somava ~700dp de altura, forçando scroll na TV mesmo em 1080p.
             val (posterW, posterH) = when (dim.formFactor) {
-                com.iptv.app.ui.common.FormFactor.Phone -> 140.dp to 210.dp
-                com.iptv.app.ui.common.FormFactor.Tablet -> 200.dp to 300.dp
-                com.iptv.app.ui.common.FormFactor.Tv -> 260.dp to 390.dp
+                com.iptv.app.ui.common.FormFactor.Phone -> 100.dp to 150.dp
+                com.iptv.app.ui.common.FormFactor.Tablet -> 130.dp to 195.dp
+                com.iptv.app.ui.common.FormFactor.Tv -> 160.dp to 240.dp
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 24.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 16.dp)) {
                 Box(
                     modifier = Modifier
                         .width(posterW)
                         .height(posterH)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center
                 ) {
@@ -625,24 +689,29 @@ fun SeriesDetailScreen(
                 }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(title, style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                     detail.info?.let { info ->
                         info.releaseDate?.takeIf { it.isNotBlank() }?.let {
-                            Text(stringResource(R.string.movie_release, it), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.movie_release, it), style = MaterialTheme.typography.bodySmall)
                         }
                         info.rating?.takeIf { it.isNotBlank() }?.let {
-                            Text(stringResource(R.string.movie_rating, it), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.movie_rating, it), style = MaterialTheme.typography.bodySmall)
                         }
                         info.genre?.takeIf { it.isNotBlank() }?.let {
-                            Text(stringResource(R.string.movie_genre, it), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.movie_genre, it), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
                         info.director?.takeIf { it.isNotBlank() }?.let {
-                            Text(stringResource(R.string.movie_director, it), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.movie_director, it), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
                         info.cast?.takeIf { it.isNotBlank() }?.let {
-                            Text(stringResource(R.string.movie_cast, it), style = MaterialTheme.typography.bodyMedium)
+                            Text(stringResource(R.string.movie_cast, it), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
                     }
                     Row(
@@ -716,21 +785,45 @@ fun SeriesDetailScreen(
             }
 
             detail.info?.plot?.takeIf { it.isNotBlank() }?.let { plot ->
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         stringResource(R.string.synopsis),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleSmall
                     )
-                    Text(plot, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        plot,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 4,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            // Seleção de temporada via combo (em vez de grid de cards). Os
-            // episódios da temporada selecionada aparecem na mesma tela,
-            // logo abaixo — sem precisar de navegação extra ou scroll
-            // grande.
+            // Pre-selecionar a primeira temporada que tem episódios.
+            LaunchedEffect(detail.seriesId) {
+                if (selectedSeason == null) {
+                    selectedSeason = detail.seasons.firstOrNull {
+                        (detail.episodesBySeason[it.seasonNumber]?.size ?: 0) > 0
+                    }?.seasonNumber ?: detail.seasons.firstOrNull()?.seasonNumber
+                }
+            }
+
+            // Botões: um por temporada. Clicar abre o popup com a lista de
+            // episódios prontos pra tocar — sem manter grid grande na própria
+            // tela, que ocupava muito espaço quando havia muitos episódios.
+            var seasonDialogOpen by rememberSaveable { mutableStateOf(false) }
+            val seasonRequesters = remember(detail.seasons.size) {
+                detail.seasons.associate { it.seasonNumber to FocusRequester() }
+            }
+            // Quando o usuário desce do menu/header até esta seção, foco vai
+            // pro botão da temporada SELECIONADA — antes caía na primeira
+            // (T1) mesmo quando outra estava ativa, induzindo erro.
+            LaunchedEffect(detail.seriesId, selectedSeason) {
+                val req = selectedSeason?.let { seasonRequesters[it] } ?: return@LaunchedEffect
+                runCatching { req.requestFocus() }
+            }
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .bringIntoViewRequester(seasonsBringIntoView)
@@ -742,75 +835,106 @@ fun SeriesDetailScreen(
                     stringResource(R.string.section_seasons),
                     style = MaterialTheme.typography.titleSmall
                 )
-                // Pre-selecionar a primeira temporada que tem episódios.
-                LaunchedEffect(detail.seriesId) {
-                    if (selectedSeason == null) {
-                        selectedSeason = detail.seasons.firstOrNull {
-                            (detail.episodesBySeason[it.seasonNumber]?.size ?: 0) > 0
-                        }?.seasonNumber ?: detail.seasons.firstOrNull()?.seasonNumber
+                // FlowRow quebra em múltiplas linhas quando há muitas
+                // temporadas (Naruto etc.) — antes a LazyRow rolava
+                // horizontalmente e o conteúdo abaixo era empurrado pra fora.
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    detail.seasons.forEach { s ->
+                        val isSel = s.seasonNumber == selectedSeason
+                        val count = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
+                        val req = seasonRequesters[s.seasonNumber] ?: FocusRequester()
+                        TouchableButton(
+                            selected = isSel,
+                            modifier = Modifier.focusRequester(req),
+                            onClick = {
+                                selectedSeason = s.seasonNumber
+                                if (count > 0) seasonDialogOpen = true
+                            }
+                        ) {
+                            Text("T${s.seasonNumber}" + if (count > 0) " ($count)" else "")
+                        }
                     }
                 }
-                val seasonOptions = detail.seasons.map { s ->
-                    val count = detail.episodesBySeason[s.seasonNumber]?.size ?: 0
-                    val label = if (count > 0) "${s.name} ($count)"
-                        else "${s.name} (sem episódios)"
-                    com.iptv.app.ui.common.ComboOption(id = s.seasonNumber, label = label)
-                }
-                val currentSeason = seasonOptions.firstOrNull { it.id == selectedSeason }
-                com.iptv.app.ui.common.ComboBox(
-                    selected = currentSeason,
-                    options = seasonOptions,
-                    onSelect = { selectedSeason = it.id },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            }
 
+            if (seasonDialogOpen && selectedSeason != null) {
                 val episodes = detail.episodesBySeason[selectedSeason] ?: emptyList()
-                if (episodes.isEmpty()) {
-                    Text(
-                        stringResource(R.string.season_empty_message),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    // Grid de 2 colunas de episódios — cabe pelo menos
-                    // duas linhas sem scroll. Usamos Column de Rows porque
-                    // estamos dentro de um parent verticalScroll (não dá
-                    // pra aninhar LazyVerticalGrid).
-                    val seriesCover = detail.coverUrl ?: detail.info?.cover
-                    val rows = episodes.chunked(2)
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        rows.forEach { rowItems ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                            rowItems.forEach { e ->
-                                Box(modifier = Modifier.weight(1f)) {
-                                    EpisodeRow(
-                                        episode = e,
-                                        watched = e.id in detail.watchedEpisodes,
-                                        percent = detail.episodePercents[e.id] ?: 0,
-                                        fallbackPoster = seriesCover,
-                                        onClick = {
-                                            onPlay(
-                                                PlayerArgs(
-                                                    kind = PlayerKind.EPISODE,
-                                                    streamId = e.id.toIntOrNull() ?: 0,
-                                                    title = e.title,
-                                                    containerExtension = e.containerExtension,
-                                                    seriesId = e.seriesId,
-                                                    seasonNumber = e.seasonNumber,
-                                                    episodeId = e.id
-                                                )
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                            if (rowItems.size == 1) {
-                                Box(modifier = Modifier.weight(1f))
-                            }
-                        }
+                val seriesCover = detail.coverUrl ?: detail.info?.cover
+                EpisodesDialog(
+                    seasonLabel = "T${selectedSeason}",
+                    episodes = episodes,
+                    watched = detail.watchedEpisodes,
+                    percents = detail.episodePercents,
+                    fallbackPoster = seriesCover,
+                    onDismiss = { seasonDialogOpen = false },
+                    onPick = { e ->
+                        seasonDialogOpen = false
+                        onPlay(
+                            PlayerArgs(
+                                kind = PlayerKind.EPISODE,
+                                streamId = e.id.toIntOrNull() ?: 0,
+                                title = e.title,
+                                containerExtension = e.containerExtension,
+                                seriesId = e.seriesId,
+                                seasonNumber = e.seasonNumber,
+                                episodeId = e.id
+                            )
+                        )
+                    }
+                )
+            }
+    }
+}
+
+@Composable
+private fun EpisodesDialog(
+    seasonLabel: String,
+    episodes: List<Episode>,
+    watched: Set<String>,
+    percents: Map<String, Int>,
+    fallbackPoster: String?,
+    onDismiss: () -> Unit,
+    onPick: (Episode) -> Unit
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            modifier = Modifier
+                .width(560.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp)
+        ) {
+            Text(
+                "Episódios — $seasonLabel",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            if (episodes.isEmpty()) {
+                Text(
+                    stringResource(R.string.season_empty_message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                androidx.compose.foundation.lazy.LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.height(480.dp)
+                ) {
+                    lazyItems(episodes) { e ->
+                        EpisodeRow(
+                            episode = e,
+                            watched = e.id in watched,
+                            percent = percents[e.id] ?: 0,
+                            fallbackPoster = fallbackPoster,
+                            onClick = { onPick(e) }
+                        )
                     }
                 }
             }
@@ -875,18 +999,27 @@ private fun EpisodeRow(
                     .weight(1f)
                     .padding(start = 8.dp)
             ) {
+                // Título único combinando "T2E33 — Nome do episódio". Antes
+                // estava em dois Text e o segundo era cortado pela altura do
+                // row no dialog (o usuário só via "T2E33").
+                val prefix = "T${episode.seasonNumber}E${episode.episodeNum}"
+                val combined = "${if (watched) "✓ " else ""}$prefix — $displayTitle" +
+                    (if (percent in 1..99) " ($percent%)" else "")
                 Text(
-                    "T${episode.seasonNumber}E${episode.episodeNum}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    (if (watched) "✓ " else "") + displayTitle +
-                        (if (percent in 1..99) " ($percent%)" else ""),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
+                    combined,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
+                episode.plot?.takeIf { it.isNotBlank() }?.let { plot ->
+                    Text(
+                        plot,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
