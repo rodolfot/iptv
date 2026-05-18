@@ -40,6 +40,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import com.iptv.app.ui.common.CatalogLoadingScreen
 import com.iptv.app.ui.common.FormFactor
 import com.iptv.app.ui.common.rememberTvDim
@@ -111,6 +116,39 @@ fun HomeScreen(
     val showMiniPlayer = playbackHolder?.minimized?.value == true &&
         playbackHolder.player != null &&
         miniPlayerFormFactor == com.iptv.app.ui.common.FormFactor.Phone
+
+    // Exit confirmation: o back na raiz da Home (sem detalhe aberto e sem
+    // back-stack interno de seção) pede confirmação antes de fechar o app.
+    // Confirmando, libera o player — sem isso o áudio às vezes continua
+    // tocando porque o onDestroy do MainActivity nem sempre é disparado
+    // (Android pode segurar o processo ao recolher para o launcher).
+    val context = LocalContext.current
+    var showExitDialog by remember { mutableStateOf(false) }
+    val canHandleBack = openMovie == null &&
+        openChannel == null &&
+        openSeries == null &&
+        headerBackController.sectionBack.value == null
+    BackHandler(enabled = canHandleBack) { showExitDialog = true }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text(stringResource(com.iptv.app.R.string.exit_title)) },
+            text = { Text(stringResource(com.iptv.app.R.string.exit_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitDialog = false
+                    playbackHolder?.release()
+                    (context as? Activity)?.finish()
+                }) { Text(stringResource(com.iptv.app.R.string.exit_yes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text(stringResource(com.iptv.app.R.string.exit_no))
+                }
+            }
+        )
+    }
 
     LaunchedEffect(Unit) { vm.bootstrapCatalog() }
 

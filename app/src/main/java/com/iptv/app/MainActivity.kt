@@ -65,12 +65,17 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         // On TV there's no PiP and no mini-player overlay to host playback
-        // when the app goes to background. Leaving the ExoPlayer rolling
-        // means audio keeps leaking out of the launcher. Detect PiP and
-        // skip the pause only when we're already in PiP (phone use-case).
+        // when the app goes to background. Pausing wasn't enough — when the
+        // process is kept alive by the system, the ExoPlayer occasionally
+        // resumed audio playback. Release fully when we're not in PiP and
+        // the activity is actually finishing or backgrounded.
         val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode
         if (!inPip) {
-            playbackHolder.player?.pause()
+            if (isFinishing) {
+                playbackHolder.release()
+            } else {
+                playbackHolder.player?.pause()
+            }
         }
     }
 

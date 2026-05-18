@@ -298,4 +298,10 @@
     <string name="snack_catalog_refreshing">Refreshing catalog…</string>
     <string name="snack_catalog_refreshed">Catalog updated.</string>
     <string name="snack_undo">Undo</string>
+
+    <!-- Exit confirmation -->
+    <string name="exit_title">Exit app</string>
+    <string name="exit_message">Are you sure you want to exit TartaTV?</string>
+    <string name="exit_yes">Yes</string>
+    <string name="exit_no">No</string>
 </resources>
