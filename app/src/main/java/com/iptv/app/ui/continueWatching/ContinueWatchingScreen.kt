@@ -64,6 +64,7 @@ class ContinueWatchingViewModel @Inject constructor(
     private val movieProgressDao: MovieProgressDao,
     private val seriesProgressDao: SeriesProgressDao,
     private val episodeProgressDao: EpisodeProgressDao,
+    private val liveHistoryDao: com.iptv.app.data.db.LiveHistoryDao,
     private val currentProfile: CurrentProfile,
     private val recommender: Recommender,
     private val xtream: com.iptv.app.data.api.XtreamRepository,
@@ -78,6 +79,9 @@ class ContinueWatchingViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val series = profileIdFlow
         .flatMapLatest { seriesProgressDao.observeRecent(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val recentChannels = profileIdFlow
+        .flatMapLatest { liveHistoryDao.observeRecent(it, limit = 10) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _movieReco = kotlinx.coroutines.flow.MutableStateFlow<Recommender.MovieRow?>(null)
@@ -172,6 +176,7 @@ fun ContinueWatchingScreen(
 ) {
     val movies by vm.movies.collectAsState()
     val series by vm.series.collectAsState()
+    val recentChannels by vm.recentChannels.collectAsState()
     val movieReco by vm.movieReco.collectAsState()
     val seriesReco by vm.seriesReco.collectAsState()
     val dim = rememberTvDim()
@@ -186,7 +191,7 @@ fun ContinueWatchingScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = dim.ScreenPadding, vertical = 6.dp)
     ) {
-        val nothingToContinue = movies.isEmpty() && series.isEmpty()
+        val nothingToContinue = movies.isEmpty() && series.isEmpty() && recentChannels.isEmpty()
         val noRecos = movieReco == null && seriesReco == null
         if (nothingToContinue && noRecos) {
             EmptyState(
@@ -203,6 +208,36 @@ fun ContinueWatchingScreen(
         val sectionTopPadding = { if (hasPriorSection) 8.dp else 0.dp }
         val headerStyle = MaterialTheme.typography.titleSmall
         val rowSpacing = 12.dp
+
+        if (recentChannels.isNotEmpty()) {
+            Text(
+                stringResource(R.string.recent_channels),
+                style = headerStyle,
+                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 4.dp)
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(rowSpacing)) {
+                items(recentChannels) { ch ->
+                    com.iptv.app.ui.common.PosterCard(
+                        title = ch.name,
+                        imageUrl = ch.logoUrl,
+                        fallbackIcon = Icons.Filled.Tv,
+                        overrideWidth = 110.dp,
+                        compactTitle = true
+                    ) {
+                        onPlay(
+                            PlayerArgs(
+                                kind = PlayerKind.LIVE,
+                                streamId = ch.channelId,
+                                title = ch.name,
+                                containerExtension = null,
+                                posterUrl = ch.logoUrl
+                            )
+                        )
+                    }
+                }
+            }
+            hasPriorSection = true
+        }
 
         if (series.isNotEmpty()) {
             Text(

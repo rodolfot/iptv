@@ -65,6 +65,20 @@ data class MovieProgressEntity(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * Histórico de canais assistidos. Insere/atualiza um row por canal a cada
+ * vez que o player Live é aberto; "Início" lê os N mais recentes.
+ */
+@Entity(tableName = "live_history", primaryKeys = ["profileId", "channelId"])
+data class LiveHistoryEntity(
+    val profileId: String = DEFAULT_PROFILE_ID,
+    val channelId: Int,
+    val name: String,
+    val logoUrl: String?,
+    val categoryId: String?,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
 @Entity(tableName = "series_progress", primaryKeys = ["profileId", "seriesId"])
 data class SeriesProgressEntity(
     val profileId: String = DEFAULT_PROFILE_ID,

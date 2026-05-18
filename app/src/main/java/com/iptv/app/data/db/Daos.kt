@@ -93,3 +93,27 @@ interface SeriesProgressDao {
     @Query("DELETE FROM series_progress WHERE profileId = :profileId")
     suspend fun clearAll(profileId: String)
 }
+
+@Dao
+interface LiveHistoryDao {
+    @Query("SELECT * FROM live_history WHERE profileId = :profileId ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeRecent(profileId: String, limit: Int = 10): Flow<List<LiveHistoryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: LiveHistoryEntity)
+
+    /**
+     * Mantém só os N mais recentes. Chamado depois de cada upsert para evitar
+     * que o zapping deixe a tabela com centenas de linhas. Usa subquery porque
+     * Room/SQLite não permite `DELETE ... ORDER BY LIMIT` em todas as versões.
+     */
+    @Query(
+        "DELETE FROM live_history WHERE profileId = :profileId AND channelId NOT IN (" +
+            "SELECT channelId FROM live_history WHERE profileId = :profileId " +
+            "ORDER BY updatedAt DESC LIMIT :keep)"
+    )
+    suspend fun trim(profileId: String, keep: Int = 10)
+
+    @Query("DELETE FROM live_history WHERE profileId = :profileId")
+    suspend fun clearAll(profileId: String)
+}
