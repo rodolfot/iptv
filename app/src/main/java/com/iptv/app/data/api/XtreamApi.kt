@@ -246,7 +246,6 @@ data class SeriesInfoResponse(
                 )
                 return@mapNotNull null
             }
-            android.util.Log.d("XtreamApi", "normalizedEpisodes: key='$key' -> ${list.size} eps")
             key to list
         }.toMap()
     }
