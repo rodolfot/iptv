@@ -36,16 +36,25 @@ class IptvApp : Application(), Configuration.Provider {
         androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
             androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
         )
+        // Locale precisa ser aplicado ANTES da Activity inflar a UI — caso
+        // contrário as strings já foram resolvidas no idioma anterior e o
+        // app continua em português mesmo após restart. Lemos de um
+        // SharedPreferences síncrono espelhado do DataStore (escrito ao
+        // mesmo tempo que setAppLocale grava no DataStore).
+        val localeTag = getSharedPreferences(LOCALE_PREFS, MODE_PRIVATE)
+            .getString(LOCALE_KEY, null)
+        com.iptv.app.ui.common.LocaleManager.apply(localeTag)
         CrashLog.install(this)
         Notifications.ensureChannels(this)
-        // Locale is applied via AppCompatDelegate inside the Compose tree once
-        // SettingsStore emits — doing it in `runBlocking` here was deadlocking
-        // because the DataStore IO scheduler hadn't started yet.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             val s = settings.flow.first()
-            com.iptv.app.ui.common.LocaleManager.apply(s.appLocale)
             CatalogRefreshWorker.schedule(this@IptvApp, s.refreshInterval)
             ResumeReminderWorker.schedule(this@IptvApp)
         }
+    }
+
+    companion object {
+        const val LOCALE_PREFS = "tartatv_locale"
+        const val LOCALE_KEY = "app_locale"
     }
 }

@@ -341,10 +341,10 @@ fun SeriesSection(
             title = openSeries!!.second,
             coverUrl = openSeries!!.third,
             onBack = { openSeries = null },
-            // Fecha o detalhe ANTES de navegar pro player — assim, ao voltar
-            // do player, o usuário cai direto na lista de séries (origem),
-            // não no detalhe. Mesmo padrão do filme.
-            onPlay = { args -> openSeries = null; onPlay(args) }
+            // Mantém o detalhe aberto ao mandar pro player. Ao voltar do
+            // player o usuário cai no detalhe (mesmo onde clicou Assistir).
+            // Segundo Voltar fecha o detalhe e vai pra lista.
+            onPlay = onPlay
         )
         return
     }
@@ -735,16 +735,22 @@ fun SeriesDetailScreen(
                                         )
                                     )
                                 },
-                                modifier = Modifier.focusRequester(playFocus)
+                                modifier = Modifier.focusRequester(playFocus),
+                                compact = true
                             ) {
                                 Text(stringResource(labelRes, resume.episode.seasonNumber, resume.episode.episodeNum))
                             }
                         }
-                        TouchableButton(onClick = {
-                            val wasFav = detail.isFavorite
-                            vm.toggleFavorite()
-                            snackbar?.show(if (wasFav) favoriteRemovedMsg else favoriteAddedMsg)
-                        }) {
+                        // Favorito e watchlist agora só ícone — texto duplica
+                        // o tooltip do screen reader e ocupa muito espaço.
+                        TouchableButton(
+                            compact = true,
+                            onClick = {
+                                val wasFav = detail.isFavorite
+                                vm.toggleFavorite()
+                                snackbar?.show(if (wasFav) favoriteRemovedMsg else favoriteAddedMsg)
+                            }
+                        ) {
                             Icon(
                                 if (detail.isFavorite) Icons.Filled.Favorite
                                 else Icons.Filled.FavoriteBorder,
@@ -752,19 +758,15 @@ fun SeriesDetailScreen(
                                     if (detail.isFavorite) R.string.remove_favorite else R.string.add_favorite
                                 )
                             )
-                            if (!isPhone) {
-                                Text(
-                                    "  " + stringResource(
-                                        if (detail.isFavorite) R.string.remove_favorite else R.string.add_favorite
-                                    )
-                                )
-                            }
                         }
-                        TouchableButton(onClick = {
-                            val wasInList = detail.isInWatchlist
-                            vm.toggleWatchlist()
-                            snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
-                        }) {
+                        TouchableButton(
+                            compact = true,
+                            onClick = {
+                                val wasInList = detail.isInWatchlist
+                                vm.toggleWatchlist()
+                                snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
+                            }
+                        ) {
                             Icon(
                                 if (detail.isInWatchlist) Icons.Filled.Bookmark
                                 else Icons.Filled.BookmarkBorder,
@@ -772,13 +774,6 @@ fun SeriesDetailScreen(
                                     if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
                                 )
                             )
-                            if (!isPhone) {
-                                Text(
-                                    "  " + stringResource(
-                                        if (detail.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
-                                    )
-                                )
-                            }
                         }
                     }
                 }
@@ -849,6 +844,7 @@ fun SeriesDetailScreen(
                         val req = seasonRequesters[s.seasonNumber] ?: FocusRequester()
                         TouchableButton(
                             selected = isSel,
+                            compact = true,
                             modifier = Modifier.focusRequester(req),
                             onClick = {
                                 selectedSeason = s.seasonNumber
@@ -962,6 +958,9 @@ private fun EpisodeRow(
     androidx.tv.material3.Card(
         onClick = onClick,
         shape = androidx.tv.material3.CardDefaults.shape(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+        scale = androidx.tv.material3.CardDefaults.scale(
+            scale = 1f, focusedScale = 1f, pressedScale = 1f
+        ),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(

@@ -131,6 +131,17 @@ class SettingsStore @Inject constructor(
         context.dataStore.edit {
             if (tag.isNullOrBlank()) it.remove(Keys.APP_LOCALE) else it[Keys.APP_LOCALE] = tag
         }
+        // Espelha no SharedPreferences síncrono lido pelo IptvApp.onCreate —
+        // o DataStore não tem leitura síncrona, então sem isso o locale
+        // só "pegaria" depois que a Activity já tivesse resolvido strings.
+        context.getSharedPreferences(
+            com.iptv.app.IptvApp.LOCALE_PREFS,
+            android.content.Context.MODE_PRIVATE
+        ).edit().apply {
+            if (tag.isNullOrBlank()) remove(com.iptv.app.IptvApp.LOCALE_KEY)
+            else putString(com.iptv.app.IptvApp.LOCALE_KEY, tag)
+            apply()
+        }
     }
 
     suspend fun skipUpdate(version: String) {

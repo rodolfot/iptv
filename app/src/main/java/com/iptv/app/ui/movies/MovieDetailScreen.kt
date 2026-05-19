@@ -286,26 +286,34 @@ fun MovieDetailScreen(
                     if (state.resumeMs > 0L) {
                         TouchableButton(
                             onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) },
-                            modifier = Modifier.focusRequester(playFocus)
+                            modifier = Modifier.focusRequester(playFocus),
+                            compact = true
                         ) {
                             Text(stringResource(R.string.movie_resume, formatTime(state.resumeMs)))
                         }
-                        TouchableButton(onClick = { onPlay(args.copy(startPositionMs = 0L)) }) {
+                        TouchableButton(
+                            onClick = { onPlay(args.copy(startPositionMs = 0L)) },
+                            compact = true
+                        ) {
                             Text(stringResource(R.string.movie_restart))
                         }
                     } else {
                         TouchableButton(
                             onClick = { onPlay(args) },
-                            modifier = Modifier.focusRequester(playFocus)
+                            modifier = Modifier.focusRequester(playFocus),
+                            compact = true
                         ) {
                             Text(stringResource(R.string.movie_play))
                         }
                     }
-                    TouchableButton(onClick = {
-                        val wasFavorite = state.isFavorite
-                        vm.toggleFavorite(args)
-                        snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
-                    }) {
+                    TouchableButton(
+                        compact = true,
+                        onClick = {
+                            val wasFavorite = state.isFavorite
+                            vm.toggleFavorite(args)
+                            snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
+                        }
+                    ) {
                         Text(stringResource(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
@@ -313,11 +321,14 @@ fun MovieDetailScreen(
                     // Bandeirinha sempre apenas ícone — usuário pediu para
                     // manter só o ícone (estava sumindo do layout em algumas
                     // configurações por falta de espaço).
-                    TouchableButton(onClick = {
-                        val wasInList = state.isInWatchlist
-                        vm.toggleWatchlist(args)
-                        snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
-                    }) {
+                    TouchableButton(
+                        compact = true,
+                        onClick = {
+                            val wasInList = state.isInWatchlist
+                            vm.toggleWatchlist(args)
+                            snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
+                        }
+                    ) {
                         androidx.compose.material3.Icon(
                             if (state.isInWatchlist) Icons.Filled.Bookmark
                             else Icons.Filled.BookmarkBorder,

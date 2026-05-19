@@ -227,13 +227,18 @@ fun HomeScreen(
             when {
                 openMovie != null -> MovieDetailScreen(
                     args = openMovie!!,
-                    onPlay = { args -> openMovie = null; onPlay(args) },
+                    // Não limpa o detalhe ao mandar pro player: assim, voltar
+                    // do player retorna pro detalhe (mesmo onde o usuário
+                    // clicou Assistir). Segundo Voltar fecha o detalhe e cai
+                    // na lista/origem. Antes limpávamos, e ao voltar caía
+                    // direto na origem — inconsistente com a UX de TV.
+                    onPlay = onPlay,
                     onBack = { openMovie = null }
                 )
                 openChannel != null -> ChannelDetailScreen(
                     channel = openChannel!!,
                     onBack = { openChannel = null },
-                    onPlay = { args -> openChannel = null; onPlay(args) }
+                    onPlay = onPlay
                 )
                 openSeries != null -> {
                     val (id, title, cover) = openSeries!!
@@ -242,9 +247,10 @@ fun HomeScreen(
                         title = title,
                         coverUrl = cover,
                         onBack = { openSeries = null },
-                        // Fecha o detalhe antes de navegar pro player — ao
-                        // voltar, o usuário retorna à origem (Início/etc.).
-                        onPlay = { args -> openSeries = null; onPlay(args) }
+                        // Mesmo padrão do filme: ao voltar do player o usuário
+                        // cai no detalhe da série; segundo Voltar fecha o
+                        // detalhe e vai pra lista/origem.
+                        onPlay = onPlay
                     )
                 }
                 else -> when (selectedKey) {
