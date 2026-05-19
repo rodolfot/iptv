@@ -128,7 +128,10 @@ fun MoviesCategoriesScreen(
                 )
             }
 
-            if (loading && movies.isEmpty()) Text(stringResource(R.string.loading))
+            if (loading && movies.isEmpty()) {
+                com.iptv.app.ui.common.InlineLoading()
+                return@Column
+            }
             error?.let { ErrorState(message = it, onRetry = onRetry) }
 
             val needle = localFilter.trim().lowercase()
@@ -226,43 +229,13 @@ private fun MoviesCategoriesDrawer(
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             lazyListItems(categories) { cat ->
                 val isSelected = cat.id == selectedId
-                val itemModifier = if (isSelected)
-                    Modifier.fillMaxWidth().padding(vertical = 1.dp).focusRequester(selectedRequester)
-                else
-                    Modifier.fillMaxWidth().padding(vertical = 1.dp)
-                Card(
+                com.iptv.app.ui.common.DrawerCategoryItem(
+                    name = cat.name,
+                    isSelected = isSelected,
+                    isAdult = cat.isAdult,
                     onClick = { onSelect(cat.id) },
-                    shape = CardDefaults.shape(RoundedCornerShape(0.dp)),
-                    modifier = itemModifier
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent
-                            )
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            cat.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (cat.isAdult) {
-                            Icon(
-                                Icons.Filled.Lock,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
+                    modifier = if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier
+                )
             }
         }
     }

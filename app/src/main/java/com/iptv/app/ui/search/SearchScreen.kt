@@ -426,7 +426,7 @@ private fun ResultRow(
             Icon(icon, contentDescription = null)
             Text(
                 "$label ($count)",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(start = 12.dp, bottom = 12.dp)
             )
         }
@@ -455,7 +455,7 @@ private fun PreSearchPanel(
         ) {
             Text(
                 stringResource(R.string.search_history_title),
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleSmall
             )
             TouchableButton(onClick = onClear) {
                 Text(stringResource(R.string.search_history_clear))

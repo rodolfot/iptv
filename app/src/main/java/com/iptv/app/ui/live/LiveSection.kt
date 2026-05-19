@@ -108,6 +108,77 @@ fun LiveSection(
         com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
     }
 
+    // TV/Tablet com categoria selecionada: LiveChannelsScreen ocupa a tela
+    // inteira sem padding lateral — equivalente a Filmes/Séries, onde o
+    // drawer começa em x=0. Antes era envolvido pela Column com padding,
+    // deslocando o drawer ~24dp para a direita e desalinhando dos demais.
+    if (isTvLike && selectedCat != null) {
+        val cat = cats.items.firstOrNull { it.id == selectedCat }
+        val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+        val needle = localFilter.trim().lowercase()
+        val filteredChannels = if (needle.isBlank()) channels.items
+            else channels.items.filter { it.name.lowercase().contains(needle) }
+        LiveChannelsScreen(
+            vm = vm,
+            categories = sortedCats,
+            selectedCategoryId = selectedCat!!,
+            channels = filteredChannels,
+            isCategoryAdult = cat?.isAdult == true,
+            isParentalUnlocked = parental.isUnlocked(),
+            loading = channels.loading,
+            onCategorySelected = { catId ->
+                val nextCat = cats.items.firstOrNull { it.id == catId }
+                if (nextCat?.isAdult == true && !parental.isUnlocked()) {
+                    pendingCategory = nextCat
+                } else {
+                    selectedCat = catId
+                    vm.loadChannels(catId)
+                }
+            },
+            onPlay = { ch ->
+                val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                if (locked) {
+                    pendingChannel = PlayerArgs(
+                        kind = PlayerKind.LIVE,
+                        streamId = ch.id,
+                        title = ch.name,
+                        containerExtension = null
+                    )
+                } else {
+                    playChannelDirect(ch)
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+        // Pendings (parental) ainda precisam aparecer mesmo no fluxo TV.
+        pendingCategory?.let { c ->
+            ParentalPinDialog(
+                expectedPin = settings.parentalPin,
+                onUnlocked = {
+                    parental.unlock()
+                    pendingCategory = null
+                    selectedCat = c.id
+                    vm.loadChannels(c.id)
+                },
+                onCancel = { pendingCategory = null },
+                onPinCreated = { vm.setParentalPin(it) }
+            )
+        }
+        pendingChannel?.let { args ->
+            ParentalPinDialog(
+                expectedPin = settings.parentalPin,
+                onUnlocked = {
+                    parental.unlock()
+                    pendingChannel = null
+                    onPlay(args)
+                },
+                onCancel = { pendingChannel = null },
+                onPinCreated = { vm.setParentalPin(it) }
+            )
+        }
+        return
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
         val catCols = when (dim.formFactor) {
             com.iptv.app.ui.common.FormFactor.Phone -> 2
@@ -293,6 +364,7 @@ fun LiveSection(
                     channels = filteredChannels,
                     isCategoryAdult = cat?.isAdult == true,
                     isParentalUnlocked = parental.isUnlocked(),
+                    loading = channels.loading,
                     onCategorySelected = { catId ->
                         val nextCat = cats.items.firstOrNull { it.id == catId }
                         if (nextCat?.isAdult == true && !parental.isUnlocked()) {
@@ -315,7 +387,6 @@ fun LiveSection(
                             playChannelDirect(ch)
                         }
                     },
-                    onClose = { selectedCat = null },
                     modifier = Modifier.fillMaxSize()
                 )
             }

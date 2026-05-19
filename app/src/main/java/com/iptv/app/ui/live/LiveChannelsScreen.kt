@@ -5,6 +5,7 @@ package com.iptv.app.ui.live
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -76,9 +77,10 @@ fun LiveChannelsScreen(
     channels: List<LiveChannel>,
     isCategoryAdult: Boolean,
     isParentalUnlocked: Boolean,
+    /** Loading do fetch atual — controla o spinner inline. */
+    loading: Boolean = false,
     onCategorySelected: (String) -> Unit,
     onPlay: (LiveChannel) -> Unit,
-    onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val favorites by vm.favorites.collectAsState()
@@ -112,26 +114,42 @@ fun LiveChannelsScreen(
                 categories = categories,
                 selectedId = selectedCategoryId,
                 onSelect = onCategorySelected,
-                onClose = onClose,
                 selectedRequester = drawerSelectedRequester,
                 modifier = Modifier.width(280.dp).fillMaxHeight()
             )
 
-            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                // Header com campo de busca — espelha o de Filmes/Séries.
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(16.dp)
+            ) {
+                // Header com campo de busca + sort à direita — replica
+                // exatamente o header de Filmes/Séries (mesma altura, mesmo
+                // alinhamento). Sem o sort, o header ficava mais curto e
+                // desalinhava as categorias com o grid.
+                val settings by vm.settingsFlow.collectAsState()
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 12.dp).fillMaxWidth()
                 ) {
                     com.iptv.app.ui.common.LocalFilterField(
                         value = localFilter,
                         onValueChange = { localFilter = it },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.weight(1f)
+                    )
+                    com.iptv.app.ui.common.SortMenuButton(
+                        current = settings.liveSort,
+                        options = com.iptv.app.domain.sort.SortOption.LIVE_OPTIONS,
+                        onSelect = { vm.setSort(com.iptv.app.data.prefs.SortScope.LIVE, it) }
                     )
                 }
 
+                if (loading && filteredChannels.isEmpty()) {
+                    com.iptv.app.ui.common.InlineLoading()
+                    return@Column
+                }
                 // Grid de canais com logos grandes.
                 ChannelsGrid(
                     channels = filteredChannels,
@@ -193,7 +211,6 @@ private fun CategoriesDrawer(
     categories: List<Category>,
     selectedId: String,
     onSelect: (String) -> Unit,
-    onClose: () -> Unit,
     selectedRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
@@ -207,68 +224,24 @@ private fun CategoriesDrawer(
             .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 8.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "Categorias",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.weight(1f)
-            )
-            Card(
-                onClick = onClose,
-                shape = CardDefaults.shape(RoundedCornerShape(50))
-            ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = "Fechar",
-                    modifier = Modifier.padding(6.dp).size(16.dp)
-                )
-            }
-        }
+        // Drawer fixo — sem botão fechar. Igual ao Filmes/Séries. Ao Vivo
+        // não tem "voltar pro grid de categorias"; a navegação é só entre
+        // as categorias e os canais.
+        Text(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.section_categories),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        )
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             lazyListItems(categories) { cat ->
                 val isSelected = cat.id == selectedId
-                val itemModifier = if (isSelected)
-                    Modifier.fillMaxWidth().padding(vertical = 1.dp).focusRequester(selectedRequester)
-                else
-                    Modifier.fillMaxWidth().padding(vertical = 1.dp)
-                Card(
+                com.iptv.app.ui.common.DrawerCategoryItem(
+                    name = cat.name,
+                    isSelected = isSelected,
+                    isAdult = cat.isAdult,
                     onClick = { onSelect(cat.id) },
-                    shape = CardDefaults.shape(RoundedCornerShape(0.dp)),
-                    modifier = itemModifier
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent
-                            )
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            cat.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                            else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (cat.isAdult) {
-                            Icon(
-                                Icons.Filled.Lock,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
+                    modifier = if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier
+                )
             }
         }
     }
@@ -308,12 +281,12 @@ private fun ChannelsGrid(
             savedFirstOffset = off
         }
     }
-    // Densidade igual à de Filmes/Séries (95dp, gap 6) — antes Live tinha
-    // tiles bem maiores (140dp) e quebrava a paridade visual.
+    // Mesmo grid de Filmes/Séries: 95dp Adaptive + gap 6 + contentPadding
+    // só vertical (o padding lateral é absorvido pelo Column pai).
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Adaptive(95.dp),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
@@ -351,6 +324,7 @@ private fun ChannelTile(
         onClick = onClick,
         onLongClick = onLongClick,
         shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
+        scale = CardDefaults.scale(scale = 1f, focusedScale = 1f, pressedScale = 1f),
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(2f / 3f)

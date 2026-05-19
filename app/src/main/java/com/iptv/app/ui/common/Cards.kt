@@ -70,11 +70,19 @@ private fun TouchableCard(
             shape = shape
         ) { content() }
     } else {
+        // scale = 1f em todos os estados (default/focused/pressed) — sem
+        // isso o Card TV aumenta ~10% ao focar, fazendo o card invadir
+        // os vizinhos. Usuário pediu pra tirar o efeito em todo o app.
         Card(
             onClick = onClick,
             onLongClick = onLongClick ?: onClick,
             modifier = modifier,
-            shape = CardDefaults.shape(shape = shape)
+            shape = CardDefaults.shape(shape = shape),
+            scale = CardDefaults.scale(
+                scale = 1f,
+                focusedScale = 1f,
+                pressedScale = 1f,
+            )
         ) { content() }
     }
 }
@@ -91,6 +99,9 @@ fun PosterCard(
     /** Quando true, usa labelSmall no rótulo do card — usado em Favoritos/Watchlist
      *  para caber mais itens visíveis. */
     compactTitle: Boolean = false,
+    /** Progresso de reprodução em 0..100 — quando setado, desenha uma barra
+     *  azul na base do card sobreposta à barra de título. */
+    progressPercent: Int? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -171,25 +182,40 @@ fun PosterCard(
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(Color(0xCC000000))
-                    .padding(
-                        horizontal = if (compactTitle) 6.dp else 12.dp,
-                        vertical = if (compactTitle) 4.dp else 8.dp
-                    )
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
             ) {
-                // Quando o card recebe foco, o título rola (marquee) caso
-                // não caiba — útil em TV pra nomes longos que ficavam só com
-                // "…".
+                // Título sempre em labelSmall (10sp) para ficar idêntico ao
+                // ChannelTile do Ao Vivo. Antes Filmes/Séries usavam
+                // titleSmall (14sp) e Live labelSmall, ficando desalinhados.
+                // Quando focado, basicMarquee rola texto longo.
                 @OptIn(ExperimentalFoundationApi::class)
                 Text(
                     title,
                     color = Color.White,
-                    style = if (compactTitle) MaterialTheme.typography.labelSmall
-                    else MaterialTheme.typography.titleSmall,
-                    maxLines = if (focused) 1 else (if (compactTitle) 1 else 2),
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
                     else Modifier
                 )
+            }
+            // Barra de progresso (azul) na base do card — só aparece quando
+            // o caller passar `progressPercent` (cards de Continuar).
+            if (progressPercent != null && progressPercent in 1..100) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Color(0x55FFFFFF))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progressPercent / 100f)
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
             }
         }
     }
