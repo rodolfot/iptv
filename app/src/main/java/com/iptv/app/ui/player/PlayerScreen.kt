@@ -333,6 +333,22 @@ fun PlayerScreen(
             repeatMode = Player.REPEAT_MODE_OFF
         } ?: ExoPlayer.Builder(context).build().apply { playWhenReady = true }
     }
+    // Manter a CPU/Wi-Fi acordados durante streaming — sem isso, o sistema
+    // adormece após ~10min com tela ativa e o playback para.
+    DisposableEffect(exo) {
+        exo.setWakeMode(androidx.media3.common.C.WAKE_MODE_NETWORK)
+        onDispose { /* holder libera o player no dispose do Activity */ }
+    }
+    // Mantém a TELA ligada enquanto o player está em primeiro plano —
+    // o launcher da TV ativa screensaver/standby após X minutos de
+    // "inatividade" mesmo com o vídeo rodando, porque não há input.
+    DisposableEffect(Unit) {
+        val activity = context as? android.app.Activity
+        activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     // Avoid re-preparing when returning from a minimized session: we'd lose position.
     var preparedFor by remember { mutableStateOf<List<PlayableItem>?>(null) }
