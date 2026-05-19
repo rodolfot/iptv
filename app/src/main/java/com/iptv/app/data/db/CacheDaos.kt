@@ -61,6 +61,9 @@ interface LiveCacheDao {
     @Query("INSERT INTO live_fts(rowid, name) VALUES(:streamId, :name)")
     suspend fun insertFts(streamId: Int, name: String)
 
+    @Query("DELETE FROM live_fts WHERE rowid = :streamId")
+    suspend fun deleteFts(streamId: Int)
+
     @Query(
         """
         SELECT lc.* FROM live_cache lc
@@ -81,12 +84,16 @@ interface LiveCacheDao {
     }
 
     /** Upsert per-category — não limpa a tabela. Usado pelo Worker que
-     *  popula categoria por categoria em background. */
+     *  popula categoria por categoria em background.
+     *  Apaga rowid do FTS antes do insert (sem isso, SQLITE_CONSTRAINT 19). */
     @Transaction
     suspend fun upsertAll(items: List<LiveChannelCacheEntity>) {
         val deduped = items.associateBy { it.streamId }.values
         insertAll(deduped.toList())
-        deduped.forEach { insertFts(it.streamId, it.name) }
+        deduped.forEach {
+            deleteFts(it.streamId)
+            insertFts(it.streamId, it.name)
+        }
     }
 }
 
@@ -109,6 +116,11 @@ interface MovieCacheDao {
 
     @Query("INSERT INTO movie_fts(rowid, name, extra) VALUES(:streamId, :name, :extra)")
     suspend fun insertFts(streamId: Int, name: String, extra: String)
+
+    // FTS5 (e FTS4) não aceita "INSERT OR REPLACE" diretamente — precisamos
+    // apagar o rowid antes de re-inserir. Usado pelo upsert per-category.
+    @Query("DELETE FROM movie_fts WHERE rowid = :streamId")
+    suspend fun deleteFts(streamId: Int)
 
     @Query(
         """
@@ -139,12 +151,18 @@ interface MovieCacheDao {
      * Upsert sem limpar o resto da tabela — usado em fetches direcionados
      * por categoria, que não devem apagar o que já está em cache de outras
      * categorias.
+     *
+     * IMPORTANTE: a tabela FTS é virtual e `INSERT` puro com rowid existente
+     * dispara SQLITE_CONSTRAINT (code 19) que rolla back a transaction toda
+     * — fazendo o filme nem chegar ao `movie_cache`. Apagamos o rowid antes
+     * do re-insert (não há `INSERT OR REPLACE` em FTS).
      */
     @Transaction
     suspend fun upsertAll(items: List<MovieCacheEntity>) {
         val deduped = items.associateBy { it.streamId }.values
         insertAll(deduped.toList())
         deduped.forEach { m ->
+            deleteFts(m.streamId)
             insertFts(
                 streamId = m.streamId,
                 name = m.name,
@@ -192,6 +210,9 @@ interface SeriesCacheDao {
     @Query("INSERT INTO series_fts(rowid, name, extra) VALUES(:seriesId, :name, :extra)")
     suspend fun insertFts(seriesId: Int, name: String, extra: String)
 
+    @Query("DELETE FROM series_fts WHERE rowid = :seriesId")
+    suspend fun deleteFts(seriesId: Int)
+
     @Query(
         """
         SELECT sc.* FROM series_cache sc
@@ -218,11 +239,13 @@ interface SeriesCacheDao {
     }
 
     /** Upsert per-category — não limpa a tabela. */
+    /** Apaga rowid do FTS antes do insert (sem isso, SQLITE_CONSTRAINT 19). */
     @Transaction
     suspend fun upsertAll(items: List<SeriesCacheEntity>) {
         val deduped = items.associateBy { it.seriesId }.values
         insertAll(deduped.toList())
         deduped.forEach { s ->
+            deleteFts(s.seriesId)
             insertFts(
                 seriesId = s.seriesId,
                 name = s.name,
