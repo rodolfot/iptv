@@ -296,6 +296,12 @@ fun PlayerScreen(
     var playbackError by remember { mutableStateOf<String?>(null) }
     var retryAttempts by remember { mutableStateOf(0) }
     var isReconnecting by remember { mutableStateOf(false) }
+    // Buffering inicial: enquanto o ExoPlayer não saiu de STATE_BUFFERING
+    // pela primeira vez. Usado pra mostrar a animação TartaTV no overlay.
+    // Reset a cada novo `args` (mídia diferente) e a cada novo `state.items`
+    // — entrar num novo filme/canal sempre mostra o splash até o player
+    // chegar em STATE_READY.
+    var isInitialBuffering by remember(args) { mutableStateOf(true) }
     // Guard contra STATE_ENDED reemitido em sequência (alguns drivers).
     var lastEndedIndex by remember { mutableStateOf(-1) }
     // Track picker e botão Faixas foram removidos do overlay — o overlay
@@ -431,6 +437,7 @@ fun PlayerScreen(
                     // libera o guard de STATE_ENDED para o próximo item.
                     retryAttempts = 0
                     isReconnecting = false
+                    isInitialBuffering = false
                     playbackError = null
                     lastEndedIndex = -1
                 }
@@ -549,7 +556,26 @@ fun PlayerScreen(
             // D-pad esquerda/direita já cobre o caso — escondemos os ícones.
             setShowRewindButton(false)
             setShowFastForwardButton(false)
+            // Esconder controles nativos que o usuário não consegue focar
+            // pelo D-pad — o Box exterior captura o OK antes do PlayerView
+            // receber, então engrenagem/subtitle/multi-window ficam
+            // inacessíveis. Removemos pra não confundir.
+            setShowSubtitleButton(false)
+            setShowMultiWindowTimeBar(false)
+            setShowVrButton(false)
+            setShowNextButton(false)
+            setShowPreviousButton(false)
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            // Engrenagem (settings / playback speed) do controller nativo
+            // não é alcançável via D-pad porque o Box exterior captura o OK
+            // antes — esconder o view diretamente após o inflate.
+            post {
+                runCatching {
+                    findViewById<android.view.View?>(
+                        androidx.media3.ui.R.id.exo_settings
+                    )?.visibility = android.view.View.GONE
+                }
+            }
             isFocusable = true
             isFocusableInTouchMode = true
             setControllerVisibilityListener(
@@ -742,6 +768,25 @@ fun PlayerScreen(
                             modifier = Modifier.padding(top = 2.dp)
                         )
                     }
+                }
+            }
+        }
+        // Overlay enquanto o vídeo está carregando pela primeira vez: mostra
+        // a animação "TartaTV" + spinner. Antes usávamos `SplashScreen()`
+        // que é fillMaxSize com background opaco — o overlay cobria a tela
+        // toda e o spinner ficava fora dela. Agora `WaveBrand()` é só o
+        // wordmark embutível dentro do Column do overlay.
+        if (isInitialBuffering && !isReconnecting && playbackError == null) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    com.iptv.app.ui.common.WaveBrand()
+                    androidx.compose.material3.CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 24.dp)
+                    )
                 }
             }
         }

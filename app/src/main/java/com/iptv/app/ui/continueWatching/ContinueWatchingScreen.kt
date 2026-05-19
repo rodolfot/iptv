@@ -84,17 +84,10 @@ class ContinueWatchingViewModel @Inject constructor(
         .flatMapLatest { liveHistoryDao.observeRecent(it, limit = 10) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    private val _movieReco = kotlinx.coroutines.flow.MutableStateFlow<Recommender.MovieRow?>(null)
-    val movieReco = _movieReco.asStateFlow()
-    private val _seriesReco = kotlinx.coroutines.flow.MutableStateFlow<Recommender.SeriesRow?>(null)
-    val seriesReco = _seriesReco.asStateFlow()
-
-    fun refreshRecommendations() {
-        viewModelScope.launch {
-            _movieReco.value = recommender.moviesFor()
-            _seriesReco.value = recommender.seriesFor()
-        }
-    }
+    // Recomendações removidas a pedido do usuário — o Recommender fazia
+    // queries pesadas no banco ao abrir a Início e dava travadinhas ao
+    // entrar em Filmes/Séries logo em seguida.
+    fun refreshRecommendations() { /* no-op */ }
 
     suspend fun episodePercent(episodeId: String): Int {
         val ep = episodeProgressDao.getById(currentProfile.id(), episodeId) ?: return 0
@@ -177,13 +170,7 @@ fun ContinueWatchingScreen(
     val movies by vm.movies.collectAsState()
     val series by vm.series.collectAsState()
     val recentChannels by vm.recentChannels.collectAsState()
-    val movieReco by vm.movieReco.collectAsState()
-    val seriesReco by vm.seriesReco.collectAsState()
     val dim = rememberTvDim()
-
-    androidx.compose.runtime.LaunchedEffect(movies.size, series.size) {
-        vm.refreshRecommendations()
-    }
 
     Column(
         modifier = Modifier
@@ -192,13 +179,14 @@ fun ContinueWatchingScreen(
             .padding(horizontal = dim.ScreenPadding, vertical = 6.dp)
     ) {
         val nothingToContinue = movies.isEmpty() && series.isEmpty() && recentChannels.isEmpty()
-        val noRecos = movieReco == null && seriesReco == null
-        if (nothingToContinue && noRecos) {
-            EmptyState(
-                title = stringResource(R.string.empty_continue_title),
-                message = stringResource(R.string.empty_continue_message),
-                icon = Icons.Filled.PlayCircle
-            )
+        if (nothingToContinue) {
+            // Skeleton placeholder enquanto o cache populado dispara as
+            // listas — dá a sensação de tela respondendo em vez de
+            // "Nada por aqui" na primeira vez.
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                com.iptv.app.ui.common.SkeletonSection(label = "")
+                com.iptv.app.ui.common.SkeletonSection(label = "")
+            }
             return
         }
 
@@ -208,8 +196,31 @@ fun ContinueWatchingScreen(
         val sectionTopPadding = { if (hasPriorSection) 8.dp else 0.dp }
         val headerStyle = MaterialTheme.typography.titleSmall
         val rowSpacing = 12.dp
+        // Animação de entrada: cada seção aparece com slide-up + fade,
+        // numa cascata de 80ms entre elas (mais natural que tudo de uma vez).
+        var sectionIndex = 0
+        @androidx.compose.runtime.Composable
+        fun AnimatedSection(content: @androidx.compose.runtime.Composable () -> Unit) {
+            val visible = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            val delayMs = sectionIndex * 80
+            sectionIndex++
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(delayMs.toLong())
+                visible.value = true
+            }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = visible.value,
+                enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(250)) +
+                    androidx.compose.animation.slideInVertically(
+                        initialOffsetY = { it / 4 },
+                        animationSpec = androidx.compose.animation.core.tween(250)
+                    )
+            ) {
+                Column { content() }
+            }
+        }
 
-        if (recentChannels.isNotEmpty()) {
+        if (recentChannels.isNotEmpty()) AnimatedSection {
             Text(
                 stringResource(R.string.recent_channels),
                 style = headerStyle,
@@ -239,7 +250,7 @@ fun ContinueWatchingScreen(
             hasPriorSection = true
         }
 
-        if (series.isNotEmpty()) {
+        if (series.isNotEmpty()) AnimatedSection {
             Text(
                 stringResource(R.string.continue_series),
                 style = headerStyle,
@@ -251,7 +262,7 @@ fun ContinueWatchingScreen(
             hasPriorSection = true
         }
 
-        if (movies.isNotEmpty()) {
+        if (movies.isNotEmpty()) AnimatedSection {
             Text(
                 stringResource(R.string.continue_movies),
                 style = headerStyle,
@@ -263,35 +274,9 @@ fun ContinueWatchingScreen(
             hasPriorSection = true
         }
 
-        movieReco?.let { row ->
-            val header = row.seedTitle?.let {
-                stringResource(R.string.recommended_because_movie, it)
-            } ?: stringResource(R.string.recommended_top_movies)
-            Text(
-                header,
-                style = headerStyle,
-                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 4.dp)
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(rowSpacing)) {
-                items(row.items) { m -> RecommendedMovieCard(m, onOpenMovie) }
-            }
-            hasPriorSection = true
-        }
-
-        seriesReco?.let { row ->
-            val header = row.seedTitle?.let {
-                stringResource(R.string.recommended_because_series, it)
-            } ?: stringResource(R.string.recommended_top_series)
-            Text(
-                header,
-                style = headerStyle,
-                modifier = Modifier.padding(top = sectionTopPadding(), bottom = 4.dp)
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(rowSpacing)) {
-                items(row.items) { s -> RecommendedSeriesCard(s, onOpenSeries) }
-            }
-            hasPriorSection = true
-        }
+        // Recomendações removidas: o Recommender consultava o catálogo
+        // inteiro (50k+ filmes) e travava a Início. Vale repensar depois
+        // como um cache pré-computado em WorkManager.
     }
 }
 
@@ -302,26 +287,25 @@ private val HomePosterWidth = 110.dp
 @Composable
 private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) -> Unit) {
     val percent = if (item.durationMs > 0) (item.positionMs * 100 / item.durationMs).toInt().coerceIn(0, 100) else 0
-    Column {
-        PosterCard(
-            title = item.title,
-            imageUrl = item.posterUrl,
-            fallbackIcon = Icons.Filled.Movie,
-            overrideWidth = HomePosterWidth
-        ) {
-            onPlay(
-                PlayerArgs(
-                    kind = PlayerKind.MOVIE,
-                    streamId = item.movieId,
-                    title = item.title,
-                    containerExtension = item.containerExtension,
-                    posterUrl = item.posterUrl,
-                    categoryId = item.categoryId,
-                    startPositionMs = item.positionMs
-                )
+    // Progresso agora vai dentro do card (barra de 3dp sobreposta).
+    PosterCard(
+        title = item.title,
+        imageUrl = item.posterUrl,
+        fallbackIcon = Icons.Filled.Movie,
+        overrideWidth = HomePosterWidth,
+        progressPercent = percent
+    ) {
+        onPlay(
+            PlayerArgs(
+                kind = PlayerKind.MOVIE,
+                streamId = item.movieId,
+                title = item.title,
+                containerExtension = item.containerExtension,
+                posterUrl = item.posterUrl,
+                categoryId = item.categoryId,
+                startPositionMs = item.positionMs
             )
-        }
-        ProgressStripe(percent)
+        )
     }
 }
 
@@ -338,18 +322,16 @@ private fun SeriesContinueCard(
         percent = vm.episodePercent(item.lastEpisodeId)
     }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    Column {
-        PosterCard(
-            title = "${item.title}\nT${item.lastSeasonNumber}E${item.lastEpisodeNum}",
-            imageUrl = item.coverUrl,
-            fallbackIcon = Icons.Filled.Tv,
-            overrideWidth = HomePosterWidth
-        ) {
-            // Resolve em background para não bloquear a UI — se o último
-            // episódio foi 100% concluído, vai para o próximo da série.
-            scope.launch { onPlay(vm.resolveNextEpisode(item)) }
-        }
-        ProgressStripe(percent)
+    PosterCard(
+        title = "${item.title}\nT${item.lastSeasonNumber}E${item.lastEpisodeNum}",
+        imageUrl = item.coverUrl,
+        fallbackIcon = Icons.Filled.Tv,
+        overrideWidth = HomePosterWidth,
+        progressPercent = percent
+    ) {
+        // Resolve em background para não bloquear a UI — se o último
+        // episódio foi 100% concluído, vai para o próximo da série.
+        scope.launch { onPlay(vm.resolveNextEpisode(item)) }
     }
 }
 

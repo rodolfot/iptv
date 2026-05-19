@@ -19,8 +19,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -166,15 +168,17 @@ fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel())
     CompositionLocalProvider(
         com.iptv.app.ui.common.LocalDeviceProfile provides state.deviceProfile
     ) {
-        // Espera o primeiro emit do DataStore antes de montar o NavHost. Caso
-        // contrário, com termos já aceitos numa instalação anterior, o app
-        // pisca a tela de boas-vindas antes de saltar pro Home.
-        if (!state.loaded) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-            )
+        // Espera o primeiro emit do DataStore + mínimo de 2 segundos antes
+        // de montar o NavHost. Sem o mínimo, em TVs rápidas o splash piscava
+        // (200ms); com 2s o usuário tem tempo de ver a animação e os
+        // outros subsistemas (Room, WorkManager) terminam de inicializar.
+        var minSplashElapsed by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(2000)
+            minSplashElapsed = true
+        }
+        if (!state.loaded || !minSplashElapsed) {
+            com.iptv.app.ui.common.SplashScreen()
             return@CompositionLocalProvider
         }
         val nav = rememberNavController()
