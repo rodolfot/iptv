@@ -298,6 +298,10 @@
     <string name="snack_pin_saved">PIN parental guardado.</string>
     <string name="snack_catalog_refreshing">Actualizando catálogo…</string>
     <string name="snack_catalog_refreshed">Catálogo actualizado.</string>
+    <string name="refresh_phase_categories">Categorías</string>
+    <string name="refresh_phase_live">Canales en vivo</string>
+    <string name="refresh_phase_movies">Películas</string>
+    <string name="refresh_phase_series">Series</string>
     <string name="snack_undo">Deshacer</string>
     <string name="player_next_in">Siguiente en %1$ds</string>
     <string name="player_reconnecting">Reconectando (intento %1$d/3)…</string>

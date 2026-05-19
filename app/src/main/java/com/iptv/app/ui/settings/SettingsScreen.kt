@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -366,14 +367,53 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall
         )
         val refreshCtx = androidx.compose.ui.platform.LocalContext.current
+        // Observa o progresso do Worker — quando rodando, mostra faixa
+        // "fase X/Y"; quando termina, snackbar "Catálogo atualizado." e
+        // atualiza o "última atualização".
+        val workProgress by com.iptv.app.work.CatalogRefreshWorker
+            .observeProgress(refreshCtx)
+            .collectAsState(initial = null)
+        // Detecta a transição de "rodando" -> "parado" pra disparar snackbar.
+        val wasRunning = remember { mutableStateOf(false) }
+        LaunchedEffect(workProgress) {
+            val running = workProgress != null
+            if (wasRunning.value && !running) {
+                snackbar?.show(refreshedMsg)
+                vm.refreshLastUpdatedAt()
+            }
+            wasRunning.value = running
+        }
         TouchableButton(onClick = {
-            // Dispara o Worker em background (categoria por categoria) —
-            // não trava se o catálogo for gigante e o usuário pode continuar
-            // navegando enquanto isso roda. UI não bloqueia.
             snackbar?.show(refreshingMsg)
             com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
         }) {
             Text(stringResource(R.string.settings_refresh_now))
+        }
+        // Faixa de progresso enquanto o Worker está rodando — feedback
+        // explícito de que algo está acontecendo (antes ficava silencioso).
+        workProgress?.let { p ->
+            val phaseLabel = when (p.phase) {
+                "categories" -> stringResource(R.string.refresh_phase_categories)
+                "live" -> stringResource(R.string.refresh_phase_live)
+                "movies" -> stringResource(R.string.refresh_phase_movies)
+                "series" -> stringResource(R.string.refresh_phase_series)
+                else -> p.phase
+            }
+            androidx.compose.foundation.layout.Row(
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "$phaseLabel ${p.current}/${p.total}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
         TouchableButton(onClick = { settingsVm.resetProgress() }) {
             Text(stringResource(R.string.settings_reset_progress))
