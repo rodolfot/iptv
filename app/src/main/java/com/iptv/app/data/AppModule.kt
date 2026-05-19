@@ -33,11 +33,14 @@ object AppModule {
         val ua = "VLC/3.0.20 LibVLC/3.0.20"
         // Log de HTTP só em debug — em release não aplica overhead de
         // serializar headers a cada request. Em TVs antigas isso somava.
+        // Timeouts mais generosos: vodStreams/series podem devolver
+        // catálogos enormes (50k+) que excediam 20s de read — daí o
+        // "timeout" reportado em categorias gigantes (Marvel/DC).
         val builder = OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(120, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .addInterceptor { chain ->
                 val req = chain.request().newBuilder()
