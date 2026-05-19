@@ -5,10 +5,15 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.cache.CatalogCacheRepository
@@ -44,7 +49,20 @@ class CatalogRefreshWorker @AssistedInject constructor(
 
         val episodeCountsBefore = collectFavoriteEpisodeCounts()
 
-        val errors = cache.refreshAll().toMutableList()
+        // Refresh per-category com progresso: aceita catálogos grandes
+        // (50k+ filmes) sem dar timeout. `refreshAll` antigo morria em
+        // listas muito grandes.
+        val errors = cache.refreshAllByCategory { p ->
+            // Progresso publicado via setProgress — UI pode observar
+            // pelo WorkManager.getWorkInfo.
+            setProgress(
+                androidx.work.Data.Builder()
+                    .putString(PROGRESS_PHASE, p.phase)
+                    .putInt(PROGRESS_CURRENT, p.current)
+                    .putInt(PROGRESS_TOTAL, p.total)
+                    .build()
+            )
+        }.toMutableList()
         epg.refresh().exceptionOrNull()?.let(errors::add)
 
         val ctx = applicationContext
@@ -98,9 +116,51 @@ class CatalogRefreshWorker @AssistedInject constructor(
 
     companion object {
         private const val UNIQUE_NAME = "catalog_refresh"
+        private const val ONESHOT_NAME = "catalog_bootstrap"
         private const val NOTIF_ID_CATALOG = 1001
         private const val NOTIF_ID_NEW_EPISODES = 1002
         private const val NOTIF_ID_ERROR = 1003
+
+        const val PROGRESS_PHASE = "phase"
+        const val PROGRESS_CURRENT = "current"
+        const val PROGRESS_TOTAL = "total"
+
+        data class Progress(val phase: String, val current: Int, val total: Int)
+
+        /**
+         * Dispara o bootstrap completo agora (one-shot). Usado:
+         *  - Logo após o login (pra popular o cache enquanto o usuário navega).
+         *  - Quando o usuário clica "Atualizar catálogo".
+         * `KEEP` evita disparar mais de um em paralelo.
+         */
+        fun enqueueOneShot(context: Context) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            val request = OneTimeWorkRequestBuilder<CatalogRefreshWorker>()
+                .setConstraints(constraints)
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                ONESHOT_NAME,
+                ExistingWorkPolicy.KEEP,
+                request
+            )
+        }
+
+        /** Flow do progresso atual do bootstrap one-shot (null quando nenhum job ativo). */
+        fun observeProgress(context: Context): Flow<Progress?> =
+            WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWorkFlow(ONESHOT_NAME)
+                .map { infos ->
+                    val active = infos.firstOrNull {
+                        it.state == WorkInfo.State.RUNNING ||
+                            it.state == WorkInfo.State.ENQUEUED
+                    } ?: return@map null
+                    val phase = active.progress.getString(PROGRESS_PHASE) ?: "categories"
+                    val current = active.progress.getInt(PROGRESS_CURRENT, 0)
+                    val total = active.progress.getInt(PROGRESS_TOTAL, 0)
+                    if (total == 0) null else Progress(phase, current, total)
+                }
 
         /**
          * Schedule periodic refresh based on the user-chosen interval.

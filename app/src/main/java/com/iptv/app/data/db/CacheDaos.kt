@@ -79,6 +79,15 @@ interface LiveCacheDao {
         insertAll(deduped.toList())
         deduped.forEach { insertFts(it.streamId, it.name) }
     }
+
+    /** Upsert per-category — não limpa a tabela. Usado pelo Worker que
+     *  popula categoria por categoria em background. */
+    @Transaction
+    suspend fun upsertAll(items: List<LiveChannelCacheEntity>) {
+        val deduped = items.associateBy { it.streamId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { insertFts(it.streamId, it.name) }
+    }
 }
 
 @Dao
@@ -125,6 +134,24 @@ interface MovieCacheDao {
             )
         }
     }
+
+    /**
+     * Upsert sem limpar o resto da tabela — usado em fetches direcionados
+     * por categoria, que não devem apagar o que já está em cache de outras
+     * categorias.
+     */
+    @Transaction
+    suspend fun upsertAll(items: List<MovieCacheEntity>) {
+        val deduped = items.associateBy { it.streamId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { m ->
+            insertFts(
+                streamId = m.streamId,
+                name = m.name,
+                extra = listOfNotNull(m.releaseDate).joinToString(" ")
+            )
+        }
+    }
 }
 
 @Dao
@@ -137,6 +164,12 @@ interface DetailCacheDao {
 
     @Query("DELETE FROM detail_cache WHERE updatedAt < :before")
     suspend fun deleteExpired(before: Long)
+
+    /** Invalida todo o detalhe — chamado ao refresh do catálogo, para que
+     *  o usuário receba dados frescos (ex.: novas temporadas) na próxima
+     *  entrada em qualquer série/filme. */
+    @Query("DELETE FROM detail_cache")
+    suspend fun clearAll()
 }
 
 @Dao
@@ -173,6 +206,20 @@ interface SeriesCacheDao {
     suspend fun replaceAll(items: List<SeriesCacheEntity>) {
         clear()
         clearFts()
+        val deduped = items.associateBy { it.seriesId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { s ->
+            insertFts(
+                seriesId = s.seriesId,
+                name = s.name,
+                extra = listOfNotNull(s.genre, s.cast, s.plot, s.releaseDate).joinToString(" ")
+            )
+        }
+    }
+
+    /** Upsert per-category — não limpa a tabela. */
+    @Transaction
+    suspend fun upsertAll(items: List<SeriesCacheEntity>) {
         val deduped = items.associateBy { it.seriesId }.values
         insertAll(deduped.toList())
         deduped.forEach { s ->

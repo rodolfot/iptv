@@ -190,6 +190,9 @@ fun SettingsScreen(
         CrashLogScreen(onClose = { crashLogOpen = false })
         return
     }
+    // Sem tela de loading global aqui — o Worker roda em background e o
+    // usuário pode continuar navegando. A faixa de progresso aparece na
+    // tela Início (CatalogLoadingScreen é usada só no primeiro boot).
     if (aboutOpen) {
         AboutScreen(onClose = { aboutOpen = false })
         return
@@ -216,7 +219,7 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
 
         // On TV/Tablet, split the settings into two side-by-side columns so
         // most of the page fits within a single viewport — the D-pad can't
@@ -224,7 +227,7 @@ fun SettingsScreen(
         val rootArrangement = if (isPhone) Arrangement.spacedBy(20.dp) else Arrangement.spacedBy(32.dp)
 
         val leftColumn: @Composable () -> Unit = {
-            Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleSmall)
         if (!editingServer) {
             Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
@@ -307,7 +310,7 @@ fun SettingsScreen(
             }
         }
 
-        Text(stringResource(R.string.settings_parental_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_parental_title), style = MaterialTheme.typography.titleSmall)
         Text(
             stringResource(if (s.isPinSet) R.string.settings_pin_set else R.string.settings_pin_unset),
             style = MaterialTheme.typography.bodySmall
@@ -332,7 +335,7 @@ fun SettingsScreen(
             ))
         }
 
-        Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleSmall)
         run {
             val intervalOptions = RefreshInterval.values().map {
                 com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
@@ -362,12 +365,13 @@ fun SettingsScreen(
             } ?: stringResource(R.string.settings_refresh_never),
             style = MaterialTheme.typography.bodySmall
         )
+        val refreshCtx = androidx.compose.ui.platform.LocalContext.current
         TouchableButton(onClick = {
-            // Background — não bloqueia a UI nem mostra a tela cheia de
-            // loading. As seções fazem stale-while-revalidate; o usuário
-            // pode continuar navegando enquanto isso roda.
+            // Dispara o Worker em background (categoria por categoria) —
+            // não trava se o catálogo for gigante e o usuário pode continuar
+            // navegando enquanto isso roda. UI não bloqueia.
             snackbar?.show(refreshingMsg)
-            vm.refreshAllInBackground { snackbar?.show(refreshedMsg) }
+            com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
         }) {
             Text(stringResource(R.string.settings_refresh_now))
         }
@@ -379,7 +383,7 @@ fun SettingsScreen(
         val rightColumn: @Composable () -> Unit = {
             NotificationsPermissionSection()
 
-            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleSmall)
             // Confirmação + restart: trocar idioma "no quente" causava crash
             // (Activity recreate + applicationLocales colidindo no Android
             // <13). Salvamos a preferência, perguntamos se o usuário quer
@@ -420,15 +424,34 @@ fun SettingsScreen(
                         androidx.compose.material3.TextButton(onClick = {
                             localeDialogOpen = false
                             val tag = pendingLocaleTag
-                            // Persiste no AppCompat e recria a activity. Antes
-                            // fazíamos Process.killProcess + Intent — funciona,
-                            // mas é agressivo: mata workers, conexões abertas
-                            // e em TVs lentas demora segundos pra reabrir.
-                            // recreate() reaplica todos os recursos (strings,
-                            // layouts) sem perder o processo.
+                            // 1) Persiste o locale via AppCompatDelegate (no
+                            //    Android 13+ o sistema recria a activity
+                            //    sozinho via LocaleManager).
+                            // 2) Em versões < 13, ou se o auto-recreate não
+                            //    rolar, relançamos MainActivity com
+                            //    CLEAR_TOP | NEW_TASK e finalizamos a atual.
+                            //    Antes usávamos activity.recreate() — em
+                            //    algumas TVs ele "trava" porque está dentro
+                            //    de um Dialog/Compose state inconsistente.
                             if (tag == null) com.iptv.app.ui.common.LocaleManager.resetToSystem()
                             else com.iptv.app.ui.common.LocaleManager.apply(tag)
-                            activity?.recreate()
+                            activity?.let { act ->
+                                val pm = act.packageManager
+                                val intent = pm.getLaunchIntentForPackage(act.packageName)
+                                    ?.apply {
+                                        addFlags(
+                                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                        )
+                                    }
+                                if (intent != null) {
+                                    act.startActivity(intent)
+                                    act.finish()
+                                    // overridePendingTransition(0, 0) evita
+                                    // flash branco entre as duas activities.
+                                    act.overridePendingTransition(0, 0)
+                                }
+                            }
                         }) { Text(stringResource(R.string.locale_restart_confirm)) }
                     },
                     dismissButton = {
@@ -477,7 +500,7 @@ fun SettingsScreen(
                 }
             }
 
-        Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleSmall)
         androidx.compose.foundation.layout.Row(
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
@@ -497,7 +520,7 @@ fun SettingsScreen(
             }
         }
 
-            Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleSmall)
             TouchableButton(onClick = {
                 vm.logout()
                 onLogout()
@@ -540,7 +563,7 @@ private fun NotificationsPermissionSection() {
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { isGranted -> granted = isGranted }
 
-    Text(stringResource(R.string.settings_notifications_title), style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.settings_notifications_title), style = MaterialTheme.typography.titleSmall)
     if (granted) {
         Text(
             stringResource(R.string.settings_notifications_perm_granted),

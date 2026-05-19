@@ -30,6 +30,7 @@ class CatalogCacheRepository @Inject constructor(
     private val live: LiveCacheDao,
     private val movies: MovieCacheDao,
     private val series: SeriesCacheDao,
+    private val detail: com.iptv.app.data.db.DetailCacheDao,
     private val settings: SettingsStore
 ) {
 
@@ -148,6 +149,73 @@ class CatalogCacheRepository @Inject constructor(
         touch(Scope.MOVIE_STREAMS)
     }
 
+    /**
+     * Fetch direcionado: baixa filmes só da categoria informada, faz upsert
+     * no cache e devolve quantos itens vieram. Usado quando o usuário entra
+     * numa categoria vazia — em vez de baixar o catálogo inteiro (que pode
+     * demorar minutos em listas gigantes), pegamos só essa categoria. O
+     * refresh completo continua acontecendo em background pela rotina
+     * normal de `isStale + refreshMovieStreams`.
+     */
+    suspend fun refreshMovieStreamsForCategory(categoryId: String): Result<Int> = runCatching {
+        if (activeProvider() == ProviderType.M3U) return@runCatching 0
+        val items = api.vodStreams(categoryId).map {
+            MovieCacheEntity(
+                streamId = it.streamId,
+                name = it.name,
+                posterUrl = it.streamIcon,
+                rating = it.rating5 ?: it.rating?.toDoubleOrNull() ?: 0.0,
+                containerExtension = it.containerExtension,
+                categoryId = it.categoryId ?: categoryId,
+                addedTimestamp = it.added?.toLongOrNull() ?: 0L,
+                releaseDate = it.releaseDate ?: it.releaseDateAlt
+            )
+        }
+        movies.upsertAll(items)
+        items.size
+    }
+
+    /** Fetch direcionado de canais Live por categoria. Equivalente ao
+     *  movie per-category — usado pelo Worker que popula em background. */
+    suspend fun refreshLiveStreamsForCategory(categoryId: String): Result<Int> = runCatching {
+        if (activeProvider() == ProviderType.M3U) return@runCatching 0
+        val items = api.liveStreams(categoryId).map {
+            LiveChannelCacheEntity(
+                streamId = it.streamId,
+                num = it.num,
+                name = it.name,
+                logoUrl = it.streamIcon,
+                categoryId = it.categoryId ?: categoryId,
+                epgChannelId = it.epgChannelId,
+                addedTimestamp = it.added?.toLongOrNull() ?: 0L,
+                tvArchive = (it.tvArchive ?: 0) > 0
+            )
+        }
+        live.upsertAll(items)
+        items.size
+    }
+
+    /** Fetch direcionado de séries por categoria. */
+    suspend fun refreshSeriesListForCategory(categoryId: String): Result<Int> = runCatching {
+        if (activeProvider() == ProviderType.M3U) return@runCatching 0
+        val items = api.series(categoryId).map {
+            SeriesCacheEntity(
+                seriesId = it.seriesId,
+                name = it.name,
+                coverUrl = it.cover,
+                rating = it.rating5 ?: it.rating?.toDoubleOrNull() ?: 0.0,
+                plot = it.plot,
+                cast = it.cast,
+                genre = it.genre,
+                categoryId = it.categoryId ?: categoryId,
+                releaseDate = it.releaseDate ?: it.releaseDateSnake,
+                lastModifiedTimestamp = it.lastModified?.toLongOrNull() ?: 0L
+            )
+        }
+        series.upsertAll(items)
+        items.size
+    }
+
     suspend fun refreshSeriesList(): Result<Unit> = runCatching {
         if (activeProvider() == ProviderType.M3U) {
             touch(Scope.SERIES_LIST)
@@ -171,7 +239,9 @@ class CatalogCacheRepository @Inject constructor(
         touch(Scope.SERIES_LIST)
     }
 
-    /** Refresh everything sequentially (used by the background Worker). */
+    /** Refresh everything sequentially — chamada antiga, mantida pra
+     *  compatibilidade mas evite usar em catálogos grandes (50k+ filmes
+     *  numa única request dão timeout). Prefira `refreshAllByCategory`. */
     suspend fun refreshAll(): List<Throwable> {
         val errors = mutableListOf<Throwable>()
         listOf(
@@ -182,6 +252,73 @@ class CatalogCacheRepository @Inject constructor(
             refreshMovieStreams(),
             refreshSeriesList()
         ).forEach { r -> r.exceptionOrNull()?.let(errors::add) }
+        return errors
+    }
+
+    data class BootstrapProgress(
+        val phase: String,
+        val current: Int,
+        val total: Int,
+    )
+
+    /**
+     * Refresh em duas fases:
+     *  1) Categorias (live + movies + series) — geralmente <100 KB total.
+     *  2) Streams por categoria, uma a uma — cada chamada é rápida (1-3s)
+     *     mesmo para categorias grandes (Marvel/DC: 182 filmes / 62 KB).
+     *
+     * Vantagem sobre `refreshAll`: nunca dá timeout, mesmo em catálogos
+     * com 50k+ filmes (que estouravam o read-timeout do OkHttp). E o
+     * usuário pode navegar em categorias já carregadas antes do fim.
+     *
+     * `onProgress` é invocado a cada item processado pra alimentar a UI.
+     */
+    suspend fun refreshAllByCategory(
+        onProgress: suspend (BootstrapProgress) -> Unit = {}
+    ): List<Throwable> {
+        val errors = mutableListOf<Throwable>()
+
+        onProgress(BootstrapProgress("categories", 0, 3))
+        refreshLiveCategories().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("categories", 1, 3))
+        refreshMovieCategories().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("categories", 2, 3))
+        refreshSeriesCategories().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("categories", 3, 3))
+
+        // Live channels
+        val liveCats = categories.get(ContentType.LIVE).map { it.id }
+        liveCats.forEachIndexed { idx, catId ->
+            runCatching { refreshLiveStreamsForCategory(catId) }
+                .exceptionOrNull()?.let(errors::add)
+            onProgress(BootstrapProgress("live", idx + 1, liveCats.size))
+        }
+        touch(Scope.LIVE_STREAMS)
+
+        // Movies
+        val movieCats = categories.get(ContentType.MOVIE).map { it.id }
+        movieCats.forEachIndexed { idx, catId ->
+            runCatching { refreshMovieStreamsForCategory(catId) }
+                .exceptionOrNull()?.let(errors::add)
+            onProgress(BootstrapProgress("movies", idx + 1, movieCats.size))
+        }
+        touch(Scope.MOVIE_STREAMS)
+
+        // Series
+        val seriesCats = categories.get(ContentType.SERIES).map { it.id }
+        seriesCats.forEachIndexed { idx, catId ->
+            runCatching { refreshSeriesListForCategory(catId) }
+                .exceptionOrNull()?.let(errors::add)
+            onProgress(BootstrapProgress("series", idx + 1, seriesCats.size))
+        }
+        touch(Scope.SERIES_LIST)
+
+        // Invalida o cache de detalhes (series_info, vod_info) — ele tem TTL
+        // próprio de 24h e fica "pegado" mesmo quando o provedor publica
+        // novas temporadas/episódios. Limpar aqui garante que a próxima
+        // entrada em qualquer série/filme busque dados frescos do servidor.
+        runCatching { detail.clearAll() }.exceptionOrNull()?.let(errors::add)
+
         return errors
     }
 
