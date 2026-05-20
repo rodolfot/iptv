@@ -6,8 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-05-19
+
 ### Added
 
+- **Contagem por categoria**: Filmes, Séries e Ao Vivo mostram `Nome (N)` em cada categoria do drawer — número reativo via `observeCountByCategory()` nos DAOs, atualiza sozinho enquanto o Worker popula o cache.
+- **PIN parental requer PIN atual** ao trocar: enquanto há PIN configurado, a tela de Config exibe um campo "PIN atual" extra; alteração só é aceita se bater com o salvo.
 - **Nota (rating) nos pôsteres** de filmes e séries: chip "★ X.X" no canto superior esquerdo, escondido quando o provedor não retorna nota válida (0.0 = desconhecido).
 - **Autoplay de episódios**: ao terminar um episódio, o próximo da série inicia automaticamente. A fila já carregava todos os episódios — agora `playWhenReady` é forçado em cada transição (caso o usuário tenha pausado o anterior).
 - **Painel lateral de EPG** nas listas de canais ao vivo (TV/Tablet): a lista virou coluna única; ao mover o foco, o painel direito mostra programa atual + próximos do canal focado. OK arma o canal (indicador ▶), OK de novo abre o player.
@@ -33,9 +37,22 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ### Fixed
 
+- **Idioma do app não trocava em Android 12**: `AppCompatDelegate.setApplicationLocales` só aplica em runtime quando a Activity é `AppCompatActivity`; nossa `MainActivity` é `ComponentActivity`. Agora `IptvApp` e `MainActivity` sobrescrevem `attachBaseContext` lendo o tag de `SharedPreferences` e criando um `Context` com `Configuration.setLocale(...)` via `createConfigurationContext`. Strings de `values-en/`, `values-es/`, `values-it/`, `values-fr/`, `values-de/` agora pegam de verdade.
+- **The Boys T3/T4 vazias** (e qualquer série com campos numéricos malformados): `EpisodeInfo.rating` / `durationSecs` / `releaseDate` vinham como `String`, `Int`, `Double` ou string vazia dependendo do episódio. Sem `@Loose`, Moshi falhava o parse de uma temporada inteira ao encontrar `"rating": ""`. Tipos agora são `@Loose String?` e convertidos em `toModel()`.
+- **Continuar séries** ia para a tela de detalhe mesmo quando o último episódio já tinha sido concluído. Agora calcula e abre o próximo episódio.
+- **Tela preta ao trocar de temporada** no detalhe de série + áudio do preview ao vivo vazando para o player principal.
+- **Botão Atualizar catálogo** ficava silencioso: agora exibe snackbar "Atualizando catálogo." ao acionar, barra de progresso por fase enquanto o Worker roda, e snackbar "Catálogo atualizado." ao terminar.
 - **Spinner fantasma** sobre o grid de categorias em TV: `PullToRefreshBox` ignorava o flag `enabled`, então refresh em background acionava o indicador mesmo em plataforma sem gesto de pull.
 - **Episódios de séries** caindo em temporadas vazias: alguns provedores Xtream enviam todos os episódios sob a chave `"0"` mas trazem o número da temporada no campo `season` de cada episódio. Agrupamento agora usa o `seasonNumber` do episódio.
 - **Episódios sem título/sinopse/poster**: `EpisodeInfo` aceita as variantes mais comuns dos provedores (`name`/`title`/`overview`/`cover_big`/`cover`/`image`).
+- **Standby da TV durante playback**: `ExoPlayer.setWakeMode(WAKE_MODE_NETWORK)` + `FLAG_KEEP_SCREEN_ON` na janela do player mantêm CPU/tela acordadas enquanto está tocando.
+- **`SQLITE_CONSTRAINT` (code 19) em Filmes Marvel/DC**: `INSERT OR REPLACE` não funciona em tabelas FTS5 — DAOs agora fazem `DELETE` + `INSERT` na transação.
+
+### Changed
+
+- **Config (Configurações)**: título do topo removido (o menu já indica onde o usuário está); seção Catálogo movida para a coluna direita, abaixo de Tipo de dispositivo; "Atualizar agora" e "Resetar progresso" lado a lado.
+- **Combos e botões** da Config em modo compacto: `ComboBox` agora usa `TouchableButton(compact = true)` com texto `labelMedium`; `ComboColumn` com label `bodySmall` e spacing de 2dp; campos de texto ocupam largura total; toda a tela cabe sem scroll em TV/Tablet.
+- **TabRow**: pílula da aba ativa agora destacada em azul; ao entrar em uma categoria, a primeira subcategoria é auto-selecionada.
 
 ## [1.0.0] — 2026-05-11
 
