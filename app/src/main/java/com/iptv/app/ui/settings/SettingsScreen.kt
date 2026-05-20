@@ -232,10 +232,10 @@ fun SettingsScreen(
             androidx.compose.foundation.layout.Row(
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
             ) {
-                TouchableButton(onClick = { editingServer = true }) {
+                TouchableButton(compact = true, onClick = { editingServer = true }) {
                     Text(stringResource(R.string.settings_change_server))
                 }
-                TouchableButton(onClick = { profilesOpen = true }) {
+                TouchableButton(compact = true, onClick = { profilesOpen = true }) {
                     Text(stringResource(R.string.settings_profiles_button))
                 }
             }
@@ -286,10 +286,12 @@ fun SettingsScreen(
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
             ) {
                 TouchableButton(
+                    compact = true,
                     enabled = !testing && editHost.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank(),
                     onClick = { settingsVm.testCredentials(editHost, editUser, editPass) }
                 ) { Text(stringResource(R.string.settings_test_connection)) }
                 TouchableButton(
+                    compact = true,
                     enabled = testResult?.ok == true,
                     onClick = {
                         settingsVm.saveCredentials(editHost, editUser, editPass) {
@@ -300,7 +302,7 @@ fun SettingsScreen(
                         }
                     }
                 ) { Text(stringResource(R.string.settings_save_credentials)) }
-                TouchableButton(onClick = {
+                TouchableButton(compact = true, onClick = {
                     editingServer = false
                     editHost = s.host; editUser = s.username; editPass = s.password
                     settingsVm.clearTestResult()
@@ -322,6 +324,7 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth()
         )
         TouchableButton(
+            compact = true,
             enabled = pin.length >= 4,
             onClick = {
                 settingsVm.setPin(pin)
@@ -380,7 +383,7 @@ fun SettingsScreen(
             }
             wasRunning.value = running
         }
-        TouchableButton(onClick = {
+        TouchableButton(compact = true, onClick = {
             snackbar?.show(refreshingMsg)
             com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
         }) {
@@ -412,7 +415,7 @@ fun SettingsScreen(
                 )
             }
         }
-        TouchableButton(onClick = { settingsVm.resetProgress() }) {
+        TouchableButton(compact = true, onClick = { settingsVm.resetProgress() }) {
             Text(stringResource(R.string.settings_reset_progress))
         }
         } // end leftColumn
@@ -536,7 +539,7 @@ fun SettingsScreen(
         androidx.compose.foundation.layout.Row(
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
-            TouchableButton(onClick = { aboutOpen = true }) {
+            TouchableButton(compact = true, onClick = { aboutOpen = true }) {
                 Text(stringResource(R.string.settings_open_about))
             }
             // Log de crash local — só visível quando há registros. Sem
@@ -546,14 +549,14 @@ fun SettingsScreen(
                 activity?.let { com.iptv.app.diag.CrashLog.read(it).isNotBlank() } ?: false
             }
             if (hasCrashLog) {
-                TouchableButton(onClick = { crashLogOpen = true }) {
+                TouchableButton(compact = true, onClick = { crashLogOpen = true }) {
                     Text(stringResource(R.string.crash_log_title))
                 }
             }
         }
 
             Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleSmall)
-            TouchableButton(onClick = {
+            TouchableButton(compact = true, onClick = {
                 vm.logout()
                 onLogout()
             }) { Text(stringResource(R.string.settings_logout)) }
@@ -603,7 +606,7 @@ private fun NotificationsPermissionSection() {
             color = MaterialTheme.colorScheme.primary
         )
     } else {
-        TouchableButton(onClick = {
+        TouchableButton(compact = true, onClick = {
             launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }) { Text(stringResource(R.string.settings_notifications_perm)) }
     }

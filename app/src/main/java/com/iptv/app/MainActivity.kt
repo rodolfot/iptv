@@ -1,6 +1,7 @@
 package com.iptv.app
 
 import android.app.PictureInPictureParams
+import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -58,6 +59,17 @@ class MainActivity : ComponentActivity() {
     var pipEnabled: Boolean = false
 
     val playbackHolder = ActivePlaybackHolder()
+
+    /**
+     * Aplica o locale persistido na Configuration da Activity. ComponentActivity
+     * não tem o hook do AppCompat, então sem isso as strings continuariam
+     * resolvendo no idioma do sistema mesmo após o usuário escolher outro.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        val localeTag = newBase.getSharedPreferences(IptvApp.LOCALE_PREFS, Context.MODE_PRIVATE)
+            .getString(IptvApp.LOCALE_KEY, null)
+        super.attachBaseContext(IptvApp.applyLocaleToContext(newBase, localeTag))
+    }
 
     override fun onDestroy() {
         playbackHolder.release()

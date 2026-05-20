@@ -1,6 +1,7 @@
 package com.iptv.app
 
 import android.app.Application
+import android.content.Context
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.iptv.app.data.prefs.SettingsStore
@@ -9,6 +10,7 @@ import com.iptv.app.notify.Notifications
 import com.iptv.app.work.CatalogRefreshWorker
 import com.iptv.app.work.ResumeReminderWorker
 import dagger.hilt.android.HiltAndroidApp
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +28,20 @@ class IptvApp : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
+
+    /**
+     * Aplica o locale escolhido ANTES de qualquer Activity inflar — em API < 33
+     * o AppCompatDelegate só funciona em AppCompatActivity, e nossa MainActivity
+     * é ComponentActivity. Sem este attachBaseContext, mesmo gravando o tag em
+     * SharedPreferences o app continuava em português porque ninguém aplicava
+     * a Configuration na hierarquia de Context da Application.
+     */
+    override fun attachBaseContext(base: Context) {
+        val localeTag = base.getSharedPreferences(LOCALE_PREFS, MODE_PRIVATE)
+            .getString(LOCALE_KEY, null)
+        val ctx = applyLocaleToContext(base, localeTag)
+        super.attachBaseContext(ctx)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -56,5 +72,19 @@ class IptvApp : Application(), Configuration.Provider {
     companion object {
         const val LOCALE_PREFS = "tartatv_locale"
         const val LOCALE_KEY = "app_locale"
+
+        /**
+         * Helper compartilhado entre Application e Activity: dado um Context
+         * base, devolve um Context com a Configuration ajustada para o BCP-47
+         * em [tag]. Tag em branco/null devolve o Context original (sistema).
+         */
+        fun applyLocaleToContext(base: Context, tag: String?): Context {
+            if (tag.isNullOrBlank()) return base
+            val locale = Locale.forLanguageTag(tag)
+            Locale.setDefault(locale)
+            val config = android.content.res.Configuration(base.resources.configuration)
+            config.setLocale(locale)
+            return base.createConfigurationContext(config)
+        }
     }
 }
