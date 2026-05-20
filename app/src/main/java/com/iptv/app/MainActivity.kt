@@ -1,6 +1,7 @@
 package com.iptv.app
 
 import android.app.PictureInPictureParams
+import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -19,8 +20,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -57,9 +60,37 @@ class MainActivity : ComponentActivity() {
 
     val playbackHolder = ActivePlaybackHolder()
 
+    /**
+     * Aplica o locale persistido na Configuration da Activity. ComponentActivity
+     * não tem o hook do AppCompat, então sem isso as strings continuariam
+     * resolvendo no idioma do sistema mesmo após o usuário escolher outro.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        val localeTag = newBase.getSharedPreferences(IptvApp.LOCALE_PREFS, Context.MODE_PRIVATE)
+            .getString(IptvApp.LOCALE_KEY, null)
+        super.attachBaseContext(IptvApp.applyLocaleToContext(newBase, localeTag))
+    }
+
     override fun onDestroy() {
         playbackHolder.release()
         super.onDestroy()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // On TV there's no PiP and no mini-player overlay to host playback
+        // when the app goes to background. Pausing wasn't enough — when the
+        // process is kept alive by the system, the ExoPlayer occasionally
+        // resumed audio playback. Release fully when we're not in PiP and
+        // the activity is actually finishing or backgrounded.
+        val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode
+        if (!inPip) {
+            if (isFinishing) {
+                playbackHolder.release()
+            } else {
+                playbackHolder.player?.pause()
+            }
+        }
     }
 
     override fun onUserLeaveHint() {
@@ -116,21 +147,59 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-data class RootState(val termsAccepted: Boolean = false, val loggedIn: Boolean = false)
+data class RootState(
+    val termsAccepted: Boolean = false,
+    val loggedIn: Boolean = false,
+    val deviceProfile: com.iptv.app.data.prefs.DeviceProfile? = null,
+    /** Falso até o primeiro emit do DataStore. Sem isso, o NavHost arranca em
+     *  "onboarding" com base no estado default e dá um flash da tela de
+     *  boas-vindas antes do estado real chegar (termos já aceitos). */
+    val loaded: Boolean = false
+)
 
 @HiltViewModel
 class RootViewModel @Inject constructor(
     settings: SettingsStore
 ) : ViewModel() {
     val state = settings.flow
-        .map { RootState(termsAccepted = it.termsAccepted, loggedIn = it.isLoggedIn && it.host.isNotBlank()) }
+        .map {
+            RootState(
+                termsAccepted = it.termsAccepted,
+                loggedIn = it.isLoggedIn && it.host.isNotBlank(),
+                deviceProfile = it.deviceProfile,
+                loaded = true
+            )
+        }
         .stateIn(viewModelScope, SharingStarted.Eagerly, RootState())
 }
 
 @Composable
 fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
-    val nav = rememberNavController()
     val state by vm.state.collectAsState()
+    // Override do form factor escolhido no onboarding aplica em toda a árvore.
+    CompositionLocalProvider(
+        com.iptv.app.ui.common.LocalDeviceProfile provides state.deviceProfile
+    ) {
+        // Espera o primeiro emit do DataStore + mínimo de 2 segundos antes
+        // de montar o NavHost. Sem o mínimo, em TVs rápidas o splash piscava
+        // (200ms); com 2s o usuário tem tempo de ver a animação e os
+        // outros subsistemas (Room, WorkManager) terminam de inicializar.
+        var minSplashElapsed by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(2000)
+            minSplashElapsed = true
+        }
+        if (!state.loaded || !minSplashElapsed) {
+            com.iptv.app.ui.common.SplashScreen()
+            return@CompositionLocalProvider
+        }
+        val nav = rememberNavController()
+        AppNavRoutes(state, nav)
+    }
+}
+
+@Composable
+private fun AppNavRoutes(state: RootState, nav: androidx.navigation.NavHostController) {
     val start = when {
         !state.termsAccepted -> "onboarding"
         state.loggedIn -> "home"

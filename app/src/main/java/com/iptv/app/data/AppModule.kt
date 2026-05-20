@@ -31,12 +31,16 @@ object AppModule {
     @Provides @Singleton
     fun provideOkHttp(): OkHttpClient {
         val ua = "VLC/3.0.20 LibVLC/3.0.20"
-        val log = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
-        return OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
+        // Log de HTTP só em debug — em release não aplica overhead de
+        // serializar headers a cada request. Em TVs antigas isso somava.
+        // Timeouts mais generosos: vodStreams/series podem devolver
+        // catálogos enormes (50k+) que excediam 20s de read — daí o
+        // "timeout" reportado em categorias gigantes (Marvel/DC).
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
-            .callTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(120, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .addInterceptor { chain ->
                 val req = chain.request().newBuilder()
@@ -45,8 +49,12 @@ object AppModule {
                     .build()
                 chain.proceed(req)
             }
-            .addInterceptor(log)
-            .build()
+        if (com.iptv.app.BuildConfig.DEBUG) {
+            builder.addInterceptor(
+                HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
+            )
+        }
+        return builder.build()
     }
 
     @Provides @Singleton
@@ -74,6 +82,7 @@ object AppModule {
     @Provides fun provideEpisodeProgressDao(db: AppDatabase) = db.episodeProgressDao()
     @Provides fun provideMovieProgressDao(db: AppDatabase) = db.movieProgressDao()
     @Provides fun provideSeriesProgressDao(db: AppDatabase) = db.seriesProgressDao()
+    @Provides fun provideLiveHistoryDao(db: AppDatabase) = db.liveHistoryDao()
     @Provides fun provideCacheMetaDao(db: AppDatabase) = db.cacheMetaDao()
     @Provides fun provideCategoryCacheDao(db: AppDatabase) = db.categoryCacheDao()
     @Provides fun provideLiveCacheDao(db: AppDatabase) = db.liveCacheDao()

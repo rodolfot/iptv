@@ -2,7 +2,10 @@
 
 package com.iptv.app.ui.common
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -21,9 +24,14 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,20 +53,36 @@ private fun TouchableCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     shape: RoundedCornerShape = RoundedCornerShape(16.dp),
+    onLongClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val dim = rememberTvDim()
     if (dim.formFactor == FormFactor.Phone) {
-        androidx.compose.material3.Card(
-            onClick = onClick,
-            modifier = modifier,
+        // Em phone usa combinedClickable em um Surface para suportar long-press.
+        @OptIn(ExperimentalFoundationApi::class)
+        androidx.compose.material3.Surface(
+            modifier = modifier
+                .clip(shape)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                ),
             shape = shape
         ) { content() }
     } else {
+        // scale = 1f em todos os estados (default/focused/pressed) — sem
+        // isso o Card TV aumenta ~10% ao focar, fazendo o card invadir
+        // os vizinhos. Usuário pediu pra tirar o efeito em todo o app.
         Card(
             onClick = onClick,
+            onLongClick = onLongClick ?: onClick,
             modifier = modifier,
-            shape = CardDefaults.shape(shape = shape)
+            shape = CardDefaults.shape(shape = shape),
+            scale = CardDefaults.scale(
+                scale = 1f,
+                focusedScale = 1f,
+                pressedScale = 1f,
+            )
         ) { content() }
     }
 }
@@ -71,16 +95,30 @@ fun PosterCard(
     fallbackIcon: ImageVector = Icons.Filled.Movie,
     fillWidth: Boolean = false,
     rating: Double? = null,
+    overrideWidth: androidx.compose.ui.unit.Dp? = null,
+    /** Quando true, usa labelSmall no rótulo do card — usado em Favoritos/Watchlist
+     *  para caber mais itens visíveis. */
+    compactTitle: Boolean = false,
+    /** Progresso de reprodução em 0..100 — quando setado, desenha uma barra
+     *  azul na base do card sobreposta à barra de título. */
+    progressPercent: Int? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
-    val cardModifier = when {
+    // Foco do card — quando focado, o título rola (marquee) caso seja maior
+    // do que o espaço disponível.
+    var focused by remember { mutableStateOf(false) }
+    val baseModifier = when {
         fillWidth -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
+        overrideWidth != null -> Modifier.width(overrideWidth).aspectRatio(2f / 3f)
         dim.formFactor == FormFactor.Phone -> Modifier.fillMaxWidth().aspectRatio(2f / 3f)
         else -> Modifier.width(dim.PosterCardW).height(dim.PosterCardH)
     }
+    val cardModifier = baseModifier.onFocusChanged { focused = it.isFocused }
     TouchableCard(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = cardModifier
     ) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -92,6 +130,11 @@ fun PosterCard(
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = title,
+                    // Crop instead of the default Fit so posters always fill
+                    // the card. Providers ship images at unpredictable aspect
+                    // ratios; Fit leaves dark bands on the sides that made the
+                    // recommendation row look ragged.
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
                 )
             }
@@ -139,15 +182,40 @@ fun PosterCard(
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(Color(0xCC000000))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
             ) {
+                // Título sempre em labelSmall (10sp) para ficar idêntico ao
+                // ChannelTile do Ao Vivo. Antes Filmes/Séries usavam
+                // titleSmall (14sp) e Live labelSmall, ficando desalinhados.
+                // Quando focado, basicMarquee rola texto longo.
+                @OptIn(ExperimentalFoundationApi::class)
                 Text(
                     title,
                     color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    else Modifier
                 )
+            }
+            // Barra de progresso (azul) na base do card — só aparece quando
+            // o caller passar `progressPercent` (cards de Continuar).
+            if (progressPercent != null && progressPercent in 1..100) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Color(0x55FFFFFF))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progressPercent / 100f)
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary)
+                    )
+                }
             }
         }
     }
@@ -164,11 +232,13 @@ fun ChannelCard(
     onClick: () -> Unit
 ) {
     val dim = rememberTvDim()
-    val channelModifier = if (dim.formFactor == FormFactor.Phone) {
+    var focused by remember { mutableStateOf(false) }
+    val baseChannelModifier = if (dim.formFactor == FormFactor.Phone) {
         Modifier.fillMaxWidth().height(dim.ChannelCardH)
     } else {
         Modifier.width(dim.ChannelCardW).height(dim.ChannelCardH)
     }
+    val channelModifier = baseChannelModifier.onFocusChanged { focused = it.isFocused }
     TouchableCard(
         onClick = onClick,
         modifier = channelModifier
@@ -207,19 +277,25 @@ fun ChannelCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    @OptIn(ExperimentalFoundationApi::class)
                     Text(
                         title,
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                        else Modifier
                     )
                     if (!nowPlaying.isNullOrBlank()) {
+                        @OptIn(ExperimentalFoundationApi::class)
                         Text(
                             nowPlaying,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                            else Modifier
                         )
                         if (nowProgress != null && nowProgress in 0f..1f) {
                             Box(

@@ -130,9 +130,17 @@ fun SeasonDto.toModel(): Season = Season(
 fun EpisodeDto.toModel(seriesId: Int, fallbackSeason: Int): Episode {
     // Providers spread the same data across different keys. Resolve title,
     // synopsis and poster from any of the common spellings.
-    val resolvedTitle = listOfNotNull(title, info?.name, info?.title)
+    val episodeNumInt = episodeNum?.toIntOrNull() ?: 0
+    val seasonInt = season?.toIntOrNull() ?: fallbackSeason
+    // Alguns provedores mandam title="S01E01" (literal). Quando é só esse
+    // formato cosmético, tratamos como ausente e usamos plot/episode_num.
+    val rawTitle = listOfNotNull(title, info?.name, info?.title)
         .firstOrNull { it.isNotBlank() }
-        ?: "Episódio ${episodeNum ?: 0}"
+    val cosmeticTitle = rawTitle != null && Regex("^[Ss]\\d{1,3}[Ee]\\d{1,3}$").matches(rawTitle)
+    val resolvedTitle = when {
+        rawTitle != null && !cosmeticTitle -> rawTitle
+        else -> "Episódio $episodeNumInt"
+    }
     val resolvedPlot = listOfNotNull(info?.plot, info?.overview)
         .firstOrNull { it.isNotBlank() }
     val resolvedPoster = listOfNotNull(
@@ -144,12 +152,12 @@ fun EpisodeDto.toModel(seriesId: Int, fallbackSeason: Int): Episode {
     return Episode(
         id = id,
         seriesId = seriesId,
-        seasonNumber = season ?: fallbackSeason,
-        episodeNum = episodeNum ?: 0,
+        seasonNumber = seasonInt,
+        episodeNum = episodeNumInt,
         title = resolvedTitle,
         containerExtension = containerExtension,
         plot = resolvedPlot,
-        durationSecs = info?.durationSecs,
+        durationSecs = info?.durationSecs?.toDoubleOrNull()?.toInt(),
         poster = resolvedPoster
     )
 }

@@ -53,6 +53,7 @@ fun <T> ComboBox(
 
     TouchableButton(
         onClick = { open = true },
+        compact = true,
         modifier = modifier
     ) {
         Row(
@@ -61,7 +62,7 @@ fun <T> ComboBox(
         ) {
             Text(
                 selected?.label ?: placeholder,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.weight(1f)
             )
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null)
@@ -128,8 +129,8 @@ fun ComboColumn(
     label: String,
     content: @Composable () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall)
         content()
     }
 }

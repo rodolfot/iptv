@@ -53,6 +53,7 @@
     <string name="continue_empty">Rien en cours. Commencez à regarder un film ou un épisode pour le voir ici.</string>
     <string name="continue_series">Reprendre les séries</string>
     <string name="continue_movies">Reprendre les films</string>
+    <string name="recent_channels">Chaînes récentes</string>
     <string name="recommended_because_movie">Parce que vous avez vu %1$s</string>
     <string name="recommended_because_series">Parce que vous avez vu %1$s</string>
 
@@ -145,8 +146,10 @@
     <string name="settings_parental_title">PIN parental</string>
     <string name="settings_pin_set">PIN configuré.</string>
     <string name="settings_pin_unset">Aucun PIN défini. Créez-en un pour débloquer le contenu adulte.</string>
-    <string name="settings_pin_label_set">Modifier le PIN</string>
+    <string name="settings_pin_label_set">Nouveau PIN</string>
     <string name="settings_pin_label_unset">Définir le PIN</string>
+    <string name="settings_pin_current_label">PIN actuel</string>
+    <string name="settings_pin_current_wrong">PIN actuel incorrect.</string>
     <string name="settings_pin_save_set">Enregistrer le PIN</string>
     <string name="settings_pin_save_unset">Définir le PIN</string>
     <string name="settings_catalog">Catalogue</string>
@@ -297,5 +300,23 @@
     <string name="snack_pin_saved">PIN parental enregistré.</string>
     <string name="snack_catalog_refreshing">Actualisation du catalogue…</string>
     <string name="snack_catalog_refreshed">Catalogue mis à jour.</string>
+    <string name="refresh_phase_categories">Catégories</string>
+    <string name="refresh_phase_live">Chaînes en direct</string>
+    <string name="refresh_phase_movies">Films</string>
+    <string name="refresh_phase_series">Séries</string>
     <string name="snack_undo">Annuler</string>
+    <string name="player_next_in">Suivant dans %1$ds</string>
+    <string name="player_reconnecting">Reconnexion (tentative %1$d/3)…</string>
+    <string name="player_cannot_play_title">Lecture impossible</string>
+    <string name="player_contact_provider">Réessayez bientôt ou contactez le propriétaire de la liste.</string>
+    <string name="player_retry">Réessayer</string>
+
+    <!-- Exit confirmation -->
+    <string name="exit_title">Quitter l\'application</string>
+    <string name="exit_message">Voulez-vous vraiment quitter TartaTV ?</string>
+    <string name="exit_yes">Oui</string>
+    <string name="exit_no">Non</string>
+    <string name="locale_restart_title">Redémarrer pour appliquer la langue</string>
+    <string name="locale_restart_message">Le changement de langue ne s\'applique qu\'après le redémarrage. Redémarrer maintenant ?</string>
+    <string name="locale_restart_confirm">Redémarrer</string>
 </resources>

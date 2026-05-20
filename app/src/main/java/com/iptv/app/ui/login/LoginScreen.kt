@@ -138,7 +138,15 @@ fun LoginScreen(
     }
 
     if (state.success) {
-        LaunchedEffect(Unit) { onLogged() }
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        LaunchedEffect(Unit) {
+            // Dispara o bootstrap por categoria em background — popula o
+            // cache enquanto o usuário começa a navegar. Cada categoria
+            // visitada antes do worker chegar nela cai no fetch on-demand
+            // do load*() (~2s).
+            com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(ctx)
+            onLogged()
+        }
     }
 
     Box(

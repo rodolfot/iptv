@@ -33,6 +33,10 @@ fun TouchableButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,
+    /** Botão menor: usado em telas de detalhe (filme/série) e nas barras de
+     *  ação onde os botões padrão do TV Material são desproporcionalmente
+     *  grandes em relação ao corpo das telas. Reduz padding e fonte. */
+    compact: Boolean = false,
     content: @Composable RowScope.() -> Unit
 ) {
     val dim = rememberTvDim()
@@ -40,14 +44,16 @@ fun TouchableButton(
         // Material3 defaults aim for tablet sizing; on a phone toolbar a row of
         // 3 buttons doesn't fit. Shrink padding and text style without touching
         // touch-target size (still ≥ 36dp tall, ≥ 48dp wide).
-        val compact = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-        CompositionLocalProvider(LocalTextStyle provides M3MaterialTheme.typography.labelLarge) {
+        val phonePadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+        val phoneStyle = if (compact) M3MaterialTheme.typography.labelMedium
+            else M3MaterialTheme.typography.labelLarge
+        CompositionLocalProvider(LocalTextStyle provides phoneStyle) {
             if (selected) {
                 androidx.compose.material3.Button(
                     onClick = onClick,
                     modifier = modifier,
                     enabled = enabled,
-                    contentPadding = compact,
+                    contentPadding = phonePadding,
                     content = content
                 )
             } else {
@@ -55,29 +61,64 @@ fun TouchableButton(
                     onClick = onClick,
                     modifier = modifier,
                     enabled = enabled,
-                    contentPadding = compact,
+                    contentPadding = phonePadding,
                     content = content
                 )
             }
         }
     } else {
+        // Cores explícitas: o default do tv.material3.Button deixa o
+        // texto branco sobre fundo branco quando focado, ficando ilegível.
+        // Aqui fixamos contraste em todos os 4 estados (default/focused/
+        // pressed/disabled).
+        val tvScheme = androidx.tv.material3.MaterialTheme.colorScheme
+        val tvContent: @Composable RowScope.() -> Unit = if (compact) {
+            {
+                CompositionLocalProvider(
+                    LocalTextStyle provides androidx.tv.material3.MaterialTheme.typography.labelMedium
+                ) {
+                    content()
+                }
+            }
+        } else content
+        val tvPadding = if (compact) PaddingValues(horizontal = 10.dp, vertical = 4.dp) else null
         if (selected) {
             androidx.tv.material3.Button(
                 onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
-                colors = androidx.tv.material3.ButtonDefaults.colors(
-                    containerColor = androidx.tv.material3.MaterialTheme.colorScheme.primary,
-                    contentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                contentPadding = tvPadding ?: androidx.tv.material3.ButtonDefaults.ContentPadding,
+                scale = androidx.tv.material3.ButtonDefaults.scale(
+                    scale = 1f, focusedScale = 1f, pressedScale = 1f
                 ),
-                content = content
+                colors = androidx.tv.material3.ButtonDefaults.colors(
+                    containerColor = tvScheme.primary,
+                    contentColor = tvScheme.onPrimary,
+                    focusedContainerColor = tvScheme.primary,
+                    focusedContentColor = tvScheme.onPrimary,
+                    pressedContainerColor = tvScheme.primary,
+                    pressedContentColor = tvScheme.onPrimary
+                ),
+                content = tvContent
             )
         } else {
             androidx.tv.material3.Button(
                 onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
-                content = content
+                contentPadding = tvPadding ?: androidx.tv.material3.ButtonDefaults.ContentPadding,
+                scale = androidx.tv.material3.ButtonDefaults.scale(
+                    scale = 1f, focusedScale = 1f, pressedScale = 1f
+                ),
+                colors = androidx.tv.material3.ButtonDefaults.colors(
+                    containerColor = tvScheme.secondaryContainer,
+                    contentColor = tvScheme.onSecondaryContainer,
+                    focusedContainerColor = tvScheme.primary,
+                    focusedContentColor = tvScheme.onPrimary,
+                    pressedContainerColor = tvScheme.primary,
+                    pressedContentColor = tvScheme.onPrimary
+                ),
+                content = tvContent
             )
         }
     }

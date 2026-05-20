@@ -1,6 +1,8 @@
 package com.iptv.app.ui.search
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +15,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.runtime.remember
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -149,13 +160,12 @@ class SearchViewModel @Inject constructor(
             else emptyList()
             val results = SearchResults(channels, movies, series)
             _state.value = _state.value.copy(results = results)
-            // Persist the term once it produced something useful, then debounce more
-            // so transient typings don't stack the history.
-            val hasResults = channels.isNotEmpty() || movies.isNotEmpty() || series.isNotEmpty()
-            if (hasResults) {
-                delay(600)
-                settings.pushSearchHistory(q)
-            }
+            // NÃO salvamos no histórico aqui. Antes, persistir a cada
+            // letra digitada com 600ms de debounce ainda gravava todos
+            // os prefixos curtos ("tr", "tra", "tran", "tran"...) porque
+            // o cancel da coroutine não desfaz writes já feitos. Agora a
+            // tela chama rememberSearch quando o usuário "submete" o
+            // termo (sai do modo de edição do campo).
         }
     }
 }
@@ -185,7 +195,17 @@ fun SearchScreen(
         SearchBar(
             query = query,
             onQueryChange = { query = it },
-            enabled = state.catalogReady
+            enabled = state.catalogReady,
+            onSubmit = {
+                // Só registra a palavra completa quando ela produziu
+                // algum resultado real — evita poluir o histórico com
+                // erros de digitação.
+                val term = query.trim()
+                val hasResults = state.results.channels.isNotEmpty() ||
+                    state.results.movies.isNotEmpty() ||
+                    state.results.series.isNotEmpty()
+                if (term.length >= 2 && hasResults) vm.rememberSearch(term)
+            }
         )
         Row(
             modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
@@ -212,12 +232,42 @@ fun SearchScreen(
 }
 
 @Composable
-private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: Boolean) {
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    enabled: Boolean,
+    onSubmit: () -> Unit = {}
+) {
+    // Mesmo padrão D-pad friendly do LocalFilterField/PinField: o foco
+    // sozinho NÃO abre o IME. Só ao apertar OK/Enter no controle é que
+    // entramos em modo edição (e o teclado aparece). Antes, ao entrar em
+    // Buscar o BasicTextField já recebia foco e disparava o teclado.
+    var editing by remember { mutableStateOf(false) }
+    val editorFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(editing) {
+        if (editing) {
+            editorFocus.requestFocus()
+            keyboard?.show()
+        } else {
+            keyboard?.hide()
+            // Saiu do modo de edição: o usuário "finalizou" o termo.
+            // Avisa a tela para persistir a palavra inteira no histórico
+            // (a palavra inteira, não cada prefixo digitado).
+            onSubmit()
+        }
+    }
+
+    val shape = RoundedCornerShape(12.dp)
+    val borderColor = if (editing) MaterialTheme.colorScheme.primary else Color.Transparent
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
+            .border(2.dp, borderColor, shape)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -226,24 +276,55 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, enabled: B
             contentDescription = null,
             modifier = Modifier.padding(end = 12.dp)
         )
-        BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            enabled = enabled,
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 22.sp),
-            modifier = Modifier.fillMaxWidth(),
-            decorationBox = { inner ->
-                if (query.isEmpty()) {
-                    Text(
-                        stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog),
-                        color = Color(0x99FFFFFF),
-                        style = MaterialTheme.typography.titleMedium
-                    )
+        if (editing) {
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                enabled = enabled,
+                singleLine = true,
+                textStyle = TextStyle(color = Color.White, fontSize = 22.sp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(editorFocus)
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Back, Key.Escape -> { editing = false; true }
+                            else -> false
+                        }
+                    },
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text(
+                            stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog),
+                            color = Color(0x99FFFFFF),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    inner()
                 }
-                inner()
-            }
-        )
+            )
+        } else {
+            Text(
+                text = query.ifEmpty {
+                    stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog)
+                },
+                color = if (query.isEmpty()) Color(0x99FFFFFF) else Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                                if (enabled) { editing = true; true } else false
+                            }
+                            else -> false
+                        }
+                    }
+                    .clickable(enabled = enabled) { editing = true }
+            )
+        }
     }
 }
 
@@ -345,7 +426,7 @@ private fun ResultRow(
             Icon(icon, contentDescription = null)
             Text(
                 "$label ($count)",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(start = 12.dp, bottom = 12.dp)
             )
         }
@@ -374,7 +455,7 @@ private fun PreSearchPanel(
         ) {
             Text(
                 stringResource(R.string.search_history_title),
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleSmall
             )
             TouchableButton(onClick = onClear) {
                 Text(stringResource(R.string.search_history_clear))

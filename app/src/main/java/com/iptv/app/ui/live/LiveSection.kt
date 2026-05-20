@@ -47,9 +47,22 @@ import com.iptv.app.ui.player.PlayerKind
 fun LiveSection(
     vm: HomeViewModel,
     parental: ParentalSession,
-    onPlay: (PlayerArgs) -> Unit,
-    onOpenChannel: (com.iptv.app.domain.model.LiveChannel) -> Unit = {}
+    onPlay: (PlayerArgs) -> Unit
 ) {
+    // Helper local: clicar num canal toca direto. A tela de detalhe (EPG +
+    // favoritos) deixou de ser usada via Ao Vivo — preview no painel da
+    // grade já dá feedback suficiente. SearchScreen ainda chama
+    // ChannelDetailScreen para preservar o caminho de detalhe lá.
+    fun playChannelDirect(ch: com.iptv.app.domain.model.LiveChannel) {
+        onPlay(
+            PlayerArgs(
+                kind = PlayerKind.LIVE,
+                streamId = ch.id,
+                title = ch.name,
+                containerExtension = null
+            )
+        )
+    }
     val rawCats by vm.liveCategories.collectAsState()
     val channels by vm.channels.collectAsState()
     val epgNow by vm.epgNow.collectAsState()
@@ -75,11 +88,96 @@ fun LiveSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadLiveCategories()
     }
-    androidx.activity.compose.BackHandler(enabled = selectedCat != null) {
+    // Em TV/Tablet, pula a tela de "grid de categorias" e abre direto a
+    // primeira (que já tem categorias no drawer lateral do LiveChannelsScreen).
+    // Em phone segue mostrando o grid (não tem espaço para drawer).
+    val isTvLike = dim.formFactor != com.iptv.app.ui.common.FormFactor.Phone
+    LaunchedEffect(cats.items, isTvLike) {
+        if (isTvLike && selectedCat == null && cats.items.isNotEmpty()) {
+            val first = cats.items.sortedForDisplay()
+                .firstOrNull { !it.isAdult || parental.isUnlocked() }
+                ?: cats.items.first()
+            selectedCat = first.id
+            vm.loadChannels(first.id)
+        }
+    }
+    androidx.activity.compose.BackHandler(enabled = !isTvLike && selectedCat != null) {
         selectedCat = null
     }
-    if (selectedCat != null) {
+    if (!isTvLike && selectedCat != null) {
         com.iptv.app.ui.common.RegisterHeaderBack { selectedCat = null }
+    }
+
+    // TV/Tablet com categoria selecionada: LiveChannelsScreen ocupa a tela
+    // inteira sem padding lateral — equivalente a Filmes/Séries, onde o
+    // drawer começa em x=0. Antes era envolvido pela Column com padding,
+    // deslocando o drawer ~24dp para a direita e desalinhando dos demais.
+    if (isTvLike && selectedCat != null) {
+        val cat = cats.items.firstOrNull { it.id == selectedCat }
+        val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+        val needle = localFilter.trim().lowercase()
+        val filteredChannels = if (needle.isBlank()) channels.items
+            else channels.items.filter { it.name.lowercase().contains(needle) }
+        LiveChannelsScreen(
+            vm = vm,
+            categories = sortedCats,
+            selectedCategoryId = selectedCat!!,
+            channels = filteredChannels,
+            isCategoryAdult = cat?.isAdult == true,
+            isParentalUnlocked = parental.isUnlocked(),
+            loading = channels.loading,
+            onCategorySelected = { catId ->
+                val nextCat = cats.items.firstOrNull { it.id == catId }
+                if (nextCat?.isAdult == true && !parental.isUnlocked()) {
+                    pendingCategory = nextCat
+                } else {
+                    selectedCat = catId
+                    vm.loadChannels(catId)
+                }
+            },
+            onPlay = { ch ->
+                val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                if (locked) {
+                    pendingChannel = PlayerArgs(
+                        kind = PlayerKind.LIVE,
+                        streamId = ch.id,
+                        title = ch.name,
+                        containerExtension = null
+                    )
+                } else {
+                    playChannelDirect(ch)
+                }
+            },
+            countByCategory = vm.liveCountByCategory.collectAsState().value,
+            modifier = Modifier.fillMaxSize()
+        )
+        // Pendings (parental) ainda precisam aparecer mesmo no fluxo TV.
+        pendingCategory?.let { c ->
+            ParentalPinDialog(
+                expectedPin = settings.parentalPin,
+                onUnlocked = {
+                    parental.unlock()
+                    pendingCategory = null
+                    selectedCat = c.id
+                    vm.loadChannels(c.id)
+                },
+                onCancel = { pendingCategory = null },
+                onPinCreated = { vm.setParentalPin(it) }
+            )
+        }
+        pendingChannel?.let { args ->
+            ParentalPinDialog(
+                expectedPin = settings.parentalPin,
+                onUnlocked = {
+                    parental.unlock()
+                    pendingChannel = null
+                    onPlay(args)
+                },
+                onCancel = { pendingChannel = null },
+                onPinCreated = { vm.setParentalPin(it) }
+            )
+        }
+        return
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = dim.ScreenPadding, vertical = 12.dp)) {
@@ -88,13 +186,46 @@ fun LiveSection(
             com.iptv.app.ui.common.FormFactor.Tablet -> 3
             com.iptv.app.ui.common.FormFactor.Tv -> 4
         }
-        if (selectedCat == null) {
-            Text(stringResource(R.string.section_categories), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 12.dp))
-            LocalFilterField(
-                value = categoryFilter,
-                onValueChange = { categoryFilter = it },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+        // Em TV/Tablet, o grid de categorias é um estado transitório (some
+        // assim que a primeira categoria é auto-selecionada). Renderizá-lo
+        // causava um flash visível antes do LiveChannelsScreen aparecer.
+        // Substituímos pelo loading enquanto a auto-seleção não ocorre.
+        if (selectedCat == null && isTvLike) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Text(stringResource(R.string.loading))
+            }
+        } else if (selectedCat == null) {
+            // Header: title on the left, inline filter on the right (TV/Tablet).
+            // Phone keeps the stacked layout — narrow viewport can't share the row.
+            val isPhoneCats = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+            if (isPhoneCats) {
+                Text(
+                    stringResource(R.string.section_categories),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                LocalFilterField(
+                    value = categoryFilter,
+                    onValueChange = { categoryFilter = it },
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+            } else {
+                Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.section_categories),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Box(modifier = Modifier.weight(1f))
+                    LocalFilterField(
+                        value = categoryFilter,
+                        onValueChange = { categoryFilter = it },
+                        modifier = Modifier.width(360.dp)
+                    )
+                }
+            }
             val needleCat = categoryFilter.trim().lowercase()
             val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
             val visibleCats = if (needleCat.isBlank()) sortedCats
@@ -124,7 +255,7 @@ fun LiveSection(
                             title = ch.name,
                             number = ch.num,
                             logoUrl = ch.logoUrl
-                        ) { onOpenChannel(ch) }
+                        ) { playChannelDirect(ch) }
                     }
                 }
             }
@@ -216,47 +347,34 @@ fun LiveSection(
                                     containerExtension = null
                                 )
                             } else {
-                                onOpenChannel(ch)
+                                playChannelDirect(ch)
                             }
                         }
                     }
                 }
             } else {
-                // TV/Tablet: title + sort on the left, filter inline on the
-                // right. Channels render as a vertical list with an EPG side
-                // panel for the focused row.
-                Row(
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                ) {
-                    Text(
-                        categoryName,
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                    Box(modifier = Modifier.padding(start = 12.dp)) {
-                        SortMenuButton(
-                            current = settings.liveSort,
-                            options = SortOption.LIVE_OPTIONS
-                        ) { vm.setSort(SortScope.LIVE, it) }
-                    }
-                    Box(modifier = Modifier.weight(1f))
-                    LocalFilterField(
-                        value = localFilter,
-                        onValueChange = { localFilter = it },
-                        modifier = Modifier.width(360.dp)
-                    )
-                }
-                if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
-                channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
+                // TV/Tablet: layout inspirado no Smarters Player Lite —
+                // categorias permanentes à esquerda, grid de canais com
+                // logos grandes à direita, PIP do canal focado no canto.
                 val cat = cats.items.firstOrNull { it.id == selectedCat }
-                ChannelListWithEpg(
+                val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
+                LiveChannelsScreen(
                     vm = vm,
+                    categories = sortedCats,
+                    selectedCategoryId = selectedCat!!,
                     channels = filteredChannels,
-                    epgNow = epgNow,
                     isCategoryAdult = cat?.isAdult == true,
                     isParentalUnlocked = parental.isUnlocked(),
+                    loading = channels.loading,
+                    onCategorySelected = { catId ->
+                        val nextCat = cats.items.firstOrNull { it.id == catId }
+                        if (nextCat?.isAdult == true && !parental.isUnlocked()) {
+                            pendingCategory = nextCat
+                        } else {
+                            selectedCat = catId
+                            vm.loadChannels(catId)
+                        }
+                    },
                     onPlay = { ch ->
                         val locked = (cat?.isAdult == true) && !parental.isUnlocked()
                         if (locked) {
@@ -267,9 +385,10 @@ fun LiveSection(
                                 containerExtension = null
                             )
                         } else {
-                            onOpenChannel(ch)
+                            playChannelDirect(ch)
                         }
-                    }
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }

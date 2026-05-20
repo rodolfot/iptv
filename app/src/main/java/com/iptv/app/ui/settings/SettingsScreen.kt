@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
@@ -83,12 +85,16 @@ class SettingsViewModel @Inject constructor(
 
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
     fun resetProgress() { viewModelScope.launch { progressDao.clearAll(currentProfile.id()) } }
+    /**
+     * Persiste a escolha; a aplicação efetiva do locale + recreate da Activity
+     * é feita pelo caller (precisa do Activity em mãos).
+     */
     fun setAppLocale(tag: String?) {
-        viewModelScope.launch {
-            settings.setAppLocale(tag)
-            if (tag.isNullOrBlank()) com.iptv.app.ui.common.LocaleManager.resetToSystem()
-            else com.iptv.app.ui.common.LocaleManager.apply(tag)
-        }
+        viewModelScope.launch { settings.setAppLocale(tag) }
+    }
+
+    fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
+        viewModelScope.launch { settings.setDeviceProfile(profile) }
     }
 
     fun setRefreshInterval(interval: RefreshInterval) {
@@ -160,24 +166,41 @@ fun SettingsScreen(
     val pinSavedMsg = stringResource(R.string.snack_pin_saved)
     val credsSavedMsg = stringResource(R.string.snack_credentials_saved)
     val refreshingMsg = stringResource(R.string.snack_catalog_refreshing)
+    val refreshedMsg = stringResource(R.string.snack_catalog_refreshed)
     val refreshIntervalSavedMsg = stringResource(R.string.snack_refresh_interval_saved)
     val localeSavedMsg = stringResource(R.string.snack_locale_saved)
     val languageLabel = stringResource(R.string.settings_language_label)
-    var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
+    val activity = LocalContext.current as? android.app.Activity
+    var pin by remember { mutableStateOf("") }
+    var currentPin by remember { mutableStateOf("") }
+    var currentPinError by remember { mutableStateOf(false) }
     var aboutOpen by remember { mutableStateOf(false) }
+    var crashLogOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
     var editingServer by remember { mutableStateOf(false) }
     var editHost by remember { mutableStateOf(s.host) }
     var editUser by remember { mutableStateOf(s.username) }
     var editPass by remember { mutableStateOf(s.password) }
 
-    LaunchedEffect(s.parentalPin) { pin = s.parentalPin.orEmpty() }
+    LaunchedEffect(s.parentalPin) {
+        // Limpa os campos sempre que o PIN persistido muda (acabou de salvar).
+        pin = ""
+        currentPin = ""
+        currentPinError = false
+    }
     LaunchedEffect(s.host, s.username, s.password) {
         if (!editingServer) {
             editHost = s.host; editUser = s.username; editPass = s.password
         }
     }
 
+    if (crashLogOpen) {
+        CrashLogScreen(onClose = { crashLogOpen = false })
+        return
+    }
+    // Sem tela de loading global aqui — o Worker roda em background e o
+    // usuário pode continuar navegando. A faixa de progresso aparece na
+    // tela Início (CatalogLoadingScreen é usada só no primeiro boot).
     if (aboutOpen) {
         AboutScreen(onClose = { aboutOpen = false })
         return
@@ -200,29 +223,24 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineSmall)
-
-        // On TV/Tablet, split the settings into two side-by-side columns so
-        // most of the page fits within a single viewport — the D-pad can't
-        // jump back to the top of a long scroll, so density matters.
-        val rootArrangement = if (isPhone) Arrangement.spacedBy(20.dp) else Arrangement.spacedBy(32.dp)
+        val rootArrangement = if (isPhone) Arrangement.spacedBy(12.dp) else Arrangement.spacedBy(24.dp)
 
         val leftColumn: @Composable () -> Unit = {
-            Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleSmall)
         if (!editingServer) {
             Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
             androidx.compose.foundation.layout.Row(
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
             ) {
-                TouchableButton(onClick = { editingServer = true }) {
+                TouchableButton(compact = true, onClick = { editingServer = true }) {
                     Text(stringResource(R.string.settings_change_server))
                 }
-                TouchableButton(onClick = { profilesOpen = true }) {
+                TouchableButton(compact = true, onClick = { profilesOpen = true }) {
                     Text(stringResource(R.string.settings_profiles_button))
                 }
             }
@@ -239,14 +257,14 @@ fun SettingsScreen(
                 onValueChange = { editHost = it },
                 label = { Text(stringResource(R.string.login_host)) },
                 singleLine = true,
-                modifier = Modifier.width(560.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = editUser,
                 onValueChange = { editUser = it },
                 label = { Text(stringResource(R.string.login_user)) },
                 singleLine = true,
-                modifier = Modifier.width(360.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = editPass,
@@ -254,7 +272,7 @@ fun SettingsScreen(
                 label = { Text(stringResource(R.string.login_pass)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.width(360.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             testResult?.let { r ->
                 if (r.ok) {
@@ -273,10 +291,12 @@ fun SettingsScreen(
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
             ) {
                 TouchableButton(
+                    compact = true,
                     enabled = !testing && editHost.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank(),
                     onClick = { settingsVm.testCredentials(editHost, editUser, editPass) }
                 ) { Text(stringResource(R.string.settings_test_connection)) }
                 TouchableButton(
+                    compact = true,
                     enabled = testResult?.ok == true,
                     onClick = {
                         settingsVm.saveCredentials(editHost, editUser, editPass) {
@@ -287,7 +307,7 @@ fun SettingsScreen(
                         }
                     }
                 ) { Text(stringResource(R.string.settings_save_credentials)) }
-                TouchableButton(onClick = {
+                TouchableButton(compact = true, onClick = {
                     editingServer = false
                     editHost = s.host; editUser = s.username; editPass = s.password
                     settingsVm.clearTestResult()
@@ -295,24 +315,50 @@ fun SettingsScreen(
             }
         }
 
-        Text(stringResource(R.string.settings_parental_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.settings_parental_title), style = MaterialTheme.typography.titleSmall)
         Text(
             stringResource(if (s.isPinSet) R.string.settings_pin_set else R.string.settings_pin_unset),
             style = MaterialTheme.typography.bodySmall
         )
+        if (s.isPinSet) {
+            PinField(
+                value = currentPin,
+                onValueChange = {
+                    currentPin = it.filter(Char::isDigit).take(8)
+                    if (currentPinError) currentPinError = false
+                },
+                placeholder = stringResource(R.string.settings_pin_current_label),
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (currentPinError) {
+                Text(
+                    stringResource(R.string.settings_pin_current_wrong),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
         PinField(
             value = pin,
             onValueChange = { pin = it.filter(Char::isDigit).take(8) },
             placeholder = stringResource(
                 if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
             ),
-            modifier = Modifier.width(360.dp)
+            modifier = Modifier.fillMaxWidth()
         )
+        val canSavePin = pin.length >= 4 && (!s.isPinSet || currentPin.isNotEmpty())
         TouchableButton(
-            enabled = pin.length >= 4,
+            compact = true,
+            enabled = canSavePin,
             onClick = {
-                settingsVm.setPin(pin)
-                snackbar?.show(pinSavedMsg)
+                // Quando já existe PIN, exige que o "PIN atual" digitado bata
+                // com o persistido antes de aceitar a troca.
+                if (s.isPinSet && currentPin != (s.parentalPin ?: "")) {
+                    currentPinError = true
+                } else {
+                    settingsVm.setPin(pin)
+                    snackbar?.show(pinSavedMsg)
+                }
             }
         ) {
             Text(stringResource(
@@ -320,51 +366,16 @@ fun SettingsScreen(
             ))
         }
 
-        Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleMedium)
-        run {
-            val intervalOptions = RefreshInterval.values().map {
-                com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
-            }
-            val current = intervalOptions.firstOrNull { it.id == s.refreshInterval }
-            com.iptv.app.ui.common.ComboColumn(
-                label = stringResource(R.string.settings_refresh_interval)
-            ) {
-                com.iptv.app.ui.common.ComboBox(
-                    selected = current,
-                    options = intervalOptions,
-                    onSelect = {
-                        settingsVm.setRefreshInterval(it.id)
-                        snackbar?.show(refreshIntervalSavedMsg)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-        val lastUpdated by vm.lastUpdatedAt.collectAsState()
-        Text(
-            text = lastUpdated?.let {
-                stringResource(
-                    R.string.settings_refresh_last,
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
-                )
-            } ?: stringResource(R.string.settings_refresh_never),
-            style = MaterialTheme.typography.bodySmall
-        )
-        TouchableButton(onClick = {
-            vm.bootstrapCatalog(force = true)
-            snackbar?.show(refreshingMsg)
-        }) {
-            Text(stringResource(R.string.settings_refresh_now))
-        }
-        TouchableButton(onClick = { settingsVm.resetProgress() }) {
-            Text(stringResource(R.string.settings_reset_progress))
-        }
         } // end leftColumn
 
         val rightColumn: @Composable () -> Unit = {
             NotificationsPermissionSection()
 
-            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleSmall)
+            // Combo do idioma direto (sem ComboColumn que duplicava o label
+            // — gerava "Idioma" duas vezes na tela).
+            var pendingLocaleTag by remember { mutableStateOf<String?>(null) }
+            var localeDialogOpen by remember { mutableStateOf(false) }
             run {
                 val localeOptions = com.iptv.app.ui.common.LocaleManager.available.map {
                     com.iptv.app.ui.common.ComboOption(
@@ -374,27 +385,207 @@ fun SettingsScreen(
                 }
                 val currentKey = s.appLocale ?: "__system__"
                 val current = localeOptions.firstOrNull { it.id == currentKey }
-                com.iptv.app.ui.common.ComboColumn(label = languageLabel) {
+                com.iptv.app.ui.common.ComboBox(
+                    selected = current,
+                    options = localeOptions,
+                    onSelect = {
+                        val tag = if (it.id == "__system__") null else it.id
+                        settingsVm.setAppLocale(tag)
+                        snackbar?.show(localeSavedMsg)
+                        pendingLocaleTag = tag
+                        localeDialogOpen = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            if (localeDialogOpen) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { localeDialogOpen = false },
+                    title = { Text(stringResource(R.string.locale_restart_title)) },
+                    text = { Text(stringResource(R.string.locale_restart_message)) },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            localeDialogOpen = false
+                            val tag = pendingLocaleTag
+                            // 1) Persiste o locale via AppCompatDelegate (no
+                            //    Android 13+ o sistema recria a activity
+                            //    sozinho via LocaleManager).
+                            // 2) Em versões < 13, ou se o auto-recreate não
+                            //    rolar, relançamos MainActivity com
+                            //    CLEAR_TOP | NEW_TASK e finalizamos a atual.
+                            //    Antes usávamos activity.recreate() — em
+                            //    algumas TVs ele "trava" porque está dentro
+                            //    de um Dialog/Compose state inconsistente.
+                            if (tag == null) com.iptv.app.ui.common.LocaleManager.resetToSystem()
+                            else com.iptv.app.ui.common.LocaleManager.apply(tag)
+                            activity?.let { act ->
+                                val pm = act.packageManager
+                                val intent = pm.getLaunchIntentForPackage(act.packageName)
+                                    ?.apply {
+                                        addFlags(
+                                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                        )
+                                    }
+                                if (intent != null) {
+                                    act.startActivity(intent)
+                                    act.finish()
+                                    // overridePendingTransition(0, 0) evita
+                                    // flash branco entre as duas activities.
+                                    act.overridePendingTransition(0, 0)
+                                }
+                            }
+                        }) { Text(stringResource(R.string.locale_restart_confirm)) }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            localeDialogOpen = false
+                        }) { Text(stringResource(R.string.exit_no)) }
+                    }
+                )
+            }
+
+            run {
+                val autoLabel = stringResource(R.string.onboarding_device_auto)
+                val tvLabel = stringResource(R.string.onboarding_device_tv)
+                val tabletLabel = stringResource(R.string.onboarding_device_tablet)
+                val phoneLabel = stringResource(R.string.onboarding_device_phone)
+                val options = listOf(
+                    com.iptv.app.ui.common.ComboOption(id = "__auto__", label = autoLabel),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.TV.name,
+                        label = tvLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.TABLET.name,
+                        label = tabletLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.PHONE.name,
+                        label = phoneLabel
+                    )
+                )
+                val currentKey = s.deviceProfile?.name ?: "__auto__"
+                val current = options.firstOrNull { it.id == currentKey }
+                com.iptv.app.ui.common.ComboColumn(
+                    label = stringResource(R.string.onboarding_device_title)
+                ) {
                     com.iptv.app.ui.common.ComboBox(
                         selected = current,
-                        options = localeOptions,
+                        options = options,
                         onSelect = {
-                            val tag = if (it.id == "__system__") null else it.id
-                            settingsVm.setAppLocale(tag)
-                            snackbar?.show(localeSavedMsg)
+                            val profile = if (it.id == "__auto__") null
+                                else com.iptv.app.data.prefs.DeviceProfile.valueOf(it.id)
+                            settingsVm.setDeviceProfile(profile)
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
 
-        Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleMedium)
-        TouchableButton(onClick = { aboutOpen = true }) {
-            Text(stringResource(R.string.settings_open_about))
+            Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleSmall)
+            run {
+                val intervalOptions = RefreshInterval.values().map {
+                    com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
+                }
+                val current = intervalOptions.firstOrNull { it.id == s.refreshInterval }
+                com.iptv.app.ui.common.ComboColumn(
+                    label = stringResource(R.string.settings_refresh_interval)
+                ) {
+                    com.iptv.app.ui.common.ComboBox(
+                        selected = current,
+                        options = intervalOptions,
+                        onSelect = {
+                            settingsVm.setRefreshInterval(it.id)
+                            snackbar?.show(refreshIntervalSavedMsg)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            val lastUpdated by vm.lastUpdatedAt.collectAsState()
+            Text(
+                text = lastUpdated?.let {
+                    stringResource(
+                        R.string.settings_refresh_last,
+                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+                    )
+                } ?: stringResource(R.string.settings_refresh_never),
+                style = MaterialTheme.typography.bodySmall
+            )
+            val refreshCtx = androidx.compose.ui.platform.LocalContext.current
+            val workProgress by com.iptv.app.work.CatalogRefreshWorker
+                .observeProgress(refreshCtx)
+                .collectAsState(initial = null)
+            val wasRunning = remember { mutableStateOf(false) }
+            LaunchedEffect(workProgress) {
+                val running = workProgress != null
+                if (wasRunning.value && !running) {
+                    snackbar?.show(refreshedMsg)
+                    vm.refreshLastUpdatedAt()
+                }
+                wasRunning.value = running
+            }
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                TouchableButton(compact = true, onClick = {
+                    snackbar?.show(refreshingMsg)
+                    com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
+                }) {
+                    Text(stringResource(R.string.settings_refresh_now))
+                }
+                TouchableButton(compact = true, onClick = { settingsVm.resetProgress() }) {
+                    Text(stringResource(R.string.settings_reset_progress))
+                }
+            }
+            workProgress?.let { p ->
+                val phaseLabel = when (p.phase) {
+                    "categories" -> stringResource(R.string.refresh_phase_categories)
+                    "live" -> stringResource(R.string.refresh_phase_live)
+                    "movies" -> stringResource(R.string.refresh_phase_movies)
+                    "series" -> stringResource(R.string.refresh_phase_series)
+                    else -> p.phase
+                }
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "$phaseLabel ${p.current}/${p.total}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+        Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleSmall)
+        androidx.compose.foundation.layout.Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+        ) {
+            TouchableButton(compact = true, onClick = { aboutOpen = true }) {
+                Text(stringResource(R.string.settings_open_about))
+            }
+            // Log de crash local — só visível quando há registros. Sem
+            // dependência externa (Firebase/Sentry); o usuário pode copiar e
+            // mandar pro suporte se quiser.
+            val hasCrashLog = remember(activity) {
+                activity?.let { com.iptv.app.diag.CrashLog.read(it).isNotBlank() } ?: false
+            }
+            if (hasCrashLog) {
+                TouchableButton(compact = true, onClick = { crashLogOpen = true }) {
+                    Text(stringResource(R.string.crash_log_title))
+                }
+            }
         }
 
-            Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleMedium)
-            TouchableButton(onClick = {
+            Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleSmall)
+            TouchableButton(compact = true, onClick = {
                 vm.logout()
                 onLogout()
             }) { Text(stringResource(R.string.settings_logout)) }
@@ -410,11 +601,11 @@ fun SettingsScreen(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) { leftColumn() }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) { rightColumn() }
             }
         }
@@ -436,7 +627,7 @@ private fun NotificationsPermissionSection() {
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { isGranted -> granted = isGranted }
 
-    Text(stringResource(R.string.settings_notifications_title), style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.settings_notifications_title), style = MaterialTheme.typography.titleSmall)
     if (granted) {
         Text(
             stringResource(R.string.settings_notifications_perm_granted),
@@ -444,7 +635,7 @@ private fun NotificationsPermissionSection() {
             color = MaterialTheme.colorScheme.primary
         )
     } else {
-        TouchableButton(onClick = {
+        TouchableButton(compact = true, onClick = {
             launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }) { Text(stringResource(R.string.settings_notifications_perm)) }
     }

@@ -1,6 +1,7 @@
 package com.iptv.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +10,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -25,6 +31,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,6 +48,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalContext
+import android.app.Activity
 import com.iptv.app.ui.common.CatalogLoadingScreen
 import com.iptv.app.ui.common.FormFactor
 import com.iptv.app.ui.common.rememberTvDim
@@ -102,6 +115,12 @@ fun HomeScreen(
     var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
     var openMovie by remember { mutableStateOf<PlayerArgs?>(null) }
     var openChannel by remember { mutableStateOf<com.iptv.app.domain.model.LiveChannel?>(null) }
+    // Elevado para sobreviver à entrada/saída do MovieDetailScreen e do player.
+    // Antes ficava dentro de MoviesSection com rememberSaveable, mas o `when` de
+    // detail/aba desmontava o composable e o estado se perdia ao voltar do
+    // player — o usuário caía no grid de categorias.
+    var moviesSelectedCat by rememberSaveable { mutableStateOf<String?>(null) }
+    var seriesSelectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     val initialLoading by vm.initialLoading.collectAsState()
     val playbackHolder = LocalPlaybackHolder.current
     val miniPlayerFormFactor = com.iptv.app.ui.common.rememberTvDim().formFactor
@@ -111,6 +130,39 @@ fun HomeScreen(
     val showMiniPlayer = playbackHolder?.minimized?.value == true &&
         playbackHolder.player != null &&
         miniPlayerFormFactor == com.iptv.app.ui.common.FormFactor.Phone
+
+    // Exit confirmation: o back na raiz da Home (sem detalhe aberto e sem
+    // back-stack interno de seção) pede confirmação antes de fechar o app.
+    // Confirmando, libera o player — sem isso o áudio às vezes continua
+    // tocando porque o onDestroy do MainActivity nem sempre é disparado
+    // (Android pode segurar o processo ao recolher para o launcher).
+    val context = LocalContext.current
+    var showExitDialog by remember { mutableStateOf(false) }
+    val canHandleBack = openMovie == null &&
+        openChannel == null &&
+        openSeries == null &&
+        headerBackController.sectionBack.value == null
+    BackHandler(enabled = canHandleBack) { showExitDialog = true }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text(stringResource(com.iptv.app.R.string.exit_title)) },
+            text = { Text(stringResource(com.iptv.app.R.string.exit_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitDialog = false
+                    playbackHolder?.release()
+                    (context as? Activity)?.finish()
+                }) { Text(stringResource(com.iptv.app.R.string.exit_yes)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text(stringResource(com.iptv.app.R.string.exit_no))
+                }
+            }
+        )
+    }
 
     LaunchedEffect(Unit) { vm.bootstrapCatalog() }
 
@@ -175,13 +227,18 @@ fun HomeScreen(
             when {
                 openMovie != null -> MovieDetailScreen(
                     args = openMovie!!,
-                    onPlay = { args -> openMovie = null; onPlay(args) },
+                    // Não limpa o detalhe ao mandar pro player: assim, voltar
+                    // do player retorna pro detalhe (mesmo onde o usuário
+                    // clicou Assistir). Segundo Voltar fecha o detalhe e cai
+                    // na lista/origem. Antes limpávamos, e ao voltar caía
+                    // direto na origem — inconsistente com a UX de TV.
+                    onPlay = onPlay,
                     onBack = { openMovie = null }
                 )
                 openChannel != null -> ChannelDetailScreen(
                     channel = openChannel!!,
                     onBack = { openChannel = null },
-                    onPlay = { args -> openChannel = null; onPlay(args) }
+                    onPlay = onPlay
                 )
                 openSeries != null -> {
                     val (id, title, cover) = openSeries!!
@@ -190,12 +247,19 @@ fun HomeScreen(
                         title = title,
                         coverUrl = cover,
                         onBack = { openSeries = null },
+                        // Mesmo padrão do filme: ao voltar do player o usuário
+                        // cai no detalhe da série; segundo Voltar fecha o
+                        // detalhe e vai pra lista/origem.
                         onPlay = onPlay
                     )
                 }
                 else -> when (selectedKey) {
                     "home" -> ContinueWatchingScreen(
                         onPlay = onPlay,
+                        // Cards recomendados de filmes abrem a tela de
+                        // detalhe (sinopse + botão Assistir). Continue
+                        // Watching continua tocando direto.
+                        onOpenMovie = handlePlay,
                         onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
                     )
                     "search" -> SearchScreen(
@@ -206,11 +270,22 @@ fun HomeScreen(
                     "live" -> LiveSection(
                         vm = vm,
                         parental = parental,
-                        onPlay = onPlay,
-                        onOpenChannel = { ch -> openChannel = ch }
+                        onPlay = onPlay
                     )
-                    "movies" -> MoviesSection(vm = vm, parental = parental, onPlay = handlePlay)
-                    "series" -> SeriesSection(vm = vm, onPlay = onPlay)
+                    "movies" -> MoviesSection(
+                        vm = vm,
+                        parental = parental,
+                        onPlay = handlePlay,
+                        onPlayDirect = onPlay,
+                        selectedCat = moviesSelectedCat,
+                        onSelectedCatChange = { moviesSelectedCat = it }
+                    )
+                    "series" -> SeriesSection(
+                        vm = vm,
+                        onPlay = onPlay,
+                        selectedCat = seriesSelectedCat,
+                        onSelectedCatChange = { seriesSelectedCat = it }
+                    )
                     "favorites" -> FavoritesScreen(vm = vm, parental = parental, onPlay = handlePlay)
                     "watchlist" -> WatchlistScreen(
                         vm = vm,
@@ -311,9 +386,9 @@ private fun TopBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = dim.ScreenPadding, vertical = 16.dp),
+            .padding(horizontal = dim.ScreenPadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (onBack != null) {
             com.iptv.app.ui.common.TouchableButton(onClick = onBack) {
@@ -325,14 +400,89 @@ private fun TopBar(
         }
         Text(
             stringResource(com.iptv.app.R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium
+            style = MaterialTheme.typography.titleLarge
         )
-        TabRow(selectedTabIndex = selectedIndex, modifier = Modifier.padding(start = 16.dp)) {
-            tabs.forEach { spec ->
+        // Dois indicadores distintos:
+        //  - Selecionado (após OK): pílula azul preenchida (mostra qual menu
+        //    está realmente ativo, mesmo quando o foco está em outro lugar).
+        //  - Focado (navegando com D-pad, ainda não confirmou): contorno
+        //    azul vazado, fundo transparente.
+        // Antes só o foco era destacado e a seleção real ficava invisível.
+        var focusedIndex by remember(selectedIndex) { mutableStateOf(selectedIndex) }
+        // Quando o TabRow recebe foco vindo do conteúdo abaixo (D-pad pra
+        // cima), o sistema cai no último Tab focado anteriormente — não no
+        // selecionado. Forçamos o foco a voltar para o Tab ativo via
+        // FocusRequester, reentrando no menu correto.
+        val tabRequesters = remember(tabs.size) {
+            List(tabs.size) { androidx.compose.ui.focus.FocusRequester() }
+        }
+        var tabRowHadFocus by remember { mutableStateOf(false) }
+        val primary = androidx.tv.material3.MaterialTheme.colorScheme.primary
+        TabRow(
+            selectedTabIndex = selectedIndex,
+            modifier = Modifier
+                .padding(start = 16.dp)
+                .onFocusChanged { state ->
+                    if (state.hasFocus && !tabRowHadFocus) {
+                        // Reentrando: alinha o foco visual no selecionado.
+                        focusedIndex = selectedIndex
+                        runCatching { tabRequesters[selectedIndex].requestFocus() }
+                    }
+                    tabRowHadFocus = state.hasFocus
+                },
+            indicator = { tabPositions, doesTabRowHaveFocus ->
+                // Camada 1: pílula preenchida no item REALMENTE selecionado.
+                tabPositions.getOrNull(selectedIndex)?.let { pos ->
+                    androidx.tv.material3.TabRowDefaults.PillIndicator(
+                        currentTabPosition = pos,
+                        activeColor = primary,
+                        inactiveColor = primary.copy(alpha = 0.6f),
+                        doesTabRowHaveFocus = doesTabRowHaveFocus
+                    )
+                }
+                // Camada 2: contorno no item em FOCO quando difere do
+                // selecionado. Quando coincidem a pílula já dá o feedback.
+                if (doesTabRowHaveFocus && focusedIndex != selectedIndex) {
+                    tabPositions.getOrNull(focusedIndex)?.let { pos ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .wrapContentSize(Alignment.BottomStart)
+                                .offset(x = pos.left, y = pos.top)
+                                .width(pos.width)
+                                .height(pos.height)
+                                .border(
+                                    width = 2.dp,
+                                    color = primary,
+                                    shape = RoundedCornerShape(50)
+                                )
+                        )
+                    }
+                }
+            }
+        ) {
+            tabs.forEachIndexed { index, spec ->
+                val isSelected = spec.key == selectedKey
+                val isFocusedOnly = focusedIndex == index && !isSelected
                 Tab(
-                    selected = spec.key == selectedKey,
-                    onFocus = { onSelected(spec.key) },
-                    onClick = { onSelected(spec.key) }
+                    selected = isSelected,
+                    onFocus = { focusedIndex = index },
+                    onClick = { onSelected(spec.key) },
+                    modifier = Modifier.focusRequester(tabRequesters[index]),
+                    // Contraste de texto por estado:
+                    //  - selecionado (pílula azul preenchida) → branco;
+                    //  - apenas focado (contorno) → azul;
+                    //  - inativo → cinza.
+                    colors = androidx.tv.material3.TabDefaults.pillIndicatorTabColors(
+                        contentColor = if (isFocusedOnly) primary
+                            else androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        inactiveContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        selectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary,
+                        focusedContentColor = if (isSelected)
+                            androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                            else primary,
+                        focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
                     Text(
                         stringResource(spec.label),

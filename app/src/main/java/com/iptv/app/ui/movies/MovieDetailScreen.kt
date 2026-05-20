@@ -163,7 +163,10 @@ class MovieDetailViewModel @Inject constructor(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class
+)
 @Composable
 fun MovieDetailScreen(
     args: PlayerArgs,
@@ -197,24 +200,23 @@ fun MovieDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Back button moved up to the app top bar (next to the logo) so it
-        // has a stable home across all detail screens.
-
+        // Tamanhos compactos para que tudo (cabeçalho + metadados +
+        // botões + sinopse) caiba sem scroll na primeira dobra.
         val (posterW, posterH) = when (dim.formFactor) {
-            com.iptv.app.ui.common.FormFactor.Phone -> 140.dp to 210.dp
-            com.iptv.app.ui.common.FormFactor.Tablet -> 200.dp to 300.dp
-            com.iptv.app.ui.common.FormFactor.Tv -> 280.dp to 420.dp
+            com.iptv.app.ui.common.FormFactor.Phone -> 120.dp to 180.dp
+            com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp to 240.dp
+            com.iptv.app.ui.common.FormFactor.Tv -> 180.dp to 270.dp
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(if (dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone) 12.dp else 24.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(if (dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone) 12.dp else 20.dp)) {
             Box(
                 modifier = Modifier
                     .width(posterW)
                     .height(posterH)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
             ) {
@@ -226,67 +228,107 @@ fun MovieDetailScreen(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(args.title, style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    args.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
                 state.info?.let { info ->
                     info.releasedate?.takeIf { it.isNotBlank() }?.let {
-                        Text(stringResource(R.string.movie_release, it), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.movie_release, it), style = MaterialTheme.typography.bodySmall)
                     }
                     info.rating?.takeIf { it.isNotBlank() }?.let {
-                        Text(stringResource(R.string.movie_rating, it), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.movie_rating, it), style = MaterialTheme.typography.bodySmall)
                     }
                     info.duration?.takeIf { it.isNotBlank() }?.let {
-                        Text(stringResource(R.string.movie_duration, it), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.movie_duration, it), style = MaterialTheme.typography.bodySmall)
                     }
                     info.genre?.takeIf { it.isNotBlank() }?.let {
-                        Text(stringResource(R.string.movie_genre, it), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.movie_genre, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
                     }
                     info.director?.takeIf { it.isNotBlank() }?.let {
-                        Text(stringResource(R.string.movie_director, it), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.movie_director, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
                     }
                     info.cast?.takeIf { it.isNotBlank() }?.let {
-                        Text(stringResource(R.string.movie_cast, it), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.movie_cast, it),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
                     }
                 }
                 state.error?.let {
                     Text(stringResource(R.string.error_prefix, it), color = MaterialTheme.colorScheme.error)
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+                // FlowRow quebra para a próxima linha quando faltam pixels —
+                // antes em TV com Continuar (texto longo) + Reiniciar +
+                // Favorito + bandeirinha, o último era empurrado pra fora.
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
                     if (state.resumeMs > 0L) {
                         TouchableButton(
                             onClick = { onPlay(args.copy(startPositionMs = state.resumeMs)) },
-                            modifier = Modifier.focusRequester(playFocus)
+                            modifier = Modifier.focusRequester(playFocus),
+                            compact = true
                         ) {
                             Text(stringResource(R.string.movie_resume, formatTime(state.resumeMs)))
                         }
-                        TouchableButton(onClick = { onPlay(args.copy(startPositionMs = 0L)) }) {
+                        TouchableButton(
+                            onClick = { onPlay(args.copy(startPositionMs = 0L)) },
+                            compact = true
+                        ) {
                             Text(stringResource(R.string.movie_restart))
                         }
                     } else {
                         TouchableButton(
                             onClick = { onPlay(args) },
-                            modifier = Modifier.focusRequester(playFocus)
+                            modifier = Modifier.focusRequester(playFocus),
+                            compact = true
                         ) {
                             Text(stringResource(R.string.movie_play))
                         }
                     }
-                    TouchableButton(onClick = {
-                        val wasFavorite = state.isFavorite
-                        vm.toggleFavorite(args)
-                        snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
-                    }) {
+                    TouchableButton(
+                        compact = true,
+                        onClick = {
+                            val wasFavorite = state.isFavorite
+                            vm.toggleFavorite(args)
+                            snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
+                        }
+                    ) {
                         Text(stringResource(
                             if (state.isFavorite) R.string.remove_favorite else R.string.add_favorite
                         ))
                     }
-                    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
-                    TouchableButton(onClick = {
-                        val wasInList = state.isInWatchlist
-                        vm.toggleWatchlist(args)
-                        snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
-                    }) {
+                    // Bandeirinha sempre apenas ícone — usuário pediu para
+                    // manter só o ícone (estava sumindo do layout em algumas
+                    // configurações por falta de espaço).
+                    TouchableButton(
+                        compact = true,
+                        onClick = {
+                            val wasInList = state.isInWatchlist
+                            vm.toggleWatchlist(args)
+                            snackbar?.show(if (wasInList) watchlistRemovedMsg else watchlistAddedMsg)
+                        }
+                    ) {
                         androidx.compose.material3.Icon(
                             if (state.isInWatchlist) Icons.Filled.Bookmark
                             else Icons.Filled.BookmarkBorder,
@@ -294,11 +336,6 @@ fun MovieDetailScreen(
                                 if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
                             )
                         )
-                        if (!isPhone) {
-                            Text("  " + stringResource(
-                                if (state.isInWatchlist) R.string.watchlist_remove else R.string.watchlist_add
-                            ))
-                        }
                     }
                 }
             }
@@ -309,7 +346,7 @@ fun MovieDetailScreen(
             // o scroll junto — sem isso, em TV (sem touch) o usuário não tem
             // como ler o texto inteiro.
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .bringIntoViewRequester(synopsisBringIntoView)
@@ -322,9 +359,14 @@ fun MovieDetailScreen(
             ) {
                 Text(
                     stringResource(R.string.synopsis),
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleSmall
                 )
-                Text(plot, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    plot,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 5,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
         }
     }

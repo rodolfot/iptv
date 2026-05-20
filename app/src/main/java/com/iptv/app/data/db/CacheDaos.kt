@@ -8,6 +8,12 @@ import androidx.room.Transaction
 import com.iptv.app.domain.model.ContentType
 import kotlinx.coroutines.flow.Flow
 
+/** Projeção `SELECT categoryId, COUNT(*) FROM <cache> GROUP BY categoryId`. */
+data class CategoryCount(
+    val categoryId: String,
+    val count: Int,
+)
+
 @Dao
 interface CacheMetaDao {
     @Query("SELECT updatedAt FROM cache_meta WHERE scope = :scope LIMIT 1")
@@ -55,11 +61,18 @@ interface LiveCacheDao {
     @Query("DELETE FROM live_cache")
     suspend fun clear()
 
+    /** Contagem por categoria — usado no drawer pra mostrar "Categoria (N)". */
+    @Query("SELECT categoryId, COUNT(*) as count FROM live_cache WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    fun observeCountByCategory(): Flow<List<CategoryCount>>
+
     @Query("DELETE FROM live_fts")
     suspend fun clearFts()
 
     @Query("INSERT INTO live_fts(rowid, name) VALUES(:streamId, :name)")
     suspend fun insertFts(streamId: Int, name: String)
+
+    @Query("DELETE FROM live_fts WHERE rowid = :streamId")
+    suspend fun deleteFts(streamId: Int)
 
     @Query(
         """
@@ -79,6 +92,19 @@ interface LiveCacheDao {
         insertAll(deduped.toList())
         deduped.forEach { insertFts(it.streamId, it.name) }
     }
+
+    /** Upsert per-category — não limpa a tabela. Usado pelo Worker que
+     *  popula categoria por categoria em background.
+     *  Apaga rowid do FTS antes do insert (sem isso, SQLITE_CONSTRAINT 19). */
+    @Transaction
+    suspend fun upsertAll(items: List<LiveChannelCacheEntity>) {
+        val deduped = items.associateBy { it.streamId }.values
+        insertAll(deduped.toList())
+        deduped.forEach {
+            deleteFts(it.streamId)
+            insertFts(it.streamId, it.name)
+        }
+    }
 }
 
 @Dao
@@ -95,11 +121,19 @@ interface MovieCacheDao {
     @Query("DELETE FROM movie_cache")
     suspend fun clear()
 
+    @Query("SELECT categoryId, COUNT(*) as count FROM movie_cache WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    fun observeCountByCategory(): Flow<List<CategoryCount>>
+
     @Query("DELETE FROM movie_fts")
     suspend fun clearFts()
 
     @Query("INSERT INTO movie_fts(rowid, name, extra) VALUES(:streamId, :name, :extra)")
     suspend fun insertFts(streamId: Int, name: String, extra: String)
+
+    // FTS5 (e FTS4) não aceita "INSERT OR REPLACE" diretamente — precisamos
+    // apagar o rowid antes de re-inserir. Usado pelo upsert per-category.
+    @Query("DELETE FROM movie_fts WHERE rowid = :streamId")
+    suspend fun deleteFts(streamId: Int)
 
     @Query(
         """
@@ -125,6 +159,30 @@ interface MovieCacheDao {
             )
         }
     }
+
+    /**
+     * Upsert sem limpar o resto da tabela — usado em fetches direcionados
+     * por categoria, que não devem apagar o que já está em cache de outras
+     * categorias.
+     *
+     * IMPORTANTE: a tabela FTS é virtual e `INSERT` puro com rowid existente
+     * dispara SQLITE_CONSTRAINT (code 19) que rolla back a transaction toda
+     * — fazendo o filme nem chegar ao `movie_cache`. Apagamos o rowid antes
+     * do re-insert (não há `INSERT OR REPLACE` em FTS).
+     */
+    @Transaction
+    suspend fun upsertAll(items: List<MovieCacheEntity>) {
+        val deduped = items.associateBy { it.streamId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { m ->
+            deleteFts(m.streamId)
+            insertFts(
+                streamId = m.streamId,
+                name = m.name,
+                extra = listOfNotNull(m.releaseDate).joinToString(" ")
+            )
+        }
+    }
 }
 
 @Dao
@@ -137,6 +195,12 @@ interface DetailCacheDao {
 
     @Query("DELETE FROM detail_cache WHERE updatedAt < :before")
     suspend fun deleteExpired(before: Long)
+
+    /** Invalida todo o detalhe — chamado ao refresh do catálogo, para que
+     *  o usuário receba dados frescos (ex.: novas temporadas) na próxima
+     *  entrada em qualquer série/filme. */
+    @Query("DELETE FROM detail_cache")
+    suspend fun clearAll()
 }
 
 @Dao
@@ -153,11 +217,17 @@ interface SeriesCacheDao {
     @Query("DELETE FROM series_cache")
     suspend fun clear()
 
+    @Query("SELECT categoryId, COUNT(*) as count FROM series_cache WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    fun observeCountByCategory(): Flow<List<CategoryCount>>
+
     @Query("DELETE FROM series_fts")
     suspend fun clearFts()
 
     @Query("INSERT INTO series_fts(rowid, name, extra) VALUES(:seriesId, :name, :extra)")
     suspend fun insertFts(seriesId: Int, name: String, extra: String)
+
+    @Query("DELETE FROM series_fts WHERE rowid = :seriesId")
+    suspend fun deleteFts(seriesId: Int)
 
     @Query(
         """
@@ -176,6 +246,22 @@ interface SeriesCacheDao {
         val deduped = items.associateBy { it.seriesId }.values
         insertAll(deduped.toList())
         deduped.forEach { s ->
+            insertFts(
+                seriesId = s.seriesId,
+                name = s.name,
+                extra = listOfNotNull(s.genre, s.cast, s.plot, s.releaseDate).joinToString(" ")
+            )
+        }
+    }
+
+    /** Upsert per-category — não limpa a tabela. */
+    /** Apaga rowid do FTS antes do insert (sem isso, SQLITE_CONSTRAINT 19). */
+    @Transaction
+    suspend fun upsertAll(items: List<SeriesCacheEntity>) {
+        val deduped = items.associateBy { it.seriesId }.values
+        insertAll(deduped.toList())
+        deduped.forEach { s ->
+            deleteFts(s.seriesId)
             insertFts(
                 seriesId = s.seriesId,
                 name = s.name,
