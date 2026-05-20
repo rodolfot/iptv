@@ -146,8 +146,10 @@
     <string name="settings_parental_title">PIN parentale</string>
     <string name="settings_pin_set">PIN configurato.</string>
     <string name="settings_pin_unset">Nessun PIN. Creane uno per sbloccare i contenuti per adulti.</string>
-    <string name="settings_pin_label_set">Cambia PIN</string>
+    <string name="settings_pin_label_set">Nuovo PIN</string>
     <string name="settings_pin_label_unset">Imposta PIN</string>
+    <string name="settings_pin_current_label">PIN attuale</string>
+    <string name="settings_pin_current_wrong">PIN attuale errato.</string>
     <string name="settings_pin_save_set">Salva PIN</string>
     <string name="settings_pin_save_unset">Imposta PIN</string>
     <string name="settings_catalog">Catalogo</string>

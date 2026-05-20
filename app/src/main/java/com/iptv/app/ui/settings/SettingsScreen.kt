@@ -171,7 +171,9 @@ fun SettingsScreen(
     val localeSavedMsg = stringResource(R.string.snack_locale_saved)
     val languageLabel = stringResource(R.string.settings_language_label)
     val activity = LocalContext.current as? android.app.Activity
-    var pin by remember { mutableStateOf(s.parentalPin.orEmpty()) }
+    var pin by remember { mutableStateOf("") }
+    var currentPin by remember { mutableStateOf("") }
+    var currentPinError by remember { mutableStateOf(false) }
     var aboutOpen by remember { mutableStateOf(false) }
     var crashLogOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
@@ -180,7 +182,12 @@ fun SettingsScreen(
     var editUser by remember { mutableStateOf(s.username) }
     var editPass by remember { mutableStateOf(s.password) }
 
-    LaunchedEffect(s.parentalPin) { pin = s.parentalPin.orEmpty() }
+    LaunchedEffect(s.parentalPin) {
+        // Limpa os campos sempre que o PIN persistido muda (acabou de salvar).
+        pin = ""
+        currentPin = ""
+        currentPinError = false
+    }
     LaunchedEffect(s.host, s.username, s.password) {
         if (!editingServer) {
             editHost = s.host; editUser = s.username; editPass = s.password
@@ -220,8 +227,6 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleMedium)
-
         val rootArrangement = if (isPhone) Arrangement.spacedBy(12.dp) else Arrangement.spacedBy(24.dp)
 
         val leftColumn: @Composable () -> Unit = {
@@ -315,6 +320,24 @@ fun SettingsScreen(
             stringResource(if (s.isPinSet) R.string.settings_pin_set else R.string.settings_pin_unset),
             style = MaterialTheme.typography.bodySmall
         )
+        if (s.isPinSet) {
+            PinField(
+                value = currentPin,
+                onValueChange = {
+                    currentPin = it.filter(Char::isDigit).take(8)
+                    if (currentPinError) currentPinError = false
+                },
+                placeholder = stringResource(R.string.settings_pin_current_label),
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (currentPinError) {
+                Text(
+                    stringResource(R.string.settings_pin_current_wrong),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
         PinField(
             value = pin,
             onValueChange = { pin = it.filter(Char::isDigit).take(8) },
@@ -323,12 +346,19 @@ fun SettingsScreen(
             ),
             modifier = Modifier.fillMaxWidth()
         )
+        val canSavePin = pin.length >= 4 && (!s.isPinSet || currentPin.isNotEmpty())
         TouchableButton(
             compact = true,
-            enabled = pin.length >= 4,
+            enabled = canSavePin,
             onClick = {
-                settingsVm.setPin(pin)
-                snackbar?.show(pinSavedMsg)
+                // Quando já existe PIN, exige que o "PIN atual" digitado bata
+                // com o persistido antes de aceitar a troca.
+                if (s.isPinSet && currentPin != (s.parentalPin ?: "")) {
+                    currentPinError = true
+                } else {
+                    settingsVm.setPin(pin)
+                    snackbar?.show(pinSavedMsg)
+                }
             }
         ) {
             Text(stringResource(
@@ -336,88 +366,6 @@ fun SettingsScreen(
             ))
         }
 
-        Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleSmall)
-        run {
-            val intervalOptions = RefreshInterval.values().map {
-                com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
-            }
-            val current = intervalOptions.firstOrNull { it.id == s.refreshInterval }
-            com.iptv.app.ui.common.ComboColumn(
-                label = stringResource(R.string.settings_refresh_interval)
-            ) {
-                com.iptv.app.ui.common.ComboBox(
-                    selected = current,
-                    options = intervalOptions,
-                    onSelect = {
-                        settingsVm.setRefreshInterval(it.id)
-                        snackbar?.show(refreshIntervalSavedMsg)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-        val lastUpdated by vm.lastUpdatedAt.collectAsState()
-        Text(
-            text = lastUpdated?.let {
-                stringResource(
-                    R.string.settings_refresh_last,
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
-                )
-            } ?: stringResource(R.string.settings_refresh_never),
-            style = MaterialTheme.typography.bodySmall
-        )
-        val refreshCtx = androidx.compose.ui.platform.LocalContext.current
-        // Observa o progresso do Worker — quando rodando, mostra faixa
-        // "fase X/Y"; quando termina, snackbar "Catálogo atualizado." e
-        // atualiza o "última atualização".
-        val workProgress by com.iptv.app.work.CatalogRefreshWorker
-            .observeProgress(refreshCtx)
-            .collectAsState(initial = null)
-        // Detecta a transição de "rodando" -> "parado" pra disparar snackbar.
-        val wasRunning = remember { mutableStateOf(false) }
-        LaunchedEffect(workProgress) {
-            val running = workProgress != null
-            if (wasRunning.value && !running) {
-                snackbar?.show(refreshedMsg)
-                vm.refreshLastUpdatedAt()
-            }
-            wasRunning.value = running
-        }
-        TouchableButton(compact = true, onClick = {
-            snackbar?.show(refreshingMsg)
-            com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
-        }) {
-            Text(stringResource(R.string.settings_refresh_now))
-        }
-        // Faixa de progresso enquanto o Worker está rodando — feedback
-        // explícito de que algo está acontecendo (antes ficava silencioso).
-        workProgress?.let { p ->
-            val phaseLabel = when (p.phase) {
-                "categories" -> stringResource(R.string.refresh_phase_categories)
-                "live" -> stringResource(R.string.refresh_phase_live)
-                "movies" -> stringResource(R.string.refresh_phase_movies)
-                "series" -> stringResource(R.string.refresh_phase_series)
-                else -> p.phase
-            }
-            androidx.compose.foundation.layout.Row(
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-            ) {
-                androidx.compose.material3.CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    "$phaseLabel ${p.current}/${p.total}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-        TouchableButton(compact = true, onClick = { settingsVm.resetProgress() }) {
-            Text(stringResource(R.string.settings_reset_progress))
-        }
         } // end leftColumn
 
         val rightColumn: @Composable () -> Unit = {
@@ -531,6 +479,87 @@ fun SettingsScreen(
                             settingsVm.setDeviceProfile(profile)
                         },
                         modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleSmall)
+            run {
+                val intervalOptions = RefreshInterval.values().map {
+                    com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
+                }
+                val current = intervalOptions.firstOrNull { it.id == s.refreshInterval }
+                com.iptv.app.ui.common.ComboColumn(
+                    label = stringResource(R.string.settings_refresh_interval)
+                ) {
+                    com.iptv.app.ui.common.ComboBox(
+                        selected = current,
+                        options = intervalOptions,
+                        onSelect = {
+                            settingsVm.setRefreshInterval(it.id)
+                            snackbar?.show(refreshIntervalSavedMsg)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            val lastUpdated by vm.lastUpdatedAt.collectAsState()
+            Text(
+                text = lastUpdated?.let {
+                    stringResource(
+                        R.string.settings_refresh_last,
+                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+                    )
+                } ?: stringResource(R.string.settings_refresh_never),
+                style = MaterialTheme.typography.bodySmall
+            )
+            val refreshCtx = androidx.compose.ui.platform.LocalContext.current
+            val workProgress by com.iptv.app.work.CatalogRefreshWorker
+                .observeProgress(refreshCtx)
+                .collectAsState(initial = null)
+            val wasRunning = remember { mutableStateOf(false) }
+            LaunchedEffect(workProgress) {
+                val running = workProgress != null
+                if (wasRunning.value && !running) {
+                    snackbar?.show(refreshedMsg)
+                    vm.refreshLastUpdatedAt()
+                }
+                wasRunning.value = running
+            }
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                TouchableButton(compact = true, onClick = {
+                    snackbar?.show(refreshingMsg)
+                    com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
+                }) {
+                    Text(stringResource(R.string.settings_refresh_now))
+                }
+                TouchableButton(compact = true, onClick = { settingsVm.resetProgress() }) {
+                    Text(stringResource(R.string.settings_reset_progress))
+                }
+            }
+            workProgress?.let { p ->
+                val phaseLabel = when (p.phase) {
+                    "categories" -> stringResource(R.string.refresh_phase_categories)
+                    "live" -> stringResource(R.string.refresh_phase_live)
+                    "movies" -> stringResource(R.string.refresh_phase_movies)
+                    "series" -> stringResource(R.string.refresh_phase_series)
+                    else -> p.phase
+                }
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        "$phaseLabel ${p.current}/${p.total}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

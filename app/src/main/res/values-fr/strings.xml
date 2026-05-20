@@ -146,8 +146,10 @@
     <string name="settings_parental_title">PIN parental</string>
     <string name="settings_pin_set">PIN configuré.</string>
     <string name="settings_pin_unset">Aucun PIN défini. Créez-en un pour débloquer le contenu adulte.</string>
-    <string name="settings_pin_label_set">Modifier le PIN</string>
+    <string name="settings_pin_label_set">Nouveau PIN</string>
     <string name="settings_pin_label_unset">Définir le PIN</string>
+    <string name="settings_pin_current_label">PIN actuel</string>
+    <string name="settings_pin_current_wrong">PIN actuel incorrect.</string>
     <string name="settings_pin_save_set">Enregistrer le PIN</string>
     <string name="settings_pin_save_unset">Définir le PIN</string>
     <string name="settings_catalog">Catalogue</string>
