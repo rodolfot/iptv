@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-05-20
+
+### Fixed
+
+- **Tela de detalhe de filme/série quebrava** com `No JsonAdapter for class String annotated [@Loose()]` para `durationSecs`/`rating`/`releaseDate`: na 1.3.0 esses campos viraram `@Loose String?` para tolerar tipos heterogêneos dos provedores, mas o `LooseStringAdapter` estava registrado apenas no Moshi local de `normalizedEpisodes()`. O Moshi global injetado por `AppModule` (usado pelo `MoshiConverterFactory` do Retrofit) agora também tem o adapter, então `get_vod_info` e `get_series_info` parseiam corretamente.
+
 ## [1.3.0] — 2026-05-19
 
 ### Added

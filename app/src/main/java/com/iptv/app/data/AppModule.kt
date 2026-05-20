@@ -25,6 +25,12 @@ object AppModule {
 
     @Provides @Singleton
     fun provideMoshi(): Moshi = Moshi.Builder()
+        // LooseStringAdapter precisa vir antes do KotlinJsonAdapterFactory
+        // — sem ele, qualquer field anotado com @Loose (rating, duration_secs,
+        // releasedate em VodInfoDetail / EpisodeInfo) falha com
+        // "No JsonAdapter for class String annotated [@Loose()]" ao desserializar
+        // a resposta de get_vod_info/get_series_info via Retrofit.
+        .add(com.iptv.app.data.api.LooseStringAdapter())
         .add(KotlinJsonAdapterFactory())
         .build()
 
