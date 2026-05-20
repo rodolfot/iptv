@@ -78,6 +78,7 @@ fun MoviesCategoriesScreen(
     onMovieClick: (Movie) -> Unit,
     onMovieDirectPlay: (Movie) -> Unit,
     onRetry: () -> Unit,
+    countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     // Sem key: a busca persiste mesmo quando o usuário troca de categoria
@@ -100,6 +101,7 @@ fun MoviesCategoriesScreen(
             selectedId = selectedCategoryId,
             onSelect = onCategorySelected,
             selectedRequester = drawerSelectedRequester,
+            countByCategory = countByCategory,
             modifier = Modifier.width(280.dp).fillMaxHeight()
         )
 
@@ -209,6 +211,7 @@ private fun MoviesCategoriesDrawer(
     selectedId: String,
     onSelect: (String) -> Unit,
     selectedRequester: FocusRequester,
+    countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -233,6 +236,7 @@ private fun MoviesCategoriesDrawer(
                     name = cat.name,
                     isSelected = isSelected,
                     isAdult = cat.isAdult,
+                    count = countByCategory[cat.id],
                     onClick = { onSelect(cat.id) },
                     modifier = if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier
                 )

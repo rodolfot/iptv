@@ -46,6 +46,8 @@ fun DrawerCategoryItem(
     isAdult: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Quantidade de itens na categoria — quando >0 vira "Nome (N)". */
+    count: Int? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val primary = MaterialTheme.colorScheme.primary
@@ -83,8 +85,9 @@ fun DrawerCategoryItem(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val display = if (count != null && count > 0) "$name ($count)" else name
             Text(
-                name,
+                display,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurface,

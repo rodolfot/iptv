@@ -506,6 +506,19 @@ class HomeViewModel @Inject constructor(
     private val _lastUpdatedAt = MutableStateFlow<Long?>(null)
     val lastUpdatedAt = _lastUpdatedAt.asStateFlow()
 
+    /** Contagem de itens por categoryId — usada nos drawers de Live/Filmes/Séries
+     *  para mostrar "Nome (N)". Reage automaticamente ao DB (Worker em
+     *  background popula categoria por categoria). */
+    val liveCountByCategory: StateFlow<Map<String, Int>> = liveDao.observeCountByCategory()
+        .map { rows -> rows.associate { it.categoryId to it.count } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val movieCountByCategory: StateFlow<Map<String, Int>> = movieDao.observeCountByCategory()
+        .map { rows -> rows.associate { it.categoryId to it.count } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val seriesCountByCategory: StateFlow<Map<String, Int>> = seriesDao.observeCountByCategory()
+        .map { rows -> rows.associate { it.categoryId to it.count } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
     init {
         viewModelScope.launch { _lastUpdatedAt.value = cache.lastUpdatedAt() }
     }

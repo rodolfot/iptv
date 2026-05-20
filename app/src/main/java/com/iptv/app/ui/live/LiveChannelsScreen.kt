@@ -81,6 +81,7 @@ fun LiveChannelsScreen(
     loading: Boolean = false,
     onCategorySelected: (String) -> Unit,
     onPlay: (LiveChannel) -> Unit,
+    countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val favorites by vm.favorites.collectAsState()
@@ -115,6 +116,7 @@ fun LiveChannelsScreen(
                 selectedId = selectedCategoryId,
                 onSelect = onCategorySelected,
                 selectedRequester = drawerSelectedRequester,
+                countByCategory = countByCategory,
                 modifier = Modifier.width(280.dp).fillMaxHeight()
             )
 
@@ -212,6 +214,7 @@ private fun CategoriesDrawer(
     selectedId: String,
     onSelect: (String) -> Unit,
     selectedRequester: FocusRequester,
+    countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -239,6 +242,7 @@ private fun CategoriesDrawer(
                     name = cat.name,
                     isSelected = isSelected,
                     isAdult = cat.isAdult,
+                    count = countByCategory[cat.id],
                     onClick = { onSelect(cat.id) },
                     modifier = if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier
                 )

@@ -166,7 +166,7 @@ data class VodInfoDetail(
     val releasedate: String? = null,
     val rating: String? = null,
     val duration: String? = null,
-    @Json(name = "duration_secs") val durationSecs: Int? = null,
+    @Loose @Json(name = "duration_secs") val durationSecs: String? = null,
     @Json(name = "youtube_trailer") val youtubeTrailer: String? = null,
     @Json(name = "backdrop_path") val backdropPath: List<String>? = null
 )
@@ -345,8 +345,12 @@ data class EpisodeInfo(
     val plot: String? = null,
     val overview: String? = null,
     val duration: String? = null,
-    @Json(name = "duration_secs") val durationSecs: Int? = null,
-    val rating: Double? = null,
-    @Json(name = "releasedate") val releaseDate: String? = null,
-    val release_date: String? = null
+    // Provedores enviam estes campos como Int, Double, String ou string vazia
+    // — sem @Loose, qualquer valor inesperado quebrava o parse de TODA a
+    // temporada (ex.: The Boys T3/T4 que tinham `rating: ""` em alguns eps).
+    // Mantemos como String? e convertemos no `toModel` quando precisamos.
+    @Loose @Json(name = "duration_secs") val durationSecs: String? = null,
+    @Loose val rating: String? = null,
+    @Loose @Json(name = "releasedate") val releaseDate: String? = null,
+    @Loose @Json(name = "release_date") val release_date: String? = null
 )

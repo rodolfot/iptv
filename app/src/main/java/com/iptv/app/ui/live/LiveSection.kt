@@ -148,6 +148,7 @@ fun LiveSection(
                     playChannelDirect(ch)
                 }
             },
+            countByCategory = vm.liveCountByCategory.collectAsState().value,
             modifier = Modifier.fillMaxSize()
         )
         // Pendings (parental) ainda precisam aparecer mesmo no fluxo TV.

@@ -373,6 +373,7 @@ fun SeriesSection(
                 },
                 onSeriesClick = { s -> openSeries = Triple(s.id, s.name, s.coverUrl) },
                 onRetry = { vm.loadSeries(selectedCat, forceRefresh = true) },
+                countByCategory = vm.seriesCountByCategory.collectAsState().value,
                 modifier = Modifier.fillMaxSize()
             )
         }

@@ -216,16 +216,13 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleMedium)
 
-        // On TV/Tablet, split the settings into two side-by-side columns so
-        // most of the page fits within a single viewport — the D-pad can't
-        // jump back to the top of a long scroll, so density matters.
-        val rootArrangement = if (isPhone) Arrangement.spacedBy(20.dp) else Arrangement.spacedBy(32.dp)
+        val rootArrangement = if (isPhone) Arrangement.spacedBy(12.dp) else Arrangement.spacedBy(24.dp)
 
         val leftColumn: @Composable () -> Unit = {
             Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleSmall)
@@ -255,14 +252,14 @@ fun SettingsScreen(
                 onValueChange = { editHost = it },
                 label = { Text(stringResource(R.string.login_host)) },
                 singleLine = true,
-                modifier = Modifier.width(560.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = editUser,
                 onValueChange = { editUser = it },
                 label = { Text(stringResource(R.string.login_user)) },
                 singleLine = true,
-                modifier = Modifier.width(360.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             OutlinedTextField(
                 value = editPass,
@@ -270,7 +267,7 @@ fun SettingsScreen(
                 label = { Text(stringResource(R.string.login_pass)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.width(360.dp)
+                modifier = Modifier.fillMaxWidth()
             )
             testResult?.let { r ->
                 if (r.ok) {
@@ -322,7 +319,7 @@ fun SettingsScreen(
             placeholder = stringResource(
                 if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
             ),
-            modifier = Modifier.width(360.dp)
+            modifier = Modifier.fillMaxWidth()
         )
         TouchableButton(
             enabled = pin.length >= 4,
@@ -424,11 +421,8 @@ fun SettingsScreen(
             NotificationsPermissionSection()
 
             Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleSmall)
-            // Confirmação + restart: trocar idioma "no quente" causava crash
-            // (Activity recreate + applicationLocales colidindo no Android
-            // <13). Salvamos a preferência, perguntamos se o usuário quer
-            // reiniciar e fazemos o restart com `Process.killProcess` —
-            // limpo, sem ApplicationLifecycle quebrado no meio.
+            // Combo do idioma direto (sem ComboColumn que duplicava o label
+            // — gerava "Idioma" duas vezes na tela).
             var pendingLocaleTag by remember { mutableStateOf<String?>(null) }
             var localeDialogOpen by remember { mutableStateOf(false) }
             run {
@@ -440,20 +434,18 @@ fun SettingsScreen(
                 }
                 val currentKey = s.appLocale ?: "__system__"
                 val current = localeOptions.firstOrNull { it.id == currentKey }
-                com.iptv.app.ui.common.ComboColumn(label = languageLabel) {
-                    com.iptv.app.ui.common.ComboBox(
-                        selected = current,
-                        options = localeOptions,
-                        onSelect = {
-                            val tag = if (it.id == "__system__") null else it.id
-                            settingsVm.setAppLocale(tag)
-                            snackbar?.show(localeSavedMsg)
-                            pendingLocaleTag = tag
-                            localeDialogOpen = true
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                com.iptv.app.ui.common.ComboBox(
+                    selected = current,
+                    options = localeOptions,
+                    onSelect = {
+                        val tag = if (it.id == "__system__") null else it.id
+                        settingsVm.setAppLocale(tag)
+                        snackbar?.show(localeSavedMsg)
+                        pendingLocaleTag = tag
+                        localeDialogOpen = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
             if (localeDialogOpen) {
                 androidx.compose.material3.AlertDialog(
@@ -577,11 +569,11 @@ fun SettingsScreen(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) { leftColumn() }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) { rightColumn() }
             }
         }

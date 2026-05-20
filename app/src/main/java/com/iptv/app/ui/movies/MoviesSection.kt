@@ -163,6 +163,7 @@ fun MoviesSection(
                     }
                 },
                 onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) },
+                countByCategory = vm.movieCountByCategory.collectAsState().value,
                 modifier = Modifier.fillMaxSize()
             )
         }

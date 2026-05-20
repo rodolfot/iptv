@@ -157,7 +157,7 @@ fun EpisodeDto.toModel(seriesId: Int, fallbackSeason: Int): Episode {
         title = resolvedTitle,
         containerExtension = containerExtension,
         plot = resolvedPlot,
-        durationSecs = info?.durationSecs,
+        durationSecs = info?.durationSecs?.toDoubleOrNull()?.toInt(),
         poster = resolvedPoster
     )
 }

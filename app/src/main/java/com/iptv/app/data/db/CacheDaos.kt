@@ -8,6 +8,12 @@ import androidx.room.Transaction
 import com.iptv.app.domain.model.ContentType
 import kotlinx.coroutines.flow.Flow
 
+/** Projeção `SELECT categoryId, COUNT(*) FROM <cache> GROUP BY categoryId`. */
+data class CategoryCount(
+    val categoryId: String,
+    val count: Int,
+)
+
 @Dao
 interface CacheMetaDao {
     @Query("SELECT updatedAt FROM cache_meta WHERE scope = :scope LIMIT 1")
@@ -54,6 +60,10 @@ interface LiveCacheDao {
 
     @Query("DELETE FROM live_cache")
     suspend fun clear()
+
+    /** Contagem por categoria — usado no drawer pra mostrar "Categoria (N)". */
+    @Query("SELECT categoryId, COUNT(*) as count FROM live_cache WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    fun observeCountByCategory(): Flow<List<CategoryCount>>
 
     @Query("DELETE FROM live_fts")
     suspend fun clearFts()
@@ -110,6 +120,9 @@ interface MovieCacheDao {
 
     @Query("DELETE FROM movie_cache")
     suspend fun clear()
+
+    @Query("SELECT categoryId, COUNT(*) as count FROM movie_cache WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    fun observeCountByCategory(): Flow<List<CategoryCount>>
 
     @Query("DELETE FROM movie_fts")
     suspend fun clearFts()
@@ -203,6 +216,9 @@ interface SeriesCacheDao {
 
     @Query("DELETE FROM series_cache")
     suspend fun clear()
+
+    @Query("SELECT categoryId, COUNT(*) as count FROM series_cache WHERE categoryId IS NOT NULL GROUP BY categoryId")
+    fun observeCountByCategory(): Flow<List<CategoryCount>>
 
     @Query("DELETE FROM series_fts")
     suspend fun clearFts()
