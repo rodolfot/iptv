@@ -177,6 +177,18 @@
     <string name="settings_save_credentials">Enregistrer et reconnecter</string>
     <string name="settings_connection_ok">Connexion OK</string>
     <string name="settings_connection_failed">Échec : %1$s</string>
+    <string name="settings_display">Affichage</string>
+    <string name="settings_hourly_clock">Afficher l\'heure toutes les heures</string>
+    <string name="settings_hourly_clock_hint">Affiche l\'horloge pendant 5 secondes au début de chaque heure.</string>
+    <string name="settings_history">Historique</string>
+    <string name="settings_history_clear">Effacer l\'historique</string>
+    <string name="history_dialog_title">Effacer l\'historique</string>
+    <string name="history_dialog_subtitle">Sélectionnez ce qui doit être effacé pour ce profil.</string>
+    <string name="history_movies">Films regardés</string>
+    <string name="history_series">Séries regardées</string>
+    <string name="history_channels">Chaînes regardées</string>
+    <string name="history_confirm">Effacer</string>
+    <string name="history_cleared">Historique effacé.</string>
     <string name="settings_about">À propos</string>
     <string name="settings_open_about">À propos de TartaTV</string>
     <string name="settings_open_about_with_version">À propos de TartaTV — v%1$s</string>
@@ -266,6 +278,8 @@
 
     <!-- Accessibility -->
     <string name="a11y_locked">Contenu verrouillé</string>
+    <string name="a11y_watched">Vu</string>
+    <string name="a11y_in_progress">En cours</string>
     <string name="a11y_favorite">Ajouter aux favoris</string>
     <string name="a11y_unfavorite">Retirer des favoris</string>
     <string name="a11y_play">Lire</string>
@@ -277,6 +291,7 @@
     <string name="empty_continue_action">Parcourir les films</string>
     <string name="empty_favorites_title">Aucun favori</string>
     <string name="empty_favorites_message">Utilisez le bouton Favori dans les détails des films, séries et chaînes pour les conserver ici.</string>
+    <string name="favorites_preview_hint">Sélectionnez une chaîne ou un film pour afficher l\'aperçu.</string>
     <string name="empty_search_title">Que voulez-vous regarder ?</string>
     <string name="empty_search_message">Recherchez par nom, genre, distribution ou synopsis. Instantané et fonctionne hors ligne.</string>
     <string name="empty_search_no_results_title">Aucun résultat</string>
@@ -307,6 +322,7 @@
     <string name="refresh_phase_series">Séries</string>
     <string name="snack_undo">Annuler</string>
     <string name="player_next_in">Suivant dans %1$ds</string>
+    <string name="player_connecting">Connexion à la chaîne…</string>
     <string name="player_reconnecting">Reconnexion (tentative %1$d/3)…</string>
     <string name="player_cannot_play_title">Lecture impossible</string>
     <string name="player_contact_provider">Réessayez bientôt ou contactez le propriétaire de la liste.</string>

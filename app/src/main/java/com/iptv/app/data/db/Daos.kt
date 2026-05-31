@@ -66,6 +66,14 @@ interface MovieProgressDao {
     @Query("SELECT * FROM movie_progress WHERE profileId = :profileId AND watched = 0 ORDER BY updatedAt DESC LIMIT :limit")
     fun observeInProgress(profileId: String, limit: Int = 20): Flow<List<MovieProgressEntity>>
 
+    /**
+     * Todos os registros de progresso do perfil — assistidos e em progresso —
+     * para alimentar os badges nos cards (✓ assistido / ⏳ meio assistido).
+     * Coleção tipicamente pequena (centenas de itens no max).
+     */
+    @Query("SELECT * FROM movie_progress WHERE profileId = :profileId")
+    fun observeAll(profileId: String): Flow<List<MovieProgressEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: MovieProgressEntity)
 

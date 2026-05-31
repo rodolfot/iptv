@@ -77,6 +77,7 @@ class HomeViewModel @Inject constructor(
     private val seriesDao: SeriesCacheDao,
     private val favoriteDao: FavoriteDao,
     private val watchlistDao: WatchlistDao,
+    private val movieProgressDao: com.iptv.app.data.db.MovieProgressDao,
     private val settings: SettingsStore,
     private val currentProfile: CurrentProfile,
     private val xtream: com.iptv.app.data.api.XtreamRepository
@@ -85,6 +86,11 @@ class HomeViewModel @Inject constructor(
     /** URL HLS para preview do canal ao vivo no painel lateral. */
     suspend fun previewUrl(channelId: Int): String? = runCatching {
         xtream.liveStreamUrl(channelId, hls = false)
+    }.getOrNull()
+
+    /** URL do filme para preview no painel de Favoritos. */
+    suspend fun moviePreviewUrl(movieId: Int, container: String?): String? = runCatching {
+        xtream.movieStreamUrl(movieId, container)
     }.getOrNull()
 
     private val _epgNow = MutableStateFlow<Map<String, EpgProgrammeEntity>>(emptyMap())
@@ -124,6 +130,26 @@ class HomeViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { watchlistDao.observeAll(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * Mapa movieId → (watched, percent) usado pelos cards de filme nas
+     * listagens (categorias, busca). O percent é truncado pra 1..99 só pra
+     * acionar o badge de "in progress"; 100 sem watched=true não acontece.
+     */
+    data class MovieWatchState(val watched: Boolean, val percent: Int)
+    val movieProgress: StateFlow<Map<Int, MovieWatchState>> = settings.flow
+        .map { currentProfile.id() }
+        .distinctUntilChanged()
+        .flatMapLatest { movieProgressDao.observeAll(it) }
+        .map { rows ->
+            rows.associate { e ->
+                val pct = if (e.durationMs > 0)
+                    ((e.positionMs * 100L) / e.durationMs).toInt().coerceIn(0, 100)
+                else 0
+                e.movieId to MovieWatchState(watched = e.watched, percent = pct)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     /** Reactive flag for Kids mode. Re-derived whenever the active profile changes. */
     val kidsMode: StateFlow<Boolean> = settings.flow

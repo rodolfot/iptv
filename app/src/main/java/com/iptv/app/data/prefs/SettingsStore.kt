@@ -40,7 +40,13 @@ data class AppSettings(
      * Manual override do form factor escolhido pelo usuário no onboarding.
      * Null = auto-detect (uiMode + smallestScreenWidthDp).
      */
-    val deviceProfile: DeviceProfile? = null
+    val deviceProfile: DeviceProfile? = null,
+    /**
+     * Quando true, a Home mostra o horário atual num pequeno chip no canto
+     * superior direito por 5 segundos no início de cada hora cheia.
+     * Default false: o usuário pediu opt-in pra não poluir a UI.
+     */
+    val showHourlyClock: Boolean = false
 )
 
 enum class DeviceProfile { TV, TABLET, PHONE }
@@ -85,6 +91,7 @@ class SettingsStore @Inject constructor(
         val SKIPPED_UPDATE = stringPreferencesKey("skipped_update_version")
         val APP_LOCALE = stringPreferencesKey("app_locale")
         val DEVICE_PROFILE = stringPreferencesKey("device_profile")
+        val SHOW_HOURLY_CLOCK = booleanPreferencesKey("show_hourly_clock")
     }
 
     // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
@@ -116,8 +123,13 @@ class SettingsStore @Inject constructor(
             appLocale = p[Keys.APP_LOCALE],
             deviceProfile = p[Keys.DEVICE_PROFILE]?.let {
                 runCatching { DeviceProfile.valueOf(it) }.getOrNull()
-            }
+            },
+            showHourlyClock = p[Keys.SHOW_HOURLY_CLOCK] == true
         )
+    }
+
+    suspend fun setShowHourlyClock(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SHOW_HOURLY_CLOCK] = enabled }
     }
 
     suspend fun setDeviceProfile(profile: DeviceProfile?) {

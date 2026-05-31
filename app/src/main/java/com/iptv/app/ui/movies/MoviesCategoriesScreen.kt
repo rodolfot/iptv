@@ -75,6 +75,8 @@ fun MoviesCategoriesScreen(
     onMovieDirectPlay: (Movie) -> Unit,
     onRetry: () -> Unit,
     countByCategory: Map<String, Int> = emptyMap(),
+    /** Mapa movieId → (watched, percent) usado pelos badges nos cards. */
+    movieProgress: Map<Int, com.iptv.app.ui.home.HomeViewModel.MovieWatchState> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     // Sem key: a busca persiste mesmo quando o usuário troca de categoria
@@ -180,6 +182,7 @@ fun MoviesCategoriesScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filtered, key = { it.id }) { m ->
+                    val mp = movieProgress[m.id]
                     PosterCard(
                         title = m.name,
                         imageUrl = m.posterUrl,
@@ -187,6 +190,8 @@ fun MoviesCategoriesScreen(
                         fallbackIcon = Icons.Filled.Movie,
                         fillWidth = true,
                         rating = m.rating,
+                        watched = mp?.watched == true,
+                        progressPercent = mp?.percent?.takeIf { mp.watched.not() && it in 1..99 },
                         onLongClick = {
                             // Long-press OK toca direto, sem detalhe/sinopse.
                             val locked2 = isCategoryAdult && !isParentalUnlocked

@@ -177,6 +177,18 @@
     <string name="settings_save_credentials">Save and reconnect</string>
     <string name="settings_connection_ok">Connection OK</string>
     <string name="settings_connection_failed">Failed: %1$s</string>
+    <string name="settings_display">Display</string>
+    <string name="settings_hourly_clock">Show time every hour</string>
+    <string name="settings_hourly_clock_hint">Shows the clock for 5 seconds at the start of every hour.</string>
+    <string name="settings_history">History</string>
+    <string name="settings_history_clear">Clear history</string>
+    <string name="history_dialog_title">Clear history</string>
+    <string name="history_dialog_subtitle">Select what to clear for this profile.</string>
+    <string name="history_movies">Watched movies</string>
+    <string name="history_series">Watched series</string>
+    <string name="history_channels">Watched channels</string>
+    <string name="history_confirm">Clear</string>
+    <string name="history_cleared">History cleared.</string>
     <string name="settings_about">About</string>
     <string name="settings_open_about">About TartaTV</string>
     <string name="settings_open_about_with_version">About TartaTV — v%1$s</string>
@@ -266,6 +278,8 @@
 
     <!-- Accessibility -->
     <string name="a11y_locked">Locked content</string>
+    <string name="a11y_watched">Watched</string>
+    <string name="a11y_in_progress">In progress</string>
     <string name="a11y_favorite">Add to favorites</string>
     <string name="a11y_unfavorite">Remove from favorites</string>
     <string name="a11y_play">Play</string>
@@ -277,6 +291,7 @@
     <string name="empty_continue_action">Browse movies</string>
     <string name="empty_favorites_title">No favorites yet</string>
     <string name="empty_favorites_message">Use the Favorite button on movie, series, and channel detail screens to keep them here.</string>
+    <string name="favorites_preview_hint">Select a channel or movie to see the preview.</string>
     <string name="empty_search_title">What do you want to watch?</string>
     <string name="empty_search_message">Search by name, genre, cast, or plot. It\'s instant and works offline.</string>
     <string name="empty_search_no_results_title">Nothing found</string>
@@ -307,6 +322,7 @@
     <string name="refresh_phase_series">Series</string>
     <string name="snack_undo">Undo</string>
     <string name="player_next_in">Next in %1$ds</string>
+    <string name="player_connecting">Connecting to channel…</string>
     <string name="player_reconnecting">Reconnecting (attempt %1$d/3)…</string>
     <string name="player_cannot_play_title">Cannot play this stream</string>
     <string name="player_contact_provider">Try again shortly or contact the playlist owner.</string>

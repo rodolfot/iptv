@@ -81,6 +81,8 @@ fun MoviesSection(
     var advancedFilters by remember(selectedCat) { mutableStateOf(AdvancedFilters()) }
     var filtersDialogOpen by remember { mutableStateOf(false) }
 
+    val movieProgress by vm.movieProgress.collectAsState()
+
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadMovieCategories()
     }
@@ -164,6 +166,7 @@ fun MoviesSection(
                 },
                 onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) },
                 countByCategory = vm.movieCountByCategory.collectAsState().value,
+                movieProgress = movieProgress,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -270,11 +273,14 @@ fun MoviesSection(
                     modifier = Modifier.padding(bottom = 12.dp)
                 ) {
                     lazyItems(foundMovies) { m ->
+                        val mp = movieProgress[m.id]
                         PosterCard(
                             title = m.name,
                             imageUrl = m.posterUrl,
                             fallbackIcon = Icons.Filled.Movie,
-                            rating = m.rating
+                            rating = m.rating,
+                            watched = mp?.watched == true,
+                            progressPercent = mp?.percent?.takeIf { mp.watched.not() && it in 1..99 }
                         ) {
                             onPlay(
                                 PlayerArgs(
@@ -402,13 +408,16 @@ fun MoviesSection(
                 items(filteredMovies) { m ->
                     val cat = cats.items.firstOrNull { it.id == selectedCat }
                     val locked = (cat?.isAdult == true) && !parental.isUnlocked()
+                    val mp = movieProgress[m.id]
                     PosterCard(
                         title = m.name,
                         imageUrl = m.posterUrl,
                         locked = locked,
                         fallbackIcon = Icons.Filled.Movie,
                         fillWidth = true,
-                        rating = m.rating
+                        rating = m.rating,
+                        watched = mp?.watched == true,
+                        progressPercent = mp?.percent?.takeIf { mp.watched.not() && it in 1..99 }
                     ) {
                         val args = PlayerArgs(
                             kind = PlayerKind.MOVIE,

@@ -24,8 +24,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1043,6 +1045,38 @@ private fun EpisodeRow(
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
+                }
+                // Badge no canto: ✓ (assistido) ou ⏳ (meio assistido).
+                // Mesmo padrão visual do PosterCard de filmes — manter a
+                // semântica consistente entre as telas.
+                val showWatched = watched
+                val showInProgress = !watched && percent in 1..99
+                if (showWatched || showInProgress) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(14.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(androidx.compose.ui.graphics.Color(0xCC000000)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (showWatched) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+                                modifier = Modifier.size(11.dp)
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.HourglassBottom,
+                                contentDescription = null,
+                                tint = androidx.compose.ui.graphics.Color(0xFFFFC107),
+                                modifier = Modifier.size(11.dp)
+                            )
+                        }
+                    }
                 }
             }
             Column(

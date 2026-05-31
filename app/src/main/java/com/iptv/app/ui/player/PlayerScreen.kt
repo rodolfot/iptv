@@ -803,6 +803,15 @@ fun PlayerScreen(
                         color = Color.White,
                         modifier = Modifier.padding(top = 24.dp)
                     )
+                    // Mensagem explícita: alguns canais demoram vários segundos
+                    // pra conectar e o usuário ficava encarando tela preta
+                    // achando que o app travou.
+                    Text(
+                        androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_connecting),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
                 }
             }
         }

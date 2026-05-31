@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +48,7 @@ import com.iptv.app.R
 import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.domain.model.ContentType
 import com.iptv.app.ui.common.EmptyState
+import com.iptv.app.ui.common.PreviewPlayer
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.parental.ParentalPinDialog
@@ -74,6 +75,11 @@ fun FavoritesScreen(
     val movies = sortFor(all.filter { it.type == ContentType.MOVIE })
     val series = sortFor(all.filter { it.type == ContentType.SERIES })
 
+    // Item atualmente sob foco — pode ser canal, filme ou série. Série não
+    // mostra preview (usuário pediu pra economizar banda + não faz sentido
+    // visualizar episódio aleatório).
+    var focusedFavorite by remember { mutableStateOf<FavoriteEntity?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -91,43 +97,57 @@ fun FavoritesScreen(
             return
         }
 
-        // 3 colunas: Canais | Filmes | Séries. Cada coluna é uma lista
-        // vertical onde os itens são linhas compactas com thumbnail de 36dp +
-        // nome ao lado. Substitui os cards 2:3 que ocupavam muito espaço.
+        // Layout split: 3 listas (canais|filmes|séries) à esquerda, painel
+        // de preview à direita. As listas ficam compactas para sobrar espaço
+        // para o player de prévia ocupar ~40% da largura útil.
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (channels.isNotEmpty()) FavoritesColumn(
-                label = stringResource(R.string.filter_channels),
-                items = channels,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onPick = { entry ->
-                    onPlay(PlayerArgs(PlayerKind.LIVE, entry.itemId, entry.name, null))
-                }
-            )
-            if (movies.isNotEmpty()) FavoritesColumn(
-                label = stringResource(R.string.filter_movies),
-                items = movies,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onPick = { entry ->
-                    onPlay(
-                        PlayerArgs(
-                            kind = PlayerKind.MOVIE,
-                            streamId = entry.itemId,
-                            title = entry.name,
-                            containerExtension = entry.containerExtension,
-                            posterUrl = entry.logoUrl,
-                            categoryId = entry.categoryId
+            Row(
+                modifier = Modifier.weight(3f).fillMaxHeight(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (channels.isNotEmpty()) FavoritesColumn(
+                    label = stringResource(R.string.filter_channels),
+                    items = channels,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onFocusItem = { focusedFavorite = it },
+                    onPick = { entry ->
+                        onPlay(PlayerArgs(PlayerKind.LIVE, entry.itemId, entry.name, null))
+                    }
+                )
+                if (movies.isNotEmpty()) FavoritesColumn(
+                    label = stringResource(R.string.filter_movies),
+                    items = movies,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onFocusItem = { focusedFavorite = it },
+                    onPick = { entry ->
+                        onPlay(
+                            PlayerArgs(
+                                kind = PlayerKind.MOVIE,
+                                streamId = entry.itemId,
+                                title = entry.name,
+                                containerExtension = entry.containerExtension,
+                                posterUrl = entry.logoUrl,
+                                categoryId = entry.categoryId
+                            )
                         )
-                    )
-                }
-            )
-            if (series.isNotEmpty()) FavoritesColumn(
-                label = stringResource(R.string.filter_series),
-                items = series,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onPick = { /* abertura de série não tem rota aqui — TODO */ }
+                    }
+                )
+                if (series.isNotEmpty()) FavoritesColumn(
+                    label = stringResource(R.string.filter_series),
+                    items = series,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onFocusItem = { focusedFavorite = it },
+                    onPick = { /* abertura de série não tem rota aqui — TODO */ }
+                )
+            }
+
+            FavoritesPreviewPanel(
+                focused = focusedFavorite,
+                vm = vm,
+                modifier = Modifier.weight(2f).fillMaxHeight()
             )
         }
     }
@@ -151,6 +171,7 @@ private fun FavoritesColumn(
     label: String,
     items: List<FavoriteEntity>,
     modifier: Modifier = Modifier,
+    onFocusItem: (FavoriteEntity) -> Unit,
     onPick: (FavoriteEntity) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = modifier) {
@@ -172,6 +193,7 @@ private fun FavoritesColumn(
                     name = f.name,
                     imageUrl = f.logoUrl,
                     fallbackIcon = icon,
+                    onFocus = { onFocusItem(f) },
                     onClick = { onPick(f) }
                 )
             }
@@ -189,6 +211,7 @@ private fun FavoriteListItem(
     name: String,
     imageUrl: String?,
     fallbackIcon: ImageVector,
+    onFocus: () -> Unit,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -209,7 +232,10 @@ private fun FavoriteListItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(bgColor)
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
             .combinedClickable(onClick = onClick, onLongClick = onClick)
     ) {
         Box(
@@ -254,6 +280,99 @@ private fun FavoriteListItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+        }
+    }
+}
+
+/**
+ * Painel direito de Favoritos. Para LIVE e MOVIE renderiza o PreviewPlayer
+ * (debounce + retry + áudio); para SERIES mostra só o pôster grande, já que
+ * tocar um episódio aleatório não faz sentido pro usuário.
+ */
+@Composable
+private fun FavoritesPreviewPanel(
+    focused: FavoriteEntity?,
+    vm: HomeViewModel,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        if (focused == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    stringResource(R.string.favorites_preview_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            return@Box
+        }
+        when (focused.type) {
+            ContentType.SERIES -> {
+                // Sem player — pôster grande + título.
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    ) {
+                        if (!focused.logoUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = focused.logoUrl,
+                                contentDescription = focused.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.Tv,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .align(Alignment.Center)
+                            )
+                        }
+                    }
+                    Text(
+                        focused.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            ContentType.LIVE -> {
+                val url by produceState<String?>(initialValue = null, focused.itemId) {
+                    value = vm.previewUrl(focused.itemId)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PreviewPlayer(streamUrl = url)
+                    Text(
+                        focused.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            ContentType.MOVIE -> {
+                val url by produceState<String?>(initialValue = null, focused.itemId) {
+                    value = vm.moviePreviewUrl(focused.itemId, focused.containerExtension)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PreviewPlayer(streamUrl = url)
+                    Text(
+                        focused.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }

@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -110,6 +112,9 @@ fun PosterCard(
     /** Progresso de reprodução em 0..100 — quando setado, desenha uma barra
      *  azul na base do card sobreposta à barra de título. */
     progressPercent: Int? = null,
+    /** Quando true, mostra um badge "assistido" (check verde) no canto
+     *  superior direito. Tem precedência sobre o ícone de meio assistido. */
+    watched: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
@@ -157,6 +162,39 @@ fun PosterCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Filled.Lock, contentDescription = "Bloqueado", tint = Color.White)
+                }
+            }
+            // Badge de status assistido — só aparece quando NÃO está bloqueado
+            // (Lock também usa TopEnd). watched > inProgress: o usuário marcou
+            // como visto, então não interessa o percentual.
+            val showWatched = watched && !locked
+            val showInProgress = !watched && !locked &&
+                progressPercent != null && progressPercent in 1..99
+            if (showWatched || showInProgress) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xCC000000)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (showWatched) {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.a11y_watched),
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.HourglassBottom,
+                            contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.a11y_in_progress),
+                            tint = Color(0xFFFFC107),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
             // Rating chip — only when the provider returned something useful.

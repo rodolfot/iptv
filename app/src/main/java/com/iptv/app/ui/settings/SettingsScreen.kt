@@ -51,6 +51,9 @@ import androidx.compose.material3.Text
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
+import com.iptv.app.data.db.LiveHistoryDao
+import com.iptv.app.data.db.MovieProgressDao
+import com.iptv.app.data.db.SeriesProgressDao
 import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
@@ -74,6 +77,9 @@ data class CredentialsTest(val ok: Boolean, val message: String)
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val progressDao: EpisodeProgressDao,
+    private val movieProgressDao: MovieProgressDao,
+    private val seriesProgressDao: SeriesProgressDao,
+    private val liveHistoryDao: LiveHistoryDao,
     private val repo: XtreamRepository,
     private val currentProfile: CurrentProfile,
     @ApplicationContext private val appContext: Context
@@ -85,6 +91,25 @@ class SettingsViewModel @Inject constructor(
 
     fun setPin(pin: String) { viewModelScope.launch { settings.setPin(pin) } }
     fun resetProgress() { viewModelScope.launch { progressDao.clearAll(currentProfile.id()) } }
+
+    /**
+     * Apaga o histórico do perfil ativo. Cada flag controla um eixo:
+     *  - movies → progresso de filmes ("Continuar filmes" + watched)
+     *  - series → progresso de séries + episódios
+     *  - channels → últimos canais assistidos (live_history)
+     */
+    fun clearHistory(movies: Boolean, series: Boolean, channels: Boolean) {
+        if (!(movies || series || channels)) return
+        viewModelScope.launch {
+            val pid = currentProfile.id()
+            if (movies) movieProgressDao.clearAll(pid)
+            if (series) {
+                seriesProgressDao.clearAll(pid)
+                progressDao.clearAll(pid)
+            }
+            if (channels) liveHistoryDao.clearAll(pid)
+        }
+    }
     /**
      * Persiste a escolha; a aplicação efetiva do locale + recreate da Activity
      * é feita pelo caller (precisa do Activity em mãos).
@@ -95,6 +120,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
         viewModelScope.launch { settings.setDeviceProfile(profile) }
+    }
+
+    fun setShowHourlyClock(enabled: Boolean) {
+        viewModelScope.launch { settings.setShowHourlyClock(enabled) }
     }
 
     fun setRefreshInterval(interval: RefreshInterval) {
@@ -177,6 +206,8 @@ fun SettingsScreen(
     var aboutOpen by remember { mutableStateOf(false) }
     var crashLogOpen by remember { mutableStateOf(false) }
     var profilesOpen by remember { mutableStateOf(false) }
+    var historyDialogOpen by remember { mutableStateOf(false) }
+    val historyClearedMsg = stringResource(R.string.history_cleared)
     var editingServer by remember { mutableStateOf(false) }
     var editHost by remember { mutableStateOf(s.host) }
     var editUser by remember { mutableStateOf(s.username) }
@@ -564,6 +595,36 @@ fun SettingsScreen(
                 }
             }
 
+        Text(stringResource(R.string.settings_display), style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { settingsVm.setShowHourlyClock(!s.showHourlyClock) }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            androidx.compose.material3.Switch(
+                checked = s.showHourlyClock,
+                onCheckedChange = { settingsVm.setShowHourlyClock(it) }
+            )
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(
+                    stringResource(R.string.settings_hourly_clock),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    stringResource(R.string.settings_hourly_clock_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Text(stringResource(R.string.settings_history), style = MaterialTheme.typography.titleSmall)
+        TouchableButton(compact = true, onClick = { historyDialogOpen = true }) {
+            Text(stringResource(R.string.settings_history_clear))
+        }
+
         Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleSmall)
         androidx.compose.foundation.layout.Row(
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
@@ -615,6 +676,82 @@ fun SettingsScreen(
                 ) { rightColumn() }
             }
         }
+    }
+
+    if (historyDialogOpen) {
+        ClearHistoryDialog(
+            onDismiss = { historyDialogOpen = false },
+            onConfirm = { movies, series, channels ->
+                settingsVm.clearHistory(movies, series, channels)
+                historyDialogOpen = false
+                snackbar?.show(historyClearedMsg)
+            }
+        )
+    }
+}
+
+@Composable
+private fun ClearHistoryDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (movies: Boolean, series: Boolean, channels: Boolean) -> Unit
+) {
+    var movies by remember { mutableStateOf(true) }
+    var series by remember { mutableStateOf(true) }
+    var channels by remember { mutableStateOf(true) }
+    val anySelected = movies || series || channels
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.history_dialog_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.history_dialog_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                HistoryCheckRow(
+                    label = stringResource(R.string.history_movies),
+                    checked = movies,
+                    onToggle = { movies = !movies }
+                )
+                HistoryCheckRow(
+                    label = stringResource(R.string.history_series),
+                    checked = series,
+                    onToggle = { series = !series }
+                )
+                HistoryCheckRow(
+                    label = stringResource(R.string.history_channels),
+                    checked = channels,
+                    onToggle = { channels = !channels }
+                )
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                enabled = anySelected,
+                onClick = { onConfirm(movies, series, channels) }
+            ) { Text(stringResource(R.string.history_confirm)) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun HistoryCheckRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

@@ -177,6 +177,18 @@
     <string name="settings_save_credentials">Salva e riconnetti</string>
     <string name="settings_connection_ok">Connessione OK</string>
     <string name="settings_connection_failed">Errore: %1$s</string>
+    <string name="settings_display">Schermo</string>
+    <string name="settings_hourly_clock">Mostra l\'orario ogni ora</string>
+    <string name="settings_hourly_clock_hint">Mostra l\'orologio per 5 secondi all\'inizio di ogni ora.</string>
+    <string name="settings_history">Cronologia</string>
+    <string name="settings_history_clear">Cancella cronologia</string>
+    <string name="history_dialog_title">Cancella cronologia</string>
+    <string name="history_dialog_subtitle">Seleziona cosa cancellare per questo profilo.</string>
+    <string name="history_movies">Film visti</string>
+    <string name="history_series">Serie viste</string>
+    <string name="history_channels">Canali visti</string>
+    <string name="history_confirm">Cancella</string>
+    <string name="history_cleared">Cronologia cancellata.</string>
     <string name="settings_about">Info</string>
     <string name="settings_open_about">Informazioni su TartaTV</string>
     <string name="settings_open_about_with_version">Informazioni su TartaTV — v%1$s</string>
@@ -266,6 +278,8 @@
 
     <!-- Accessibility -->
     <string name="a11y_locked">Contenuto bloccato</string>
+    <string name="a11y_watched">Visto</string>
+    <string name="a11y_in_progress">In corso</string>
     <string name="a11y_favorite">Aggiungi ai preferiti</string>
     <string name="a11y_unfavorite">Rimuovi dai preferiti</string>
     <string name="a11y_play">Riproduci</string>
@@ -277,6 +291,7 @@
     <string name="empty_continue_action">Sfoglia film</string>
     <string name="empty_favorites_title">Nessun preferito</string>
     <string name="empty_favorites_message">Usa il pulsante Preferito nei dettagli di film, serie e canali per salvarli qui.</string>
+    <string name="favorites_preview_hint">Seleziona un canale o un film per vedere l\'anteprima.</string>
     <string name="empty_search_title">Cosa vuoi guardare?</string>
     <string name="empty_search_message">Cerca per nome, genere, cast o trama. Istantaneo e funziona offline.</string>
     <string name="empty_search_no_results_title">Nessun risultato</string>
@@ -307,6 +322,7 @@
     <string name="refresh_phase_series">Serie</string>
     <string name="snack_undo">Annulla</string>
     <string name="player_next_in">Prossimo tra %1$ds</string>
+    <string name="player_connecting">Connessione al canale…</string>
     <string name="player_reconnecting">Riconnessione (tentativo %1$d/3)…</string>
     <string name="player_cannot_play_title">Impossibile riprodurre</string>
     <string name="player_contact_provider">Riprova tra poco o contatta il proprietario della lista.</string>
