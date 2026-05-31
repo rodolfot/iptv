@@ -1,5 +1,3 @@
-@file:OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
-
 package com.iptv.app.ui.movies
 
 import androidx.compose.foundation.background
@@ -42,8 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
 import com.iptv.app.R
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.model.Movie

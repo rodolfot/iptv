@@ -1,5 +1,3 @@
-@file:OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
-
 package com.iptv.app.ui.live
 
 import androidx.compose.foundation.background
@@ -52,8 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
 import coil.compose.AsyncImage
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.model.LiveChannel
@@ -324,11 +320,10 @@ private fun ChannelTile(
     var focused by remember { mutableStateOf(false) }
     // Mesmo formato dos cards de Filmes/Séries: aspect 2:3 com nome em barra
     // preta na base. Marquee quando focado (canais como "Globo SP HD ★").
-    Card(
+    com.iptv.app.ui.common.TouchableCard(
         onClick = onClick,
         onLongClick = onLongClick,
-        shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
-        scale = CardDefaults.scale(scale = 1f, focusedScale = 1f, pressedScale = 1f),
+        shape = RoundedCornerShape(10.dp),
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(2f / 3f)

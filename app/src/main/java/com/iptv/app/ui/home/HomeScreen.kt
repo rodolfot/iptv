@@ -77,6 +77,20 @@ import com.iptv.app.ui.watchlist.WatchlistScreen
 
 private data class TabSpec(val label: Int, val key: String)
 
+/**
+ * Args para abrir a tela de detalhe de uma série. Quando vem do "Continuar
+ * Assistindo" carregamos também o último episódio para que o detalhe já abra
+ * com a temporada selecionada e a lista de episódios visível, em vez de
+ * tocar direto (o usuário pediu o detalhe pra escolher por onde continuar).
+ */
+data class SeriesOpenArgs(
+    val id: Int,
+    val title: String,
+    val cover: String?,
+    val initialSeasonNumber: Int? = null,
+    val initialEpisodeId: String? = null
+)
+
 private val ALL_TABS = listOf(
     TabSpec(com.iptv.app.R.string.tab_home, "home"),
     TabSpec(com.iptv.app.R.string.tab_search, "search"),
@@ -112,9 +126,17 @@ fun HomeScreen(
         }
     }
     val parental = remember { ParentalSession() }
-    var openSeries by remember { mutableStateOf<Triple<Int, String, String?>?>(null) }
+    var openSeries by remember { mutableStateOf<SeriesOpenArgs?>(null) }
     var openMovie by remember { mutableStateOf<PlayerArgs?>(null) }
     var openChannel by remember { mutableStateOf<com.iptv.app.domain.model.LiveChannel?>(null) }
+    // Estado da Busca elevado pra cá: rememberSaveable dentro de um `when`
+    // não restaurava ao voltar para a aba — o slot é destruído quando outro
+    // ramo do `when` ganha (ex.: openSeries != null). Mantendo aqui o
+    // termo/filtro sobrevivem à ida ao player e à entrada em séries.
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchFilter by rememberSaveable {
+        mutableStateOf(com.iptv.app.ui.search.SearchFilter.ALL)
+    }
     // Elevado para sobreviver à entrada/saída do MovieDetailScreen e do player.
     // Antes ficava dentro de MoviesSection com rememberSaveable, mas o `when` de
     // detail/aba desmontava o composable e o estado se perdia ao voltar do
@@ -241,11 +263,13 @@ fun HomeScreen(
                     onPlay = onPlay
                 )
                 openSeries != null -> {
-                    val (id, title, cover) = openSeries!!
+                    val args = openSeries!!
                     SeriesDetailScreen(
-                        seriesId = id,
-                        title = title,
-                        coverUrl = cover,
+                        seriesId = args.id,
+                        title = args.title,
+                        coverUrl = args.cover,
+                        initialSeasonNumber = args.initialSeasonNumber,
+                        initialEpisodeId = args.initialEpisodeId,
                         onBack = { openSeries = null },
                         // Mesmo padrão do filme: ao voltar do player o usuário
                         // cai no detalhe da série; segundo Voltar fecha o
@@ -258,14 +282,22 @@ fun HomeScreen(
                         onPlay = onPlay,
                         // Cards recomendados de filmes abrem a tela de
                         // detalhe (sinopse + botão Assistir). Continue
-                        // Watching continua tocando direto.
+                        // Watching de série abre o detalhe com a temporada
+                        // do último episódio aberta — em vez de tocar direto
+                        // o usuário escolhe por onde continuar.
                         onOpenMovie = handlePlay,
-                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
+                        onOpenSeries = { args -> openSeries = args }
                     )
                     "search" -> SearchScreen(
                         onPlay = handlePlay,
-                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) },
-                        onOpenChannel = { ch -> openChannel = ch }
+                        onOpenSeries = { id, title, cover ->
+                            openSeries = SeriesOpenArgs(id, title, cover)
+                        },
+                        onOpenChannel = { ch -> openChannel = ch },
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        filter = searchFilter,
+                        onFilterChange = { searchFilter = it }
                     )
                     "live" -> LiveSection(
                         vm = vm,
@@ -290,7 +322,9 @@ fun HomeScreen(
                     "watchlist" -> WatchlistScreen(
                         vm = vm,
                         onPlay = handlePlay,
-                        onOpenSeries = { id, title, cover -> openSeries = Triple(id, title, cover) }
+                        onOpenSeries = { id, title, cover ->
+                            openSeries = SeriesOpenArgs(id, title, cover)
+                        }
                     )
                     "settings" -> SettingsScreen(vm = vm, onLogout = onLogout)
                 }
@@ -332,7 +366,13 @@ private fun TopBar(
 ) {
     val dim = rememberTvDim()
     val selectedIndex = tabs.indexOfFirst { it.key == selectedKey }.coerceAtLeast(0)
-    if (dim.formFactor == FormFactor.Phone) {
+    if (dim.useTouchUi) {
+        // Dispositivos touch (celular, tablet, multimídia de carro): o TabRow
+        // do tv.material3 só dispara `onClick` após o D-pad focar, então o
+        // toque ficava sem efeito e o usuário travava no menu. Usamos o
+        // layout Phone (banner + LazyRow de PhoneTab clicáveis) — em Tablet o
+        // banner fica um pouco maior para não parecer subdimensionado.
+        val bannerHeight = if (dim.formFactor == FormFactor.Phone) 28.dp else 36.dp
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -363,7 +403,7 @@ private fun TopBar(
                 Image(
                     painter = painterResource(com.iptv.app.R.drawable.app_banner),
                     contentDescription = stringResource(com.iptv.app.R.string.app_name),
-                    modifier = Modifier.height(28.dp)
+                    modifier = Modifier.height(bannerHeight)
                 )
             }
             LazyRow(

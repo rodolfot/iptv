@@ -179,6 +179,7 @@
     <string name="settings_connection_failed">Error: %1$s</string>
     <string name="settings_about">Acerca de</string>
     <string name="settings_open_about">Acerca de TartaTV</string>
+    <string name="settings_open_about_with_version">Acerca de TartaTV — v%1$s</string>
 
     <!-- Player -->
     <string name="player_unsupported_title">No se puede reproducir</string>
@@ -191,7 +192,7 @@
     <!-- About / Legal -->
     <string name="about_title">Acerca de TartaTV</string>
     <string name="about_version">Versión %1$s</string>
-    <string name="about_intro">TartaTV es un cliente de TV que reproduce listas en formato Xtream Codes proporcionadas por el usuario. No distribuye, aloja ni comercializa contenido — toda la reproducción depende exclusivamente de la lista que has introducido.</string>
+    <string name="about_intro">TartaTV es una aplicación reproductor que reproduce listas IPTV en formato Xtream Codes proporcionadas por el propio usuario. Funciona como un lector: se conecta al servidor cuyas credenciales introduces y muestra el contenido devuelto.\n\nNo distribuye, aloja, indexa ni comercializa ningún contenido — no hay catálogo integrado ni listas precargadas. Toda la reproducción depende exclusivamente de la lista que introduzcas.\n\nFunciones: canales en directo con guía de programación (EPG), películas y series con sinopsis y carátula, continuar viendo, favoritos, lista para ver después, control parental con PIN y múltiples perfiles. Todo se guarda localmente en tu dispositivo — sin servidor propio, sin analítica y sin anuncios.</string>
     <string name="about_terms">Términos de Uso</string>
     <string name="about_privacy">Política de Privacidad</string>
     <string name="about_open_source">Bibliotecas de código abierto</string>
@@ -207,7 +208,7 @@
     <string name="settings_language">Idioma de la app</string>
     <string name="onboarding_language_title">Elige idioma</string>
     <string name="onboarding_title">Bienvenido a TartaTV</string>
-    <string name="onboarding_message">Para usar la aplicación, debes aceptar los Términos de Uso y la Política de Privacidad.</string>
+    <string name="onboarding_message">TartaTV es un reproductor de listas IPTV en formato Xtream Codes — solo reproduce el contenido del servidor cuyas credenciales facilites. No hay catálogo integrado ni contenido propio.\n\nTus credenciales y preferencias permanecen únicamente en tu dispositivo, en almacenamiento cifrado. No enviamos datos a nosotros ni a terceros, y no usamos anuncios ni rastreo.\n\nAntes de continuar, lee los documentos a continuación. Para usar la aplicación debes aceptar los Términos de Uso y la Política de Privacidad.</string>
     <string name="onboarding_read_terms">Leer Términos de Uso</string>
     <string name="onboarding_read_privacy">Leer Política de Privacidad</string>
     <string name="onboarding_accept">Acepto y quiero continuar</string>

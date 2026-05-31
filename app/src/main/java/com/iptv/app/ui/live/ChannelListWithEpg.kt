@@ -1,5 +1,3 @@
-@file:OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
-
 package com.iptv.app.ui.live
 
 import androidx.compose.foundation.background
@@ -49,8 +47,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
 import coil.compose.AsyncImage
 import com.iptv.app.data.db.EpgProgrammeEntity
 import com.iptv.app.domain.model.LiveChannel
@@ -175,10 +171,10 @@ private fun ChannelRow(
 ) {
     // Linha compacta no estilo dos apps de IPTV: número | logo | nome.
     // EPG completo aparece no painel grande à direita.
-    Card(
+    com.iptv.app.ui.common.TouchableCard(
         onClick = onClick,
         onLongClick = onLongClick,
-        shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
+        shape = RoundedCornerShape(8.dp),
         modifier = modifier.fillMaxWidth().height(52.dp)
     ) {
         Row(

@@ -179,6 +179,7 @@
     <string name="settings_connection_failed">Failed: %1$s</string>
     <string name="settings_about">About</string>
     <string name="settings_open_about">About TartaTV</string>
+    <string name="settings_open_about_with_version">About TartaTV — v%1$s</string>
 
     <!-- Player -->
     <string name="player_unsupported_title">Cannot play</string>
@@ -191,7 +192,7 @@
     <!-- About / Legal -->
     <string name="about_title">About TartaTV</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_intro">TartaTV is a TV client that plays Xtream Codes lists provided by the user. It does not distribute, host, or sell any content — playback depends entirely on the list you supply.</string>
+    <string name="about_intro">TartaTV is a player app that streams IPTV lists in the Xtream Codes standard provided by you. It works as a reader: it connects to the server whose credentials you enter and plays whatever the server returns.\n\nIt does not distribute, host, index or sell any content — there is no built-in catalog and no preloaded list. Playback depends entirely on the list you supply.\n\nFeatures: live channels with electronic program guide (EPG), movies and series with synopsis and cover art, continue watching, favorites, watch-later list, parental PIN control and multiple profiles. Everything is stored locally on your device — no server of our own, no analytics, no ads.</string>
     <string name="about_terms">Terms of Use</string>
     <string name="about_privacy">Privacy Policy</string>
     <string name="about_open_source">Open source libraries</string>
@@ -207,7 +208,7 @@
     <string name="settings_language">App language</string>
     <string name="onboarding_language_title">Choose language</string>
     <string name="onboarding_title">Welcome to TartaTV</string>
-    <string name="onboarding_message">To use the app, you need to agree to the Terms of Use and Privacy Policy.</string>
+    <string name="onboarding_message">TartaTV is a player for IPTV lists in the Xtream Codes standard — it only plays the content returned by the server whose credentials you provide. There is no built-in catalog and no content of our own.\n\nYour credentials and preferences stay on your device, in encrypted storage. We do not send data to us or to third parties, and we do not use ads or tracking.\n\nBefore continuing, please read the documents below. To use the app you need to agree to the Terms of Use and the Privacy Policy.</string>
     <string name="onboarding_read_terms">Read Terms of Use</string>
     <string name="onboarding_read_privacy">Read Privacy Policy</string>
     <string name="onboarding_accept">I agree and want to continue</string>

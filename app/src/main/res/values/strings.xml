@@ -230,6 +230,7 @@
     <string name="settings_connection_failed">Falha: %1$s</string>
     <string name="settings_about">Sobre</string>
     <string name="settings_open_about">Sobre o TartaTV</string>
+    <string name="settings_open_about_with_version">Sobre o TartaTV — v%1$s</string>
 
     <!-- Player -->
     <string name="player_unsupported_title">Não foi possível reproduzir</string>
@@ -242,7 +243,7 @@
     <!-- About / Legal -->
     <string name="about_title">Sobre o TartaTV</string>
     <string name="about_version">Versão %1$s</string>
-    <string name="about_intro">TartaTV é um cliente de TV que reproduz listas no padrão Xtream Codes fornecidas pelo usuário. Ele não distribui, hospeda nem comercializa conteúdo — toda a exibição depende exclusivamente da lista que você inseriu.</string>
+    <string name="about_intro">O TartaTV é um aplicativo player que reproduz listas IPTV no padrão Xtream Codes fornecidas pelo próprio usuário. Funciona como um leitor: conecta-se ao servidor cujas credenciais você inserir e exibe o conteúdo retornado.\n\nEle não distribui, não hospeda, não indexa nem comercializa qualquer conteúdo — não há catálogo embarcado nem lista pronta. Toda a exibição depende exclusivamente da lista que você cadastrar.\n\nRecursos: canais ao vivo com guia de programação (EPG), filmes e séries com sinopse e capa, continuar assistindo, favoritos, lista para ver depois, controle parental por PIN e múltiplos perfis. Tudo fica armazenado localmente no seu dispositivo — sem servidor próprio, sem analytics e sem anúncios.</string>
     <string name="about_terms">Termos de Uso</string>
     <string name="about_privacy">Política de Privacidade</string>
     <string name="about_open_source">Bibliotecas open source</string>
@@ -263,7 +264,7 @@
     <string name="onboarding_device_tablet">Tablet</string>
     <string name="onboarding_device_phone">Celular</string>
     <string name="onboarding_title">Bem-vindo ao TartaTV</string>
-    <string name="onboarding_message">Para usar o aplicativo, você precisa concordar com os Termos de Uso e a Política de Privacidade.</string>
+    <string name="onboarding_message">O TartaTV é um player de listas IPTV no padrão Xtream Codes — ele apenas reproduz o conteúdo do servidor cujas credenciais você fornecer. Não há catálogo embarcado nem conteúdo próprio.\n\nSuas credenciais e preferências ficam apenas no seu dispositivo, em armazenamento criptografado. Não enviamos dados para nós nem para terceiros, e não usamos anúncios ou rastreamento.\n\nAntes de continuar, leia os documentos abaixo. Para usar o aplicativo, você precisa concordar com os Termos de Uso e a Política de Privacidade.</string>
     <string name="onboarding_read_terms">Ler Termos de Uso</string>
     <string name="onboarding_read_privacy">Ler Política de Privacidade</string>
     <string name="onboarding_accept">Concordo e quero continuar</string>

@@ -117,6 +117,12 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // TV/Android entra em standby após ~10min sem input. Como app de
+        // streaming, queremos manter a tela acordada o tempo todo enquanto
+        // a Activity estiver em primeiro plano — não só durante o player.
+        // O sistema limpa o flag automaticamente quando a Activity é
+        // pausada/destruída.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContent {
             IptvTheme {
                 Surface(

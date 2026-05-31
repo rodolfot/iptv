@@ -1,6 +1,7 @@
 package com.iptv.app.ui.series
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import com.iptv.app.ui.common.TouchableButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.foundation.lazy.items as lazyItems
+import androidx.compose.foundation.lazy.itemsIndexed as lazyItemsIndexed
 import com.iptv.app.data.api.SeriesInfoDetail
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.db.EpisodeProgressDao
@@ -622,6 +624,11 @@ fun SeriesDetailScreen(
     onBack: () -> Unit,
     onPlay: (PlayerArgs) -> Unit,
     coverUrl: String? = null,
+    /** Quando vem do "Continuar Assistindo", pulamos a etapa de escolher
+     *  temporada — abrimos direto o popup de episódios na temporada do
+     *  último episódio assistido. */
+    initialSeasonNumber: Int? = null,
+    initialEpisodeId: String? = null,
     vm: SeriesDetailViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
@@ -631,7 +638,13 @@ fun SeriesDetailScreen(
     val watchlistRemovedMsg = stringResource(R.string.snack_watchlist_removed)
     val favoriteAddedMsg = stringResource(R.string.snack_favorite_added)
     val favoriteRemovedMsg = stringResource(R.string.snack_favorite_removed)
-    var selectedSeason by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedSeason by rememberSaveable { mutableStateOf<Int?>(initialSeasonNumber) }
+    // Elevado pra cá (antes ficava bem mais embaixo) porque o botão Resume
+    // do topo agora marca o popup como aberto antes de chamar onPlay — assim
+    // o usuário volta do player diretamente na lista de episódios.
+    var seasonDialogOpen by rememberSaveable {
+        mutableStateOf(initialSeasonNumber != null)
+    }
 
     LaunchedEffect(seriesId) { vm.load(seriesId, title, coverUrl) }
     // Agora a tela mostra detalhes + combo de temporadas + episódios na
@@ -723,6 +736,13 @@ fun SeriesDetailScreen(
                             val labelRes = if (resume.positionMs > 0) R.string.series_resume else R.string.series_play_next
                             TouchableButton(
                                 onClick = {
+                                    // Marca o popup da temporada como aberto
+                                    // *antes* de mandar pro player — assim ao
+                                    // voltar do player o usuário cai na lista
+                                    // de episódios, não na tela só com botões
+                                    // de temporada.
+                                    selectedSeason = resume.episode.seasonNumber
+                                    seasonDialogOpen = true
                                     onPlay(
                                         PlayerArgs(
                                             kind = PlayerKind.EPISODE,
@@ -807,7 +827,8 @@ fun SeriesDetailScreen(
             // Botões: um por temporada. Clicar abre o popup com a lista de
             // episódios prontos pra tocar — sem manter grid grande na própria
             // tela, que ocupava muito espaço quando havia muitos episódios.
-            var seasonDialogOpen by rememberSaveable { mutableStateOf(false) }
+            // `seasonDialogOpen` está declarado no topo da função pra que o
+            // botão Resume (acima) consiga marcá-lo antes do onPlay.
             val seasonRequesters = remember(detail.seasons.size) {
                 detail.seasons.associate { it.seasonNumber to FocusRequester() }
             }
@@ -867,9 +888,14 @@ fun SeriesDetailScreen(
                     watched = detail.watchedEpisodes,
                     percents = detail.episodePercents,
                     fallbackPoster = seriesCover,
+                    highlightEpisodeId = initialEpisodeId,
                     onDismiss = { seasonDialogOpen = false },
                     onPick = { e ->
-                        seasonDialogOpen = false
+                        // NÃO fechamos o popup ao mandar pro player. Assim,
+                        // quando o usuário voltar (Back), cai na lista de
+                        // episódios — onde parou — em vez do menu de séries.
+                        // O dismiss do diálogo continua disponível via Back
+                        // explícito dentro da própria tela de detalhe.
                         onPlay(
                             PlayerArgs(
                                 kind = PlayerKind.EPISODE,
@@ -894,6 +920,7 @@ private fun EpisodesDialog(
     watched: Set<String>,
     percents: Map<String, Int>,
     fallbackPoster: String?,
+    highlightEpisodeId: String? = null,
     onDismiss: () -> Unit,
     onPick: (Episode) -> Unit
 ) {
@@ -920,16 +947,34 @@ private fun EpisodesDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                // Quando veio de "Continuar Assistindo", rola até o episódio
+                // e dá foco — vira o primeiro clique evidente do usuário.
+                val highlightIndex = remember(highlightEpisodeId, episodes) {
+                    if (highlightEpisodeId == null) -1
+                    else episodes.indexOfFirst { it.id == highlightEpisodeId }
+                }
+                val highlightFocus = remember { FocusRequester() }
+                LaunchedEffect(highlightIndex) {
+                    if (highlightIndex >= 0) {
+                        runCatching { listState.scrollToItem(highlightIndex) }
+                        runCatching { highlightFocus.requestFocus() }
+                    }
+                }
                 androidx.compose.foundation.lazy.LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.height(480.dp)
                 ) {
-                    lazyItems(episodes) { e ->
+                    lazyItemsIndexed(episodes) { index, e ->
                         EpisodeRow(
                             episode = e,
                             watched = e.id in watched,
                             percent = percents[e.id] ?: 0,
                             fallbackPoster = fallbackPoster,
+                            highlighted = index == highlightIndex,
+                            modifier = if (index == highlightIndex)
+                                Modifier.focusRequester(highlightFocus) else Modifier,
                             onClick = { onPick(e) }
                         )
                     }
@@ -939,13 +984,14 @@ private fun EpisodesDialog(
     }
 }
 
-@OptIn(androidx.tv.material3.ExperimentalTvMaterial3Api::class)
 @Composable
 private fun EpisodeRow(
     episode: Episode,
     watched: Boolean,
     percent: Int,
     fallbackPoster: String? = null,
+    highlighted: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     // Título sintetizado se o provedor não enviou um — alguns servidores
@@ -956,13 +1002,18 @@ private fun EpisodeRow(
     // Quando o episódio não tem poster próprio, usa a capa da série para
     // não deixar um quadrado cinza com ícone genérico.
     val poster = episode.poster?.takeIf { it.isNotBlank() } ?: fallbackPoster
-    androidx.tv.material3.Card(
+    com.iptv.app.ui.common.TouchableCard(
         onClick = onClick,
-        shape = androidx.tv.material3.CardDefaults.shape(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
-        scale = androidx.tv.material3.CardDefaults.scale(
-            scale = 1f, focusedScale = 1f, pressedScale = 1f
-        ),
-        modifier = Modifier.fillMaxWidth()
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (highlighted) Modifier.border(
+                    width = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                ) else Modifier
+            )
     ) {
         Row(
             modifier = Modifier

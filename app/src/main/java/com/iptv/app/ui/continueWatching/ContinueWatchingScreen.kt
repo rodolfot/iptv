@@ -6,12 +6,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayCircle
@@ -160,7 +168,7 @@ class ContinueWatchingViewModel @Inject constructor(
 @Composable
 fun ContinueWatchingScreen(
     onPlay: (PlayerArgs) -> Unit,
-    onOpenSeries: (id: Int, title: String, cover: String?) -> Unit = { _, _, _ -> },
+    onOpenSeries: (com.iptv.app.ui.home.SeriesOpenArgs) -> Unit = { },
     // Callback separado para filmes recomendados (sem progresso). Em vez de
     // tocar direto como Continue Watching, abre a tela de detalhe com sinopse
     // — o usuário ainda não decidiu se quer ver.
@@ -228,12 +236,10 @@ fun ContinueWatchingScreen(
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(rowSpacing)) {
                 items(recentChannels) { ch ->
-                    com.iptv.app.ui.common.PosterCard(
+                    ChannelMiniHomeCard(
                         title = ch.name,
-                        imageUrl = ch.logoUrl,
-                        fallbackIcon = Icons.Filled.Tv,
-                        overrideWidth = 110.dp,
-                        compactTitle = true
+                        logoUrl = ch.logoUrl,
+                        width = HomePosterWidth
                     ) {
                         onPlay(
                             PlayerArgs(
@@ -257,7 +263,7 @@ fun ContinueWatchingScreen(
                 modifier = Modifier.padding(top = sectionTopPadding(), bottom = 4.dp)
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(rowSpacing)) {
-                items(series) { s -> SeriesContinueCard(s, vm, onPlay) }
+                items(series) { s -> SeriesContinueCard(s, vm, onOpenSeries) }
             }
             hasPriorSection = true
         }
@@ -280,9 +286,11 @@ fun ContinueWatchingScreen(
     }
 }
 
-// Pôsteres do Início em 110dp (220x ratio 2:3 = altura ~165dp). Antes era
-// 150dp e a segunda linha caía abaixo da dobra em telas TV 1080p.
-private val HomePosterWidth = 110.dp
+// Pôsteres do Início em 96dp (altura 144dp na razão 2:3). Antes 110dp
+// somava ~720dp com 3 seções e ainda forçava scroll vertical na TV 1080p
+// — agora as 3 caem confortáveis na dobra. ChannelMiniHomeCard usa o
+// mesmo width pra deixar a linha de canais com a mesma altura visual.
+private val HomePosterWidth = 96.dp
 
 @Composable
 private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) -> Unit) {
@@ -313,7 +321,7 @@ private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) ->
 private fun SeriesContinueCard(
     item: SeriesProgressEntity,
     vm: ContinueWatchingViewModel,
-    onPlay: (PlayerArgs) -> Unit
+    onOpenSeries: (com.iptv.app.ui.home.SeriesOpenArgs) -> Unit
 ) {
     var percent by androidx.compose.runtime.remember(item.lastEpisodeId) {
         androidx.compose.runtime.mutableStateOf(0)
@@ -321,7 +329,6 @@ private fun SeriesContinueCard(
     androidx.compose.runtime.LaunchedEffect(item.lastEpisodeId) {
         percent = vm.episodePercent(item.lastEpisodeId)
     }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
     PosterCard(
         title = "${item.title}\nT${item.lastSeasonNumber}E${item.lastEpisodeNum}",
         imageUrl = item.coverUrl,
@@ -329,9 +336,18 @@ private fun SeriesContinueCard(
         overrideWidth = HomePosterWidth,
         progressPercent = percent
     ) {
-        // Resolve em background para não bloquear a UI — se o último
-        // episódio foi 100% concluído, vai para o próximo da série.
-        scope.launch { onPlay(vm.resolveNextEpisode(item)) }
+        // Abre o detalhe da série com a temporada do último episódio já
+        // selecionada (e o diálogo de episódios aberto). O usuário pediu
+        // ver a lista pra escolher — em vez de tocar direto.
+        onOpenSeries(
+            com.iptv.app.ui.home.SeriesOpenArgs(
+                id = item.seriesId,
+                title = item.title,
+                cover = item.coverUrl,
+                initialSeasonNumber = item.lastSeasonNumber,
+                initialEpisodeId = item.lastEpisodeId
+            )
+        )
     }
 }
 
@@ -368,6 +384,62 @@ private fun RecommendedSeriesCard(
         overrideWidth = HomePosterWidth
     ) {
         onOpenSeries(item.seriesId, item.name, item.coverUrl)
+    }
+}
+
+/**
+ * Card de canal para a tela Início — logo dentro de um quadrado (Fit, sem
+ * crop) e nome em uma faixa logo abaixo. Antes usávamos PosterCard com
+ * aspect 2:3 + título sobreposto: as logos largas (ESPN, SBT, Discovery)
+ * eram cortadas e o nome ficava por cima da imagem.
+ */
+@Composable
+private fun ChannelMiniHomeCard(
+    title: String,
+    logoUrl: String?,
+    width: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    com.iptv.app.ui.common.TouchableCard(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.width(width)
+    ) {
+        Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (logoUrl.isNullOrBlank()) {
+                    Icon(
+                        Icons.Filled.Tv,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                } else {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                    )
+                }
+            }
+            Text(
+                title,
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
+        }
     }
 }
 

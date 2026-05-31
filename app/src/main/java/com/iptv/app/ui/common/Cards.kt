@@ -45,11 +45,23 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import coil.compose.AsyncImage
 
 /**
- * Phone uses the standard Material3 Card with a clickable Surface so taps register.
- * Tablet/TV keep the TV Material3 Card so D-pad focus stays correct on Leanback.
+ * Card clicável que funciona com touch em celular/tablet/multimídia de carro
+ * e com D-pad em TV Leanback.
+ *
+ * Em dispositivos touch (`useTouchUi`) usamos um `Surface` com
+ * `combinedClickable` — `androidx.tv.material3.Card` só aceita clique após
+ * receber foco do D-pad, e isso prendia o usuário em telas touch puras (vide
+ * multimídia de carro Android, onde o app ficava travado na tela inicial).
+ *
+ * Em TV mantemos `androidx.tv.material3.Card` para preservar o highlight de
+ * foco do controle remoto. `scale = 1f` em todos os estados — o usuário
+ * removeu o efeito de zoom ao focar no app inteiro.
+ *
+ * Público (em vez de privado) porque telas que renderizam tiles próprios
+ * (canais, episódios) precisam do mesmo wrapper para também ganhar touch.
  */
 @Composable
-private fun TouchableCard(
+fun TouchableCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     shape: RoundedCornerShape = RoundedCornerShape(16.dp),
@@ -57,8 +69,7 @@ private fun TouchableCard(
     content: @Composable () -> Unit
 ) {
     val dim = rememberTvDim()
-    if (dim.formFactor == FormFactor.Phone) {
-        // Em phone usa combinedClickable em um Surface para suportar long-press.
+    if (dim.useTouchUi) {
         @OptIn(ExperimentalFoundationApi::class)
         androidx.compose.material3.Surface(
             modifier = modifier
@@ -70,9 +81,6 @@ private fun TouchableCard(
             shape = shape
         ) { content() }
     } else {
-        // scale = 1f em todos os estados (default/focused/pressed) — sem
-        // isso o Card TV aumenta ~10% ao focar, fazendo o card invadir
-        // os vizinhos. Usuário pediu pra tirar o efeito em todo o app.
         Card(
             onClick = onClick,
             onLongClick = onLongClick ?: onClick,

@@ -18,6 +18,17 @@ enum class FormFactor { Phone, Tablet, Tv }
 
 data class TvDimensions(
     val formFactor: FormFactor,
+    /**
+     * Quando true, telas devem usar componentes Material3 padrão (com
+     * `clickable`/`combinedClickable`) em vez de `androidx.tv.material3.*`.
+     *
+     * O TV Material3 só dispara `onClick` após um evento de foco do D-pad —
+     * em telas touch puras (celular, tablet, multimídia de carro) o usuário
+     * fica preso porque o toque não chega como clique. Mantemos os
+     * componentes TV apenas em TV de verdade (Leanback), onde o input
+     * primário é o controle.
+     */
+    val useTouchUi: Boolean,
     val ScreenPadding: Dp,
     val SectionSpacing: Dp,
     val CardSpacing: Dp,
@@ -37,6 +48,7 @@ data class TvDimensions(
 
 private val TvDefaults = TvDimensions(
     formFactor = FormFactor.Tv,
+    useTouchUi = false,
     ScreenPadding = 32.dp,
     SectionSpacing = 24.dp,
     CardSpacing = 20.dp,
@@ -56,6 +68,7 @@ private val TvDefaults = TvDimensions(
 
 private val TabletDefaults = TvDimensions(
     formFactor = FormFactor.Tablet,
+    useTouchUi = true,
     ScreenPadding = 32.dp,
     SectionSpacing = 24.dp,
     CardSpacing = 16.dp,
@@ -75,6 +88,7 @@ private val TabletDefaults = TvDimensions(
 
 private val PhoneDefaults = TvDimensions(
     formFactor = FormFactor.Phone,
+    useTouchUi = true,
     ScreenPadding = 12.dp,
     SectionSpacing = 16.dp,
     CardSpacing = 10.dp,
@@ -104,10 +118,13 @@ val LocalDeviceProfile = compositionLocalOf<DeviceProfile?> { null }
  *
  * Ordem de precedência:
  *  1. Override manual do usuário (LocalDeviceProfile) — escolhido no onboarding.
- *  2. UiModeManager.UI_MODE_TYPE_TELEVISION — alguns Android TVs (PS5 HDMI,
+ *  2. UiModeManager.UI_MODE_TYPE_CAR — multimídia automotiva. Apesar do
+ *     tamanho de tela (geralmente 7–10"), o input é 100% touch e sem D-pad,
+ *     então força a UI touch (cai no perfil Tablet).
+ *  3. UiModeManager.UI_MODE_TYPE_TELEVISION — alguns Android TVs (PS5 HDMI,
  *     TCLs) reportam smallestScreenWidthDp <600 e cairiam em phone sem este
  *     check.
- *  3. smallestScreenWidthDp como heurística final.
+ *  4. smallestScreenWidthDp como heurística final.
  */
 @Composable
 @ReadOnlyComposable
@@ -124,10 +141,15 @@ fun rememberTvDim(): TvDimensions {
     val context = LocalContext.current
     val sw = configuration.smallestScreenWidthDp
     val uiModeType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+    val uiModeMgr = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+    val isCar = uiModeType == Configuration.UI_MODE_TYPE_CAR ||
+        uiModeMgr?.currentModeType == Configuration.UI_MODE_TYPE_CAR
     val isLeanback = uiModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-        (context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
-            ?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+        uiModeMgr?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
     return when {
+        // Multimídia de carro: touch puro. Mapeamos pra Tablet (layout médio)
+        // em vez de Phone pra aproveitar a tela maior.
+        isCar -> if (sw < 600) PhoneDefaults else TabletDefaults
         isLeanback -> TvDefaults
         sw < 600 -> PhoneDefaults
         sw < 840 -> TabletDefaults

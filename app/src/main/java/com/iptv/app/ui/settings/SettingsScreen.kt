@@ -569,7 +569,13 @@ fun SettingsScreen(
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
             TouchableButton(compact = true, onClick = { aboutOpen = true }) {
-                Text(stringResource(R.string.settings_open_about))
+                // Versão visível direto no botão — antes só aparecia depois de
+                // entrar na tela Sobre. Útil pra suporte ("qual versão você está
+                // usando?") sem precisar navegar.
+                Text(stringResource(
+                    R.string.settings_open_about_with_version,
+                    com.iptv.app.BuildConfig.VERSION_NAME
+                ))
             }
             // Log de crash local — só visível quando há registros. Sem
             // dependência externa (Firebase/Sentry); o usuário pode copiar e

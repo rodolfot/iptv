@@ -13,11 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Button that registers touch on phones AND keeps D-pad focus on TV.
+ * Button that registers touch on phones/tablet/car AND keeps D-pad focus on TV.
  *
  * androidx.tv.material3.Button only fires onClick from a focused D-pad event;
- * tapping it on a phone does nothing. We pick the standard Material3 Button on
- * phones and the TV variant on tablet/TV so both input modes work.
+ * tapping it em dispositivos touch puros (celular, tablet, multimídia de carro)
+ * não dispara o clique. Mantemos o componente TV apenas em Leanback real,
+ * onde o input principal é o controle remoto — em qualquer outro caso usamos
+ * o Material3 padrão para que o toque funcione.
  *
  * `selected = true` renders a filled "current selection" affordance; otherwise
  * a tonal variant is used so callers can express toggle groups without
@@ -40,20 +42,26 @@ fun TouchableButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val dim = rememberTvDim()
-    if (dim.formFactor == FormFactor.Phone) {
+    if (dim.useTouchUi) {
         // Material3 defaults aim for tablet sizing; on a phone toolbar a row of
         // 3 buttons doesn't fit. Shrink padding and text style without touching
-        // touch-target size (still ≥ 36dp tall, ≥ 48dp wide).
-        val phonePadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+        // touch-target size (still ≥ 36dp tall, ≥ 48dp wide). Em Tablet/Car
+        // mantemos o padding default do M3 (mais confortável pra dedos em
+        // telas grandes).
+        val isPhone = dim.formFactor == FormFactor.Phone
+        val touchPadding = if (isPhone) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            else if (compact) PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            else ButtonDefaults.ContentPadding
         val phoneStyle = if (compact) M3MaterialTheme.typography.labelMedium
             else M3MaterialTheme.typography.labelLarge
-        CompositionLocalProvider(LocalTextStyle provides phoneStyle) {
+        val textStyle = if (isPhone) phoneStyle else LocalTextStyle.current
+        CompositionLocalProvider(LocalTextStyle provides textStyle) {
             if (selected) {
                 androidx.compose.material3.Button(
                     onClick = onClick,
                     modifier = modifier,
                     enabled = enabled,
-                    contentPadding = phonePadding,
+                    contentPadding = touchPadding,
                     content = content
                 )
             } else {
@@ -61,7 +69,7 @@ fun TouchableButton(
                     onClick = onClick,
                     modifier = modifier,
                     enabled = enabled,
-                    contentPadding = phonePadding,
+                    contentPadding = touchPadding,
                     content = content
                 )
             }
@@ -124,7 +132,3 @@ fun TouchableButton(
     }
 }
 
-// Silence unused-import warning if Detekt scans defaults that aren't referenced
-// here directly anymore.
-@Suppress("unused")
-private val keepButtonDefaultsImport = ButtonDefaults

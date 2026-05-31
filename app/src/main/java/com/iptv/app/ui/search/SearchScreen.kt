@@ -4,11 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.style.TextOverflow
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -175,13 +182,18 @@ fun SearchScreen(
     onPlay: (PlayerArgs) -> Unit,
     onOpenSeries: (id: Int, title: String, cover: String?) -> Unit,
     onOpenChannel: (LiveChannel) -> Unit = { },
+    // Estado elevado para HomeScreen — rememberSaveable local não sobrevive
+    // à saída/retorno via openSeries (o slot do `when` é destruído). Mantendo
+    // aqui, voltar de uma série ou do player preserva termo e filtro.
+    query: String = "",
+    onQueryChange: (String) -> Unit = {},
+    filter: SearchFilter = SearchFilter.ALL,
+    onFilterChange: (SearchFilter) -> Unit = {},
     vm: SearchViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
     val history by vm.history.collectAsState()
     val dim = rememberTvDim()
-    var query by rememberSaveable { mutableStateOf("") }
-    var filter by rememberSaveable { mutableStateOf(SearchFilter.ALL) }
 
     LaunchedEffect(Unit) { vm.loadCatalog() }
     LaunchedEffect(query, filter) { vm.onQueryChanged(query, filter) }
@@ -194,7 +206,7 @@ fun SearchScreen(
     ) {
         SearchBar(
             query = query,
-            onQueryChange = { query = it },
+            onQueryChange = onQueryChange,
             enabled = state.catalogReady,
             onSubmit = {
                 // Só registra a palavra completa quando ela produziu
@@ -208,13 +220,13 @@ fun SearchScreen(
             }
         )
         Row(
-            modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            FilterChip(stringResource(R.string.filter_all), filter == SearchFilter.ALL) { filter = SearchFilter.ALL }
-            FilterChip(stringResource(R.string.filter_channels), filter == SearchFilter.LIVE) { filter = SearchFilter.LIVE }
-            FilterChip(stringResource(R.string.filter_movies), filter == SearchFilter.MOVIE) { filter = SearchFilter.MOVIE }
-            FilterChip(stringResource(R.string.filter_series), filter == SearchFilter.SERIES) { filter = SearchFilter.SERIES }
+            FilterChip(stringResource(R.string.filter_all), filter == SearchFilter.ALL) { onFilterChange(SearchFilter.ALL) }
+            FilterChip(stringResource(R.string.filter_channels), filter == SearchFilter.LIVE) { onFilterChange(SearchFilter.LIVE) }
+            FilterChip(stringResource(R.string.filter_movies), filter == SearchFilter.MOVIE) { onFilterChange(SearchFilter.MOVIE) }
+            FilterChip(stringResource(R.string.filter_series), filter == SearchFilter.SERIES) { onFilterChange(SearchFilter.SERIES) }
         }
 
         when {
@@ -223,7 +235,7 @@ fun SearchScreen(
                 ErrorState(message = state.error!!, onRetry = { vm.retry() })
             query.trim().length < 2 -> PreSearchPanel(
                 history = history,
-                onPick = { query = it },
+                onPick = onQueryChange,
                 onClear = { vm.clearHistory() }
             )
             else -> ResultsContent(state.results, onPlay, onOpenSeries, onOpenChannel)
@@ -259,22 +271,25 @@ private fun SearchBar(
         }
     }
 
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(10.dp)
     val borderColor = if (editing) MaterialTheme.colorScheme.primary else Color.Transparent
 
+    // Compactado: era 16/12 + ícone+12 + fontSize 22. Como Buscar tem três
+    // seções (canais/filmes/séries) competindo por altura, encolher o campo
+    // libera ~30dp por dobra.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(2.dp, borderColor, shape)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .border(1.5.dp, borderColor, shape)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             Icons.Filled.Search,
             contentDescription = null,
-            modifier = Modifier.padding(end = 12.dp)
+            modifier = Modifier.padding(end = 8.dp).size(18.dp)
         )
         if (editing) {
             BasicTextField(
@@ -282,7 +297,7 @@ private fun SearchBar(
                 onValueChange = onQueryChange,
                 enabled = enabled,
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 22.sp),
+                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(editorFocus)
@@ -298,7 +313,7 @@ private fun SearchBar(
                         Text(
                             stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog),
                             color = Color(0x99FFFFFF),
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     inner()
@@ -310,7 +325,7 @@ private fun SearchBar(
                     stringResource(if (enabled) R.string.search_hint else R.string.loading_catalog)
                 },
                 color = if (query.isEmpty()) Color(0x99FFFFFF) else Color.White,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
                     .onPreviewKeyEvent { e ->
@@ -330,10 +345,10 @@ private fun SearchBar(
 
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    TouchableButton(onClick = onClick) {
+    TouchableButton(onClick = onClick, compact = true, selected = selected) {
         Text(
             if (selected) "• $label" else label,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.labelMedium
         )
     }
 }
@@ -345,7 +360,6 @@ private fun ResultsContent(
     onOpenSeries: (Int, String, String?) -> Unit,
     onOpenChannel: (LiveChannel) -> Unit
 ) {
-    val dim = rememberTvDim()
     val empty = results.channels.isEmpty() && results.movies.isEmpty() && results.series.isEmpty()
     if (empty) {
         EmptyState(
@@ -356,30 +370,41 @@ private fun ResultsContent(
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    // Cards compactos pra caber as 3 linhas (canais/filmes/séries) sem
+    // scroll vertical na primeira dobra. Os tamanhos padrão (Channel 320,
+    // Poster 220) consumiam ~700dp em TV.
+    val dim = rememberTvDim()
+    val posterW = when (dim.formFactor) {
+        com.iptv.app.ui.common.FormFactor.Phone -> 90.dp
+        com.iptv.app.ui.common.FormFactor.Tablet -> 100.dp
+        com.iptv.app.ui.common.FormFactor.Tv -> 110.dp
+    }
+    val rowGap = 10.dp
+    val cardGap = 8.dp
+    Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
         if (results.channels.isNotEmpty()) {
             ResultRow("Canais", results.channels.size, Icons.Filled.LiveTv) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(cardGap)) {
                     items(results.channels) { ch ->
-                        ChannelCard(
+                        ChannelMiniCard(
                             title = ch.name,
-                            number = ch.num,
-                            logoUrl = ch.logoUrl
-                        ) {
-                            onOpenChannel(ch)
-                        }
+                            logoUrl = ch.logoUrl,
+                            width = posterW
+                        ) { onOpenChannel(ch) }
                     }
                 }
             }
         }
         if (results.movies.isNotEmpty()) {
             ResultRow("Filmes", results.movies.size, Icons.Filled.Movie) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(cardGap)) {
                     items(results.movies) { m ->
                         PosterCard(
                             title = m.name,
                             imageUrl = m.posterUrl,
-                            fallbackIcon = Icons.Filled.Movie
+                            fallbackIcon = Icons.Filled.Movie,
+                            overrideWidth = posterW,
+                            compactTitle = true
                         ) {
                             onPlay(
                                 PlayerArgs(
@@ -398,18 +423,75 @@ private fun ResultsContent(
         }
         if (results.series.isNotEmpty()) {
             ResultRow("Séries", results.series.size, Icons.Filled.Tv) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(cardGap)) {
                     items(results.series) { s ->
                         PosterCard(
                             title = s.name,
                             imageUrl = s.coverUrl,
-                            fallbackIcon = Icons.Filled.Tv
+                            fallbackIcon = Icons.Filled.Tv,
+                            overrideWidth = posterW,
+                            compactTitle = true
                         ) {
                             onOpenSeries(s.id, s.name, s.coverUrl)
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Card miniatura para canais: logo dentro de uma caixa quadrada (Fit, sem
+ * crop) e nome em uma faixa logo abaixo. O PosterCard 2:3 cortava logos
+ * largas (ESPN, Discovery) e a faixa do nome ficava em cima do logo.
+ */
+@Composable
+private fun ChannelMiniCard(
+    title: String,
+    logoUrl: String?,
+    width: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    com.iptv.app.ui.common.TouchableCard(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.width(width)
+    ) {
+        Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (logoUrl.isNullOrBlank()) {
+                    Icon(
+                        Icons.Filled.LiveTv,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                } else {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                    )
+                }
+            }
+            Text(
+                title,
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
         }
     }
 }
