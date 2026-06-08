@@ -27,10 +27,23 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.foundation.text.KeyboardOptions
 
-class ParentalSession(private var unlockedAt: Long = 0L) {
-    fun isUnlocked(): Boolean = System.currentTimeMillis() - unlockedAt < 15 * 60 * 1000L
+/**
+ * Sessão de desbloqueio do controle parental.
+ *
+ * O timestamp é estático (escopo de processo), então o desbloqueio sobrevive
+ * à recriação de telas/Composables — trocar de canal ou navegar entre seções
+ * não pede a senha de novo. Uma vez digitada, vale por [WINDOW_MS] (1h) desde
+ * a última vez; depois disso pede novamente. Reinício do app sempre tranca.
+ */
+class ParentalSession {
+    fun isUnlocked(): Boolean = System.currentTimeMillis() - unlockedAt < WINDOW_MS
     fun unlock() { unlockedAt = System.currentTimeMillis() }
     fun lock() { unlockedAt = 0L }
+
+    companion object {
+        private const val WINDOW_MS = 60L * 60 * 1000 // 1 hora
+        @Volatile private var unlockedAt: Long = 0L
+    }
 }
 
 /**

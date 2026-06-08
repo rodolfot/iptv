@@ -69,8 +69,17 @@ data class PlayerUiState(
     val items: List<PlayableItem> = emptyList(),
     val currentIndex: Int = 0,
     val countdownSeconds: Int = 0,
-    val title: String = ""
+    val title: String = "",
+    /** True quando o conteúdo atual é um canal Ao Vivo (habilita zapping). */
+    val isLive: Boolean = false,
+    /** Canais irmãos (mesma categoria) para zapping esquerda/direita. */
+    val liveSiblings: List<LiveNav> = emptyList(),
+    /** Índice do canal atual em [liveSiblings], ou -1 se desconhecido. */
+    val liveIndex: Int = -1
 )
+
+/** Item mínimo para navegação entre canais Ao Vivo via D-pad. */
+data class LiveNav(val streamId: Int, val name: String)
 
 data class PlayableItem(
     val url: String,
@@ -96,8 +105,20 @@ class PlayerViewModel @Inject constructor(
     private val seriesProgressDao: SeriesProgressDao,
     private val liveCache: LiveCacheDao,
     private val liveHistoryDao: com.iptv.app.data.db.LiveHistoryDao,
+    private val categoryCache: com.iptv.app.data.db.CategoryCacheDao,
+    private val seriesCache: com.iptv.app.data.db.SeriesCacheDao,
     private val currentProfile: CurrentProfile
 ) : ViewModel() {
+
+    /** True quando a categoria é marcada como adulta — conteúdo protegido não
+     *  deve entrar nos históricos (canais recentes / continuar assistindo). */
+    private suspend fun isAdultCategory(
+        type: com.iptv.app.domain.model.ContentType,
+        categoryId: String?
+    ): Boolean {
+        if (categoryId.isNullOrBlank()) return false
+        return categoryCache.isAdult(type, categoryId) == true
+    }
     private val _state = MutableStateFlow(PlayerUiState())
     val state = _state.asStateFlow()
 
@@ -105,42 +126,29 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             when (args.kind) {
                 PlayerKind.LIVE -> {
-                    // If the cached channel carries a concrete streamUrl (M3U import),
-                    // play that directly — bypassing Xtream URL construction.
                     val cached = liveCache.getById(args.streamId)
-                    val directUrl = cached?.streamUrl
-                    val url = when {
-                        directUrl != null && args.timeshiftStartMs == 0L -> directUrl
-                        args.timeshiftStartMs > 0L -> repo.timeshiftUrl(
+                    // Timeshift (tv_archive) é um pedido específico — não entra no
+                    // fluxo de zapping nem carrega os canais irmãos.
+                    if (args.timeshiftStartMs > 0L) {
+                        val url = repo.timeshiftUrl(
                             streamId = args.streamId,
                             startMs = args.timeshiftStartMs,
                             durationMin = args.timeshiftDurationMin
                         )
-                        else -> repo.liveStreamUrl(args.streamId, hls = false)
+                        _state.value = PlayerUiState(
+                            items = listOf(PlayableItem(url, args.title)),
+                            title = args.title
+                        )
+                        return@launch
                     }
-                    _state.value = PlayerUiState(
-                        items = listOf(PlayableItem(url, args.title)),
-                        title = args.title
-                    )
-                    // Histórico: marca este canal como o mais recente assistido,
-                    // para alimentar a seção "Canais recentes" na Início.
-                    // trim() logo depois pra manter no máximo 10 — sem isso
-                    // zapping pesado deixaria a tabela com centenas de linhas.
-                    if (args.timeshiftStartMs == 0L) {
-                        runCatching {
-                            val pid = currentProfile.id()
-                            liveHistoryDao.upsert(
-                                com.iptv.app.data.db.LiveHistoryEntity(
-                                    profileId = pid,
-                                    channelId = args.streamId,
-                                    name = args.title,
-                                    logoUrl = cached?.logoUrl,
-                                    categoryId = cached?.categoryId
-                                )
-                            )
-                            liveHistoryDao.trim(pid, keep = 10)
-                        }
-                    }
+                    // Canais irmãos da mesma categoria, na ordem do drawer, para
+                    // permitir zapping com esquerda/direita do controle.
+                    val siblings = cached?.categoryId
+                        ?.let { catId -> liveCache.getByCategory(catId) }
+                        ?.map { LiveNav(it.streamId, it.name) }
+                        ?: emptyList()
+                    val index = siblings.indexOfFirst { it.streamId == args.streamId }
+                    playLive(args.streamId, args.title, siblings, index)
                 }
                 PlayerKind.MOVIE -> {
                     val url = repo.movieStreamUrl(args.streamId, args.containerExtension)
@@ -224,6 +232,58 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    /** Constrói a URL do canal, atualiza o estado e registra no histórico.
+     *  Usado tanto no load inicial quanto no zapping. */
+    private suspend fun playLive(
+        streamId: Int,
+        title: String,
+        siblings: List<LiveNav>,
+        liveIndex: Int
+    ) {
+        val cached = liveCache.getById(streamId)
+        // Canal importado via M3U traz a URL direta; senão monta a do Xtream.
+        val url = cached?.streamUrl ?: repo.liveStreamUrl(streamId, hls = false)
+        _state.value = PlayerUiState(
+            items = listOf(PlayableItem(url, title)),
+            title = title,
+            isLive = true,
+            liveSiblings = siblings,
+            liveIndex = liveIndex
+        )
+        // Histórico: marca este canal como o mais recente assistido, para
+        // alimentar a seção "Canais recentes" na Início. trim() logo depois
+        // pra manter no máximo 10 — sem isso zapping pesado deixaria a tabela
+        // com centenas de linhas. Conteúdo adulto/protegido NÃO entra no
+        // histórico (a pedido do usuário).
+        if (!isAdultCategory(com.iptv.app.domain.model.ContentType.LIVE, cached?.categoryId)) {
+            runCatching {
+                val pid = currentProfile.id()
+                liveHistoryDao.upsert(
+                    com.iptv.app.data.db.LiveHistoryEntity(
+                        profileId = pid,
+                        channelId = streamId,
+                        name = title,
+                        logoUrl = cached?.logoUrl,
+                        categoryId = cached?.categoryId
+                    )
+                )
+                liveHistoryDao.trim(pid, keep = 10)
+            }
+        }
+    }
+
+    /** Avança (+1) ou volta (-1) um canal dentro da categoria atual, com
+     *  wrap-around nas pontas. No-op se não houver canais irmãos. */
+    fun zapLive(delta: Int) {
+        val s = _state.value
+        if (!s.isLive || s.liveSiblings.size < 2 || s.liveIndex < 0) return
+        val newIndex = (s.liveIndex + delta).mod(s.liveSiblings.size)
+        val target = s.liveSiblings[newIndex]
+        viewModelScope.launch {
+            playLive(target.streamId, target.name, s.liveSiblings, newIndex)
+        }
+    }
+
     fun onTransition(index: Int) {
         val item = _state.value.items.getOrNull(index) ?: return
         _state.value = _state.value.copy(currentIndex = index, title = item.title)
@@ -236,6 +296,11 @@ class PlayerViewModel @Inject constructor(
             val pid = currentProfile.id()
             when {
                 !item.episodeId.isNullOrBlank() && item.seriesId >= 0 -> {
+                    // Série em categoria adulta não entra no "Continuar assistindo".
+                    val seriesCat = seriesCache.categoryIdOf(item.seriesId)
+                    if (isAdultCategory(com.iptv.app.domain.model.ContentType.SERIES, seriesCat)) {
+                        return@launch
+                    }
                     progressDao.upsert(
                         EpisodeProgressEntity(
                             profileId = pid,
@@ -261,6 +326,10 @@ class PlayerViewModel @Inject constructor(
                     )
                 }
                 item.movieId >= 0 -> {
+                    // Filme em categoria adulta não entra no "Continuar assistindo".
+                    if (isAdultCategory(com.iptv.app.domain.model.ContentType.MOVIE, item.movieCategory)) {
+                        return@launch
+                    }
                     if (watched) {
                         movieProgressDao.delete(pid, item.movieId)
                     } else {
@@ -632,6 +701,11 @@ fun PlayerScreen(
                         // (MediaRewind/MediaFastForward) sempre fazem seek.
                         if (overlayHasFocus && evt.key == Key.DirectionLeft) {
                             false
+                        } else if (state.isLive && evt.key == Key.DirectionLeft) {
+                            // Ao Vivo: esquerda volta um canal (seek não faz
+                            // sentido em stream contínuo).
+                            vm.zapLive(-1)
+                            true
                         } else {
                             playerView.showController()
                             exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
@@ -641,6 +715,10 @@ fun PlayerScreen(
                     Key.DirectionRight, Key.MediaFastForward -> {
                         if (overlayHasFocus && evt.key == Key.DirectionRight) {
                             false
+                        } else if (state.isLive && evt.key == Key.DirectionRight) {
+                            // Ao Vivo: direita avança um canal.
+                            vm.zapLive(1)
+                            true
                         } else {
                             playerView.showController()
                             val target = exo.currentPosition + seekStepMs
@@ -664,6 +742,9 @@ fun PlayerScreen(
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
                             if (overlayHasFocus) {
                                 false
+                            } else if (state.isLive) {
+                                vm.zapLive(-1)
+                                true
                             } else {
                                 playerView.showController()
                                 exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
@@ -673,6 +754,9 @@ fun PlayerScreen(
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
                             if (overlayHasFocus) {
                                 false
+                            } else if (state.isLive) {
+                                vm.zapLive(1)
+                                true
                             } else {
                                 playerView.showController()
                                 val target = exo.currentPosition + seekStepMs

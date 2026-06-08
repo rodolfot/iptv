@@ -59,10 +59,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import com.iptv.app.domain.model.ContentType
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -73,6 +75,7 @@ class ContinueWatchingViewModel @Inject constructor(
     private val seriesProgressDao: SeriesProgressDao,
     private val episodeProgressDao: EpisodeProgressDao,
     private val liveHistoryDao: com.iptv.app.data.db.LiveHistoryDao,
+    private val categoryCache: com.iptv.app.data.db.CategoryCacheDao,
     private val currentProfile: CurrentProfile,
     private val recommender: Recommender,
     private val xtream: com.iptv.app.data.api.XtreamRepository,
@@ -82,15 +85,28 @@ class ContinueWatchingViewModel @Inject constructor(
         .map { currentProfile.id() }
         .distinctUntilChanged()
 
-    val movies = profileIdFlow
-        .flatMapLatest { movieProgressDao.observeInProgress(it) }
+    // Conjunto de ids de categorias adultas por tipo — usado para esconder
+    // conteúdo protegido dos históricos, inclusive entradas gravadas antes
+    // do filtro existir.
+    private fun adultIds(type: ContentType) = categoryCache.observe(type)
+        .map { cats -> cats.filter { it.isAdult }.map { it.id }.toSet() }
+        .distinctUntilChanged()
+
+    val movies = combine(
+        profileIdFlow.flatMapLatest { movieProgressDao.observeInProgress(it) },
+        adultIds(ContentType.MOVIE)
+    ) { list, adult -> list.filterNot { it.categoryId != null && it.categoryId in adult } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val series = profileIdFlow
         .flatMapLatest { seriesProgressDao.observeRecent(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val recentChannels = profileIdFlow
-        .flatMapLatest { liveHistoryDao.observeRecent(it, limit = 10) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val recentChannels = combine(
+        // Busca a mais que 10 porque o filtro abaixo pode remover alguns.
+        profileIdFlow.flatMapLatest { liveHistoryDao.observeRecent(it, limit = 30) },
+        adultIds(ContentType.LIVE)
+    ) { list, adult ->
+        list.filterNot { it.categoryId != null && it.categoryId in adult }.take(10)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Recomendações removidas a pedido do usuário — o Recommender fazia
     // queries pesadas no banco ao abrir a Início e dava travadinhas ao

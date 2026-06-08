@@ -31,6 +31,11 @@ interface CategoryCacheDao {
     @Query("SELECT * FROM category_cache WHERE type = :type ORDER BY sortKey")
     suspend fun get(type: ContentType): List<CategoryCacheEntity>
 
+    /** Marca de conteúdo adulto de uma categoria — usado para manter conteúdo
+     *  protegido fora dos históricos (canais recentes / continuar assistindo). */
+    @Query("SELECT isAdult FROM category_cache WHERE type = :type AND id = :id LIMIT 1")
+    suspend fun isAdult(type: ContentType, id: String): Boolean?
+
     @Query("DELETE FROM category_cache WHERE type = :type")
     suspend fun clear(type: ContentType)
 
@@ -54,6 +59,11 @@ interface LiveCacheDao {
 
     @Query("SELECT * FROM live_cache WHERE streamId = :streamId LIMIT 1")
     suspend fun getById(streamId: Int): LiveChannelCacheEntity?
+
+    /** Canais da mesma categoria, na mesma ordem do drawer — usado para o
+     *  zapping (botões esquerda/direita do controle) no player Ao Vivo. */
+    @Query("SELECT * FROM live_cache WHERE categoryId = :categoryId ORDER BY name COLLATE NOCASE")
+    suspend fun getByCategory(categoryId: String): List<LiveChannelCacheEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<LiveChannelCacheEntity>)
@@ -210,6 +220,11 @@ interface SeriesCacheDao {
 
     @Query("SELECT * FROM series_cache ORDER BY lastModifiedTimestamp DESC")
     fun observeAll(): Flow<List<SeriesCacheEntity>>
+
+    /** Categoria de uma série — para checar se é conteúdo adulto ao salvar
+     *  progresso (a tabela de progresso de série não guarda categoryId). */
+    @Query("SELECT categoryId FROM series_cache WHERE seriesId = :seriesId LIMIT 1")
+    suspend fun categoryIdOf(seriesId: Int): String?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<SeriesCacheEntity>)

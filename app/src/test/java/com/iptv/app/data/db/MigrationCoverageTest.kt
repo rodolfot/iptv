@@ -13,7 +13,11 @@ class MigrationCoverageTest {
 
     @Test
     fun `every version step has a registered migration`() {
-        val expectedSteps = (1 until 9).map { it to it + 1 }
+        // Mantenha igual ao `version` da @Database em AppDatabase. As anotações
+        // do Room não são retidas em runtime, então não dá pra ler por
+        // reflection — ao bumpar o schema, atualize aqui e adicione a migração.
+        val currentDbVersion = 10
+        val expectedSteps = (1 until currentDbVersion).map { it to it + 1 }
         val actualSteps = ALL_MIGRATIONS.map { it.startVersion to it.endVersion }
         assertEquals(expectedSteps, actualSteps)
     }

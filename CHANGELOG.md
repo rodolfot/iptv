@@ -6,6 +6,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-06-07
+
+### Added
+
+- **Zapping por D-pad no player Ao Vivo**: com um canal aberto, esquerda/direita do controle troca para o canal anterior/seguinte dentro da categoria (mesma ordem do drawer, com wrap-around nas pontas). O `PlayerViewModel` carrega os canais irmãos via `LiveCacheDao.getByCategory()` e o `zapLive(±1)` recompõe a reprodução sem voltar pra lista. Seek por D-pad (±10s) continua valendo para filmes/séries; timeshift (`tv_archive`) fica fora do zapping.
+
+### Changed
+
+- **Sessão do PIN parental dura 1 hora e sobrevive à navegação**: o desbloqueio era guardado num `remember` recriado a cada tela, então trocar de canal/categoria pedia a senha de novo; agora o timestamp é estático (escopo de processo) e a janela subiu de 15min para 1h. Digitou uma vez, vale 1h desde a última vez; reiniciar o app sempre tranca.
+
+### Fixed
+
+- **Conteúdo adulto/protegido fora dos históricos**: canais, filmes e séries em categorias adultas não entram mais em "Canais recentes" nem em "Continuar assistindo". Filtra em duas camadas — não grava no histórico ao reproduzir (`PlayerScreen`) e também esconde na leitura (`ContinueWatchingViewModel`), removendo entradas adultas gravadas antes do filtro existir. A marca de "adulto" usa a mesma regra das categorias (regex de nome + categorias marcadas manualmente).
+- **Testes desatualizados voltaram a passar**: `MigrationCoverageTest` esperava o range de migrações até a versão 9, mas o schema já estava em 10 (com `MIGRATION_9_10` registrada) — agora alinhado. `XtreamDtoParsingTest` esperava `durationSecs` como `Int`, mas o campo virou `@Loose String?` na 1.3.0 — asserção corrigida para a string.
+
 ## [1.3.1] — 2026-05-20
 
 ### Fixed

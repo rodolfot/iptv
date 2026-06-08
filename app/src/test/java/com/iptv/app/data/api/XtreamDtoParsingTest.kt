@@ -103,7 +103,9 @@ class XtreamDtoParsingTest {
         assertEquals(1, parsed.seasons?.size)
         val episodes = parsed.normalizedEpisodes().getValue("1")
         assertEquals(2, episodes.size)
-        assertEquals(1200, episodes[0].info?.durationSecs)
+        // durationSecs virou @Loose String? na 1.3.0 (provedores mandam Int,
+        // Double ou String), então o valor cru parseado é a string "1200".
+        assertEquals("1200", episodes[0].info?.durationSecs)
     }
 
     @Test fun `category with parent_id missing`() {
