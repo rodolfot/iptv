@@ -32,6 +32,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.runtime.remember
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
@@ -230,7 +231,11 @@ fun SearchScreen(
         }
 
         when {
-            state.loadingCatalog -> Text(stringResource(R.string.loading_catalog))
+            state.loadingCatalog -> Text(
+                stringResource(R.string.loading_catalog),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             state.error != null && !state.catalogReady ->
                 ErrorState(message = state.error!!, onRetry = { vm.retry() })
             query.trim().length < 2 -> PreSearchPanel(
@@ -345,11 +350,10 @@ private fun SearchBar(
 
 @Composable
 private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    // Sem prefixo "•": a cor de preenchimento do TouchableButton(selected)
+    // já comunica a seleção — o marcador de texto era redundante.
     TouchableButton(onClick = onClick, compact = true, selected = selected) {
-        Text(
-            if (selected) "• $label" else label,
-            style = MaterialTheme.typography.labelMedium
-        )
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -539,8 +543,11 @@ private fun PreSearchPanel(
                 stringResource(R.string.search_history_title),
                 style = MaterialTheme.typography.titleSmall
             )
-            TouchableButton(onClick = onClear) {
-                Text(stringResource(R.string.search_history_clear))
+            TouchableButton(onClick = onClear, compact = true) {
+                Text(
+                    stringResource(R.string.search_history_clear),
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
         }
         // Wrap chips in a flow-like LazyRow; on Phone the content scrolls horizontally
@@ -555,7 +562,12 @@ private fun PreSearchPanel(
 
 @Composable
 private fun HistoryChip(label: String, onClick: () -> Unit) {
-    TouchableButton(onClick = onClick) {
-        Text("• $label", style = MaterialTheme.typography.labelLarge)
+    TouchableButton(onClick = onClick, compact = true) {
+        Icon(
+            Icons.Filled.History,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp)
+        )
+        Text("  $label", style = MaterialTheme.typography.labelMedium)
     }
 }

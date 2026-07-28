@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -228,8 +230,13 @@ fun PosterCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(Color(0xCC000000))
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                    .fillMaxHeight(0.4f)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color(0xEE000000))
+                        )
+                    ),
+                contentAlignment = Alignment.BottomStart
             ) {
                 // Título sempre em labelSmall (10sp) para ficar idêntico ao
                 // ChannelTile do Ao Vivo. Antes Filmes/Séries usavam
@@ -242,8 +249,10 @@ fun PosterCard(
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
-                    else Modifier
+                    modifier = (if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    else Modifier)
+                        .fillMaxWidth()
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
                 )
             }
             // Barra de progresso (azul) na base do card — só aparece quando
@@ -445,8 +454,21 @@ fun CategoryCard(
         onClick = onClick,
         modifier = categoryModifier
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).padding(pad)) {
-            Column(modifier = Modifier.align(Alignment.CenterStart)) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+            // Barra de destaque à esquerda — mesma linguagem visual do
+            // DrawerCategoryItem, dá um acento de cor ao card que antes era
+            // só texto sobre uma superfície lisa.
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(4.dp)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = pad + 6.dp, end = pad, top = pad, bottom = pad)
+            ) {
                 Text(
                     title,
                     style = when (dim.formFactor) {
@@ -458,19 +480,27 @@ fun CategoryCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 if (count != null) {
-                    Text(
-                        "$count itens",
-                        style = if (isPhone) MaterialTheme.typography.bodySmall
-                        else MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            "$count itens",
+                            style = if (isPhone) MaterialTheme.typography.labelSmall
+                            else MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             if (locked) {
                 Icon(
                     Icons.Filled.Lock,
                     contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.a11y_locked),
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    modifier = Modifier.align(Alignment.TopEnd).padding(pad)
                 )
             }
         }

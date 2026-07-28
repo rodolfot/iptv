@@ -6,6 +6,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-07-27
+
+### Changed
+
+- **Polimento visual em Filmes, Séries e Busca**: sem mudar densidade de grid nem fluxo de navegação — passada de acabamento em hierarquia, espaçamento e consistência entre telas.
+  - Pôsteres (`PosterCard`) ganharam gradiente no rótulo do título em vez da faixa preta sólida, deixando a transição para o texto mais suave.
+  - Cartões de categoria (`CategoryCard`, usado em Filmes/Séries/Ao Vivo no telefone) ganharam uma barra de destaque à esquerda e o contador de itens virou uma etiqueta arredondada, mesma linguagem visual do drawer de categorias.
+  - Botão "Filtros" (Filmes/Séries) ganhou ícone, alinhado ao padrão já usado no botão de ordenação.
+  - Cabeçalhos do drawer de categorias ("Categorias de filmes"/"Categorias de séries") ganharam um ícone.
+  - `ErrorState` (usado em várias telas) ganhou um ícone de alerta ao lado da mensagem.
+  - Busca: os botões da tela (chips de filtro, "Limpar" histórico, chips de histórico) tinham 3 tamanhos/fontes diferentes — agora todos usam o mesmo padrão compacto. Chips de filtro perderam o prefixo "•" redundante (a cor já indica seleção) e os chips de histórico ganharam um ícone de relógio.
+
 ## [2.1.1] — 2026-07-27
 
 ### Fixed

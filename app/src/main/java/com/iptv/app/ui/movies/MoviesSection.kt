@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
-import com.iptv.app.ui.common.TouchableButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.iptv.app.data.prefs.SortScope
@@ -361,11 +360,10 @@ fun MoviesSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
-                    TouchableButton(onClick = { filtersDialogOpen = true }) {
-                        Text(stringResource(
-                            if (advancedFilters.isActive) R.string.filters_button_active else R.string.filters_button
-                        ))
-                    }
+                    com.iptv.app.ui.common.FiltersButton(
+                        active = advancedFilters.isActive,
+                        onClick = { filtersDialogOpen = true }
+                    )
                     SortMenuButton(
                         current = settings.moviesSort,
                         options = SortOption.MOVIE_OPTIONS
@@ -378,11 +376,10 @@ fun MoviesSection(
                         style = MaterialTheme.typography.headlineSmall
                     )
                     Box(modifier = Modifier.weight(1f))
-                    TouchableButton(onClick = { filtersDialogOpen = true }) {
-                        Text(stringResource(
-                            if (advancedFilters.isActive) R.string.filters_button_active else R.string.filters_button
-                        ))
-                    }
+                    com.iptv.app.ui.common.FiltersButton(
+                        active = advancedFilters.isActive,
+                        onClick = { filtersDialogOpen = true }
+                    )
                     SortMenuButton(
                         current = settings.moviesSort,
                         options = SortOption.MOVIE_OPTIONS

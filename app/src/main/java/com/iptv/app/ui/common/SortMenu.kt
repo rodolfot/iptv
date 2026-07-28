@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import com.iptv.app.domain.sort.SortOption
+
+/** Botão "Filtros" com ícone — mesma linguagem visual do [SortMenuButton]. */
+@Composable
+fun FiltersButton(active: Boolean, onClick: () -> Unit) {
+    TouchableButton(onClick = onClick) {
+        Icon(Icons.Filled.FilterList, contentDescription = null)
+        Text(
+            "  " + stringResource(if (active) R.string.filters_button_active else R.string.filters_button),
+            maxLines = 1,
+            style = MaterialTheme.typography.labelLarge
+        )
+    }
+}
 
 @Composable
 fun SortMenuButton(

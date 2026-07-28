@@ -192,11 +192,22 @@ private fun SeriesCategoriesDrawer(
             .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 8.dp)
     ) {
-        Text(
-            stringResource(R.string.section_series_categories),
-            style = MaterialTheme.typography.titleSmall,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-        )
+        ) {
+            Icon(
+                Icons.Filled.Tv,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                stringResource(R.string.section_series_categories),
+                style = MaterialTheme.typography.titleSmall
+            )
+        }
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             lazyListItems(categories) { cat ->
                 val isSelected = cat.id == selectedId
