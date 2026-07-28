@@ -192,7 +192,7 @@ fun LiveSection(
         // Substituímos pelo loading enquanto a auto-seleção não ocorre.
         if (selectedCat == null && isTvLike) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                Text(stringResource(R.string.loading))
+                com.iptv.app.ui.common.InlineLoading()
             }
         } else if (selectedCat == null) {
             // Header: title on the left, inline filter on the right (TV/Tablet).
@@ -237,7 +237,7 @@ fun LiveSection(
                 foundChannels = vm.searchLiveByName(needleCat)
             }
 
-            if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
+            if (cats.loading && cats.items.isEmpty()) com.iptv.app.ui.common.InlineLoading()
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadLiveCategories(forceRefresh = true) }) }
 
             if (foundChannels.isNotEmpty()) {
@@ -310,7 +310,7 @@ fun LiveSection(
                         options = SortOption.LIVE_OPTIONS
                     ) { vm.setSort(SortScope.LIVE, it) }
                 }
-                if (channels.loading && channels.items.isEmpty()) Text(stringResource(R.string.loading))
+                if (channels.loading && channels.items.isEmpty()) com.iptv.app.ui.common.InlineLoading()
                 channels.error?.let { ErrorState(message = it, onRetry = { vm.loadChannels(selectedCat, forceRefresh = true) }) }
                 LocalFilterField(
                     value = localFilter,

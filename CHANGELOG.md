@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-07-28
+
+### Changed
+
+- **Tela de login redesenhada**: era a única tela do app que ainda usava os campos e o botão padrão do Material3 em vez do padrão visual (campo em pílula, rótulo acima, `TouchableButton`) já usado em Perfis, Configurações e no PIN parental — a primeira tela que um usuário novo vê destoava do resto do app. Agora usa os mesmos componentes, com o mesmo comportamento seguro para D-pad (foco não abre o teclado sozinho).
+- **Estados de carregamento consistentes**: Filmes, Séries e Ao Vivo mostravam um texto "Carregando…" sem estilo em alguns pontos (categoria inicial na TV, grade de itens no telefone) enquanto outras partes do app já usavam o indicador com spinner (`InlineLoading`). Unificado em todas as 9 ocorrências dessas 3 telas.
+
 ## [2.2.1] — 2026-07-28
 
 ### Fixed

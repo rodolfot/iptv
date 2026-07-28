@@ -10,13 +10,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,13 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusEvent
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,12 +35,13 @@ import androidx.lifecycle.viewModelScope
 import com.iptv.app.R
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.prefs.SettingsStore
+import com.iptv.app.ui.common.TouchableButton
+import com.iptv.app.ui.common.TvSafeTextField
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * Returns the host(s) to try when logging in. We used to probe a handful of
@@ -109,7 +101,6 @@ class LoginViewModel @Inject constructor(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun LoginScreen(
     onLogged: () -> Unit,
@@ -121,21 +112,12 @@ fun LoginScreen(
     val state by vm.state.collectAsState()
 
     val hostFocus = remember { FocusRequester() }
-    val userFocus = remember { FocusRequester() }
-    val passFocus = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
     val fieldsRequired = stringResource(R.string.login_fields_required)
 
-    val scrollState = rememberScrollState()
-    val hostBringIntoView = remember { BringIntoViewRequester() }
-    val userBringIntoView = remember { BringIntoViewRequester() }
-    val passBringIntoView = remember { BringIntoViewRequester() }
-    val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        hostFocus.requestFocus()
-        keyboard?.show()
-    }
+    // Foco inicial no primeiro campo — mesmo padrão D-pad-safe do resto do
+    // app (TvSafeTextField): o foco não abre o teclado sozinho, só marca
+    // onde o OK vai agir primeiro.
+    LaunchedEffect(Unit) { runCatching { hostFocus.requestFocus() } }
 
     if (state.success) {
         val ctx = androidx.compose.ui.platform.LocalContext.current
@@ -159,70 +141,52 @@ fun LoginScreen(
     ) {
         Column(
             modifier = Modifier
-                .width(640.dp)
-                .verticalScroll(scrollState)
+                .width(480.dp)
+                .verticalScroll(rememberScrollState())
                 .padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(stringResource(R.string.login_brand), style = MaterialTheme.typography.displayMedium)
-            Text(stringResource(R.string.login_title), style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
+            Text(
+                stringResource(R.string.login_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            TvSafeTextField(
                 value = host,
                 onValueChange = { host = it },
-                label = { Text(stringResource(R.string.login_host)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(onNext = { userFocus.requestFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .bringIntoViewRequester(hostBringIntoView)
-                    .onFocusEvent { if (it.isFocused) coroutineScope.launch { hostBringIntoView.bringIntoView() } }
-                    .focusRequester(hostFocus)
+                label = stringResource(R.string.login_host),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                modifier = Modifier.fillMaxWidth().focusRequester(hostFocus)
             )
-            OutlinedTextField(
+            TvSafeTextField(
                 value = user,
                 onValueChange = { user = it },
-                label = { Text(stringResource(R.string.login_user)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { passFocus.requestFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .bringIntoViewRequester(userBringIntoView)
-                    .onFocusEvent { if (it.isFocused) coroutineScope.launch { userBringIntoView.bringIntoView() } }
-                    .focusRequester(userFocus)
+                label = stringResource(R.string.login_user),
+                modifier = Modifier.fillMaxWidth()
             )
-            OutlinedTextField(
+            TvSafeTextField(
                 value = pass,
                 onValueChange = { pass = it },
-                label = { Text(stringResource(R.string.login_pass)) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = {
-                    keyboard?.hide()
-                    vm.login(host, user, pass, fieldsRequired)
-                }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .bringIntoViewRequester(passBringIntoView)
-                    .onFocusEvent { if (it.isFocused) coroutineScope.launch { passBringIntoView.bringIntoView() } }
-                    .focusRequester(passFocus)
+                label = stringResource(R.string.login_pass),
+                isPassword = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth()
             )
             state.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
-            Button(
+            TouchableButton(
                 onClick = { vm.login(host, user, pass, fieldsRequired) },
-                modifier = Modifier.fillMaxWidth()
+                selected = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             ) {
-                Text(stringResource(if (state.loading) R.string.login_connecting else R.string.login_button))
+                Text(
+                    stringResource(if (state.loading) R.string.login_connecting else R.string.login_button),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         }
     }

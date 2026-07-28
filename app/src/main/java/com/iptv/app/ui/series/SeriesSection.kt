@@ -357,7 +357,7 @@ fun SeriesSection(
     if (isTvLike) {
         if (selectedCat == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.loading))
+                com.iptv.app.ui.common.InlineLoading()
             }
         } else {
             val sortedCats = remember(cats.items) { cats.items.sortedForDisplay() }
@@ -452,7 +452,7 @@ fun SeriesSection(
                 foundSeries = vm.searchSeriesByName(needleCat)
             }
 
-            if (cats.loading && cats.items.isEmpty()) Text(stringResource(R.string.loading))
+            if (cats.loading && cats.items.isEmpty()) com.iptv.app.ui.common.InlineLoading()
             cats.error?.let { ErrorState(message = it, onRetry = { vm.loadSeriesCategories(forceRefresh = true) }) }
 
             if (foundSeries.isNotEmpty()) {
@@ -541,7 +541,7 @@ fun SeriesSection(
                     ) { vm.setSort(SortScope.SERIES, it) }
                 }
             }
-            if (series.loading && series.items.isEmpty()) Text(stringResource(R.string.loading))
+            if (series.loading && series.items.isEmpty()) com.iptv.app.ui.common.InlineLoading()
             series.error?.let { ErrorState(message = it, onRetry = { vm.loadSeries(selectedCat, forceRefresh = true) }) }
             LocalFilterField(
                 value = localFilter,
