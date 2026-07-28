@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -64,6 +65,15 @@ import com.iptv.app.ui.movies.MovieDetailScreen
 import com.iptv.app.ui.movies.MoviesSection
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.iptv.app.ui.parental.ParentalSession
 import com.iptv.app.ui.player.LocalPlaybackHolder
 import com.iptv.app.ui.player.MiniPlayer
@@ -75,7 +85,7 @@ import com.iptv.app.ui.settings.SettingsScreen
 import com.iptv.app.ui.update.UpdatePromptHost
 import com.iptv.app.ui.watchlist.WatchlistScreen
 
-private data class TabSpec(val label: Int, val key: String)
+private data class TabSpec(val label: Int, val key: String, val icon: ImageVector)
 
 /**
  * Args para abrir a tela de detalhe de uma série. Quando vem do "Continuar
@@ -92,14 +102,14 @@ data class SeriesOpenArgs(
 )
 
 private val ALL_TABS = listOf(
-    TabSpec(com.iptv.app.R.string.tab_home, "home"),
-    TabSpec(com.iptv.app.R.string.tab_search, "search"),
-    TabSpec(com.iptv.app.R.string.tab_live, "live"),
-    TabSpec(com.iptv.app.R.string.tab_movies, "movies"),
-    TabSpec(com.iptv.app.R.string.tab_series, "series"),
-    TabSpec(com.iptv.app.R.string.tab_favorites, "favorites"),
-    TabSpec(com.iptv.app.R.string.tab_watchlist, "watchlist"),
-    TabSpec(com.iptv.app.R.string.tab_settings, "settings")
+    TabSpec(com.iptv.app.R.string.tab_home, "home", Icons.Filled.Home),
+    TabSpec(com.iptv.app.R.string.tab_search, "search", Icons.Filled.Search),
+    TabSpec(com.iptv.app.R.string.tab_live, "live", Icons.Filled.LiveTv),
+    TabSpec(com.iptv.app.R.string.tab_movies, "movies", Icons.Filled.Movie),
+    TabSpec(com.iptv.app.R.string.tab_series, "series", Icons.Filled.Tv),
+    TabSpec(com.iptv.app.R.string.tab_favorites, "favorites", Icons.Filled.Favorite),
+    TabSpec(com.iptv.app.R.string.tab_watchlist, "watchlist", Icons.Filled.Bookmark),
+    TabSpec(com.iptv.app.R.string.tab_settings, "settings", Icons.Filled.Settings)
 )
 
 /** Search and Settings are hidden in Kids mode — children shouldn't be able to
@@ -441,6 +451,7 @@ private fun TopBar(
                 itemsIndexed(tabs) { _, spec ->
                     PhoneTab(
                         label = stringResource(spec.label),
+                        icon = spec.icon,
                         selected = spec.key == selectedKey,
                         onClick = { onSelected(spec.key) }
                     )
@@ -454,7 +465,7 @@ private fun TopBar(
             .fillMaxWidth()
             .padding(horizontal = dim.ScreenPadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (onBack != null) {
             com.iptv.app.ui.common.TouchableButton(onClick = onBack) {
@@ -466,7 +477,7 @@ private fun TopBar(
         }
         Text(
             stringResource(com.iptv.app.R.string.app_name),
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.titleMedium
         )
         // Dois indicadores distintos:
         //  - Selecionado (após OK): pílula azul preenchida (mostra qual menu
@@ -487,7 +498,7 @@ private fun TopBar(
         TabRow(
             selectedTabIndex = selectedIndex,
             modifier = Modifier
-                .padding(start = 16.dp)
+                .padding(start = 4.dp)
                 .onFocusChanged { state ->
                     if (state.hasFocus && !tabRowHadFocus) {
                         // Reentrando: alinha o foco visual no selecionado.
@@ -550,10 +561,18 @@ private fun TopBar(
                         focusedSelectedContentColor = androidx.tv.material3.MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text(
-                        stringResource(spec.label),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            spec.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(stringResource(spec.label), style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }
@@ -562,16 +581,24 @@ private fun TopBar(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun PhoneTab(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun PhoneTab(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
+    Row(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        androidx.compose.material3.Icon(
+            icon,
+            contentDescription = null,
+            tint = fg,
+            modifier = Modifier.size(16.dp)
+        )
         Text(label, style = MaterialTheme.typography.labelLarge, color = fg)
     }
 }

@@ -214,12 +214,13 @@ fun ContinueWatchingScreen(
             return
         }
 
-        // Tamanhos compactos para caber pelo menos duas linhas de cards
-        // sem scroll na primeira dobra em TV.
+        // Tamanhos compactos para caber as 3 seções (canais/séries/filmes)
+        // sem scroll na primeira dobra em TV — com HomePosterWidth=96dp a
+        // 3ª seção ficava cortada na borda inferior em telas 1080p.
         var hasPriorSection = false
-        val sectionTopPadding = { if (hasPriorSection) 8.dp else 0.dp }
+        val sectionTopPadding = { if (hasPriorSection) 6.dp else 0.dp }
         val headerStyle = MaterialTheme.typography.titleSmall
-        val rowSpacing = 12.dp
+        val rowSpacing = 10.dp
         // Animação de entrada: cada seção aparece com slide-up + fade,
         // numa cascata de 80ms entre elas (mais natural que tudo de uma vez).
         var sectionIndex = 0
@@ -302,11 +303,12 @@ fun ContinueWatchingScreen(
     }
 }
 
-// Pôsteres do Início em 96dp (altura 144dp na razão 2:3). Antes 110dp
-// somava ~720dp com 3 seções e ainda forçava scroll vertical na TV 1080p
-// — agora as 3 caem confortáveis na dobra. ChannelMiniHomeCard usa o
-// mesmo width pra deixar a linha de canais com a mesma altura visual.
-private val HomePosterWidth = 96.dp
+// Pôsteres do Início em 84dp (altura 126dp na razão 2:3). Já foi 110dp e
+// depois 96dp tentando caber as 3 seções sem scroll na TV 1080p — o TopBar
+// ganhou ícones (mais alto) e voltou a cortar a 3ª seção, por isso mais um
+// ajuste pra baixo. ChannelMiniHomeCard usa o mesmo width pra manter a
+// linha de canais com a mesma altura visual.
+private val HomePosterWidth = 84.dp
 
 @Composable
 private fun MovieContinueCard(item: MovieProgressEntity, onPlay: (PlayerArgs) -> Unit) {

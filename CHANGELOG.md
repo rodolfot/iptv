@@ -6,6 +6,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-07-27
+
+### Changed
+
+- **Menu principal com ícones, sem cortar mais nenhuma aba**: cada aba (Início, Buscar, Ao Vivo, Filmes, Séries, Favoritos, Lista, Config) ganhou um ícone ao lado do rótulo, em TV e em telefone. Em TV os ícones ficaram pequenos de propósito (14dp) — grandes demais desequilibrava a barra — e o espaçamento/padding de cada aba foi reduzido até as 8 caberem numa linha só em 1080p, sem precisar da barra rolar horizontalmente pra alcançar "Config".
+- **Favoritos e Lista redesenhados**: as 3 colunas estreitas de linhas minúsculas (thumb 36dp + texto) deram lugar a seções empilhadas em linhas horizontais de cards grandes — mesmo padrão visual usado em Filmes/Séries/Ao Vivo (`PosterCard`/`ChannelCard`). Favoritos mantém o painel de preview lateral em TV/Tablet, atualizado pelo item em foco; telefone (que antes não tinha tratamento próprio nessas duas telas) agora empilha as seções em largura cheia, sem o preview.
+- **Início sem scroll vertical**: as 3 seções (canais recentes, continuar séries, continuar filmes) preenchidas ao mesmo tempo faziam a 3ª ficar cortada na borda inferior em TV 1080p, forçando scroll — pôsteres reduzidos de 96dp para 84dp pra caber as 3 na primeira dobra.
+
 ## [2.0.0] — 2026-07-27
 
 ### Added
