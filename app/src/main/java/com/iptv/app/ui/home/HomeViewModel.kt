@@ -103,6 +103,58 @@ class HomeViewModel @Inject constructor(
     private val _epgNow = MutableStateFlow<Map<String, EpgProgrammeEntity>>(emptyMap())
     val epgNow = _epgNow.asStateFlow()
 
+    /**
+     * Estado do guia em grade (EPG): programas por channelId (epg id) numa
+     * janela de tempo. windowStartMs é ancorado na hora cheia atual.
+     */
+    data class EpgGuideState(
+        val loading: Boolean = false,
+        val byChannel: Map<String, List<EpgProgrammeEntity>> = emptyMap(),
+        val windowStartMs: Long = 0L,
+        val windowEndMs: Long = 0L
+    )
+
+    private val _epgGuide = MutableStateFlow(EpgGuideState())
+    val epgGuide = _epgGuide.asStateFlow()
+
+    /** Horas exibidas na grade do guia a partir da hora cheia atual. */
+    private val guideHours = 8
+
+    /**
+     * Carrega a EPG dos canais informados para a janela do guia (hora cheia
+     * atual → +[guideHours]h). Faz refresh do XMLTV se estiver stale antes de
+     * ler o range.
+     */
+    fun loadEpgGuide(channels: List<LiveChannel>) {
+        val ids = channels.mapNotNull { it.epgChannelId }.filter { it.isNotBlank() }.distinct()
+        val hourMs = 3600_000L
+        val windowStart = (System.currentTimeMillis() / hourMs) * hourMs
+        val windowEnd = windowStart + guideHours * hourMs
+        _epgGuide.value = _epgGuide.value.copy(
+            loading = true,
+            windowStartMs = windowStart,
+            windowEndMs = windowEnd
+        )
+        if (ids.isEmpty()) {
+            _epgGuide.value = EpgGuideState(
+                loading = false, byChannel = emptyMap(),
+                windowStartMs = windowStart, windowEndMs = windowEnd
+            )
+            return
+        }
+        viewModelScope.launch {
+            if (epg.isStale()) runCatching { epg.refresh() }
+            val byChannel = runCatching { epg.rangeForChannels(ids, windowStart, windowEnd) }
+                .getOrDefault(emptyMap())
+            _epgGuide.value = EpgGuideState(
+                loading = false,
+                byChannel = byChannel,
+                windowStartMs = windowStart,
+                windowEndMs = windowEnd
+            )
+        }
+    }
+
     val settingsFlow: StateFlow<com.iptv.app.data.prefs.AppSettings> =
         settings.flow.stateIn(viewModelScope, SharingStarted.Eagerly, com.iptv.app.data.prefs.AppSettings())
 

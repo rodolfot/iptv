@@ -87,8 +87,10 @@ enum class DeviceProfile { TV, TABLET, PHONE }
  *  - LIST_WITH_CATEGORIES: 3 colunas — categorias | lista de canais | preview.
  *  - LIST_FOCUS: 2 áreas — lista de canais | preview ocupando o resto da tela,
  *    sem coluna de categorias (Voltar leva à tela de categorias).
+ *  - GRID_GUIDE: guia em grade estilo TV — canais nas linhas × horário nas
+ *    colunas, com os programas da EPG e a linha do "agora".
  */
-enum class LiveViewMode { GRID, LIST_WITH_CATEGORIES, LIST_FOCUS }
+enum class LiveViewMode { GRID, LIST_WITH_CATEGORIES, LIST_FOCUS, GRID_GUIDE }
 
 enum class RefreshInterval(val ttlMs: Long, val labelRes: Int) {
     HOURS_1(1L * 60 * 60 * 1000, com.iptv.app.R.string.refresh_interval_1h),

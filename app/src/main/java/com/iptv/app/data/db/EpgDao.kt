@@ -34,6 +34,20 @@ interface EpgDao {
     )
     suspend fun getUpcoming(channelId: String, now: Long, limit: Int = 12): List<EpgProgrammeEntity>
 
+    /**
+     * Todos os programas de vários canais que se sobrepõem à janela
+     * [fromMs, toMs) — base do guia em grade. Ordena por canal e início para
+     * o layout montar cada linha em sequência de tempo.
+     */
+    @Query(
+        """
+        SELECT * FROM epg_programme
+        WHERE channelId IN (:channelIds) AND stopMs > :fromMs AND startMs < :toMs
+        ORDER BY channelId, startMs
+        """
+    )
+    suspend fun getRangeForChannels(channelIds: List<String>, fromMs: Long, toMs: Long): List<EpgProgrammeEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<EpgProgrammeEntity>)
 

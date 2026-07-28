@@ -85,6 +85,20 @@ class EpgRepository @Inject constructor(
     suspend fun upcoming(channelId: String): List<EpgProgrammeEntity> =
         epgDao.getUpcoming(channelId, System.currentTimeMillis())
 
+    /**
+     * Programas de vários canais dentro de uma janela — usado pelo guia em
+     * grade. Devolve agrupado por channelId (cada lista já ordenada por
+     * início pela query).
+     */
+    suspend fun rangeForChannels(
+        channelIds: List<String>,
+        fromMs: Long,
+        toMs: Long
+    ): Map<String, List<EpgProgrammeEntity>> {
+        if (channelIds.isEmpty()) return emptyMap()
+        return epgDao.getRangeForChannels(channelIds, fromMs, toMs).groupBy { it.channelId }
+    }
+
     companion object {
         private const val SCOPE = "epg"
         private const val TTL_MS = 6L * 60 * 60 * 1000

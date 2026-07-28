@@ -121,6 +121,8 @@
     <string name="live_view_mode_grid">Griglia</string>
     <string name="live_view_mode_list_categories">Elenco con categorie</string>
     <string name="live_view_mode_list_focus">Elenco con anteprima</string>
+    <string name="live_view_mode_guide">Guida a griglia</string>
+    <string name="guide_now_label">Ora: %1$s</string>
     <string name="live_preview_idle_hint">Seleziona un canale e premi OK per l\'anteprima</string>
     <string name="live_preview_confirm_hint">Premi di nuovo OK per guardare a schermo intero</string>
 

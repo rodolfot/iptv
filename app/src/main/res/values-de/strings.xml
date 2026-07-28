@@ -121,6 +121,8 @@
     <string name="live_view_mode_grid">Raster</string>
     <string name="live_view_mode_list_categories">Liste mit Kategorien</string>
     <string name="live_view_mode_list_focus">Liste mit Vorschau</string>
+    <string name="live_view_mode_guide">Raster-Guide</string>
+    <string name="guide_now_label">Jetzt: %1$s</string>
     <string name="live_preview_idle_hint">Sender auswählen und OK drücken, um eine Vorschau zu sehen</string>
     <string name="live_preview_confirm_hint">Nochmals OK drücken, um im Vollbild zu schauen</string>
 

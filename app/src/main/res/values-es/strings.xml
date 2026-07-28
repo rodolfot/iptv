@@ -134,6 +134,8 @@
     <string name="live_view_mode_grid">Cuadrícula</string>
     <string name="live_view_mode_list_categories">Lista con categorías</string>
     <string name="live_view_mode_list_focus">Lista con vista previa</string>
+    <string name="live_view_mode_guide">Guía en cuadrícula</string>
+    <string name="guide_now_label">Ahora: %1$s</string>
     <string name="live_preview_idle_hint">Selecciona un canal y pulsa OK para previsualizar</string>
     <string name="live_preview_confirm_hint">Pulsa OK de nuevo para ver en pantalla completa</string>
 

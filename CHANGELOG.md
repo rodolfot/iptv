@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-07-28
+
+### Added
+
+- **Guia de programação em grade (estilo TV)** — novo 4º modo de visualização do Ao Vivo, escolhível em Config → EPG → Visualização ("Guia em grade"). Canais nas linhas × horário nas colunas, com os programas da EPG posicionados por horário, régua de horas no topo e uma linha vermelha marcando o "agora". A coluna de canais fica fixa à esquerda enquanto a linha do tempo e a régua rolam juntas (scroll horizontal compartilhado, sempre alinhadas). Navegação por D-pad: ←→ entre programas na mesma faixa, ↑↓ entre canais, e o seletor de categoria no topo troca a grade inteira. Cada célula de canal e cada bloco de programa é focável — OK/clique abre o canal —, então a grade continua navegável mesmo em categorias sem EPG (ex.: canais 24h), onde a faixa mostra "Programação não disponível". Reaproveita a EPG (XMLTV do provedor ou URL externa) que o app já baixava; nova query de range no `EpgDao` monta a janela de 8h a partir da hora cheia atual.
+
 ## [2.3.1] — 2026-07-28
 
 ### Fixed

@@ -121,6 +121,8 @@
     <string name="live_view_mode_grid">Grid</string>
     <string name="live_view_mode_list_categories">List with categories</string>
     <string name="live_view_mode_list_focus">List with preview</string>
+    <string name="live_view_mode_guide">Grid guide</string>
+    <string name="guide_now_label">Now: %1$s</string>
     <string name="live_preview_idle_hint">Select a channel and press OK to preview</string>
     <string name="live_preview_confirm_hint">Press OK again to watch full screen</string>
 

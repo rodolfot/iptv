@@ -718,6 +718,7 @@ fun SettingsScreen(
                         LiveViewMode.GRID -> stringResource(R.string.live_view_mode_grid)
                         LiveViewMode.LIST_WITH_CATEGORIES -> stringResource(R.string.live_view_mode_list_categories)
                         LiveViewMode.LIST_FOCUS -> stringResource(R.string.live_view_mode_list_focus)
+                        LiveViewMode.GRID_GUIDE -> stringResource(R.string.live_view_mode_guide)
                     }
                 )
             }

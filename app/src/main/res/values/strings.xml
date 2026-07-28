@@ -173,6 +173,8 @@
     <string name="live_view_mode_grid">Grade</string>
     <string name="live_view_mode_list_categories">Lista com categorias</string>
     <string name="live_view_mode_list_focus">Lista com preview</string>
+    <string name="live_view_mode_guide">Guia em grade</string>
+    <string name="guide_now_label">Agora: %1$s</string>
     <string name="live_preview_idle_hint">Selecione um canal e aperte OK para pré-visualizar</string>
     <string name="live_preview_confirm_hint">Aperte OK de novo para assistir em tela cheia</string>
 

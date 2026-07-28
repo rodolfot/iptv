@@ -121,6 +121,8 @@
     <string name="live_view_mode_grid">Grille</string>
     <string name="live_view_mode_list_categories">Liste avec catégories</string>
     <string name="live_view_mode_list_focus">Liste avec aperçu</string>
+    <string name="live_view_mode_guide">Guide en grille</string>
+    <string name="guide_now_label">Maintenant : %1$s</string>
     <string name="live_preview_idle_hint">Sélectionnez une chaîne et appuyez sur OK pour prévisualiser</string>
     <string name="live_preview_confirm_hint">Appuyez de nouveau sur OK pour regarder en plein écran</string>
 

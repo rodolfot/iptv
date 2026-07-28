@@ -130,6 +130,15 @@ fun LiveChannelsScreen(
             countByCategory = countByCategory,
             modifier = modifier
         )
+        LiveViewMode.GRID_GUIDE -> LiveEpgGuideLayout(
+            vm = vm,
+            categories = categories,
+            selectedCategoryId = selectedCategoryId,
+            channels = channels,
+            onCategorySelected = onCategorySelected,
+            onPlay = onPlay,
+            modifier = modifier
+        )
     }
 }
 
