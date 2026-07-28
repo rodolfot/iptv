@@ -6,6 +6,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.2.1] — 2026-07-28
+
+### Fixed
+
+- **Painéis de resultado da Busca cortavam a seção "Séries" fora da tela**: os cards de Canais/Filmes/Séries usavam 110dp de largura (aspecto 2:3 nos pôsteres) — a soma das 3 linhas passava da altura útil da TV e a 3ª linha ficava fora da primeira dobra. Reduzido para 84dp (mesma largura usada em "Continuar" na Início), enxugados os espaçamentos entre seções e reduzido o padding geral da tela — ainda sobrava scroll residual mesmo com os cards menores.
+- **Teclado numérico do PIN parental**: em Android TV, o campo de senha abria o teclado numérico do sistema como um painel flutuante numa posição fixa da tela, desconectado do diálogo — o print que o usuário mandou mostrava o diálogo "Conteúdo restrito" num canto e o teclado solto em outro, sem relação visual entre os dois. Trocado por um teclado numérico (0-9 + apagar) desenhado dentro do próprio diálogo, navegável por D-pad, com confirmação automática assim que o PIN atinge o tamanho salvo — sem depender mais do IME do sistema.
+
+### Changed
+
+- **Campo de busca e chips de filtro (Tudo/Canais/Filmes/Séries) agora dividem uma linha só**: antes ocupavam duas linhas empilhadas — o campo sozinho numa linha inteira e os chips embaixo. Ganha mais espaço pros painéis de resultado.
+- **Botão "Limpar" (histórico de busca)**: virou um ícone compacto na ponta oposta ao título "Buscas recentes" em vez de um botão com texto colado nele, disputando atenção com o cabeçalho da seção.
+
 ## [2.2.0] — 2026-07-27
 
 ### Changed

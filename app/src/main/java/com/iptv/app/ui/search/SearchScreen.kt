@@ -32,6 +32,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.runtime.remember
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -202,28 +203,32 @@ fun SearchScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 8.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        SearchBar(
-            query = query,
-            onQueryChange = onQueryChange,
-            enabled = state.catalogReady,
-            onSubmit = {
-                // Só registra a palavra completa quando ela produziu
-                // algum resultado real — evita poluir o histórico com
-                // erros de digitação.
-                val term = query.trim()
-                val hasResults = state.results.channels.isNotEmpty() ||
-                    state.results.movies.isNotEmpty() ||
-                    state.results.series.isNotEmpty()
-                if (term.length >= 2 && hasResults) vm.rememberSearch(term)
-            }
-        )
+        // Campo de busca e chips de filtro na mesma linha — ganha uma linha
+        // inteira de altura em vez de empilhar busca + filtros.
         Row(
-            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 6.dp)
         ) {
+            SearchBar(
+                query = query,
+                onQueryChange = onQueryChange,
+                enabled = state.catalogReady,
+                onSubmit = {
+                    // Só registra a palavra completa quando ela produziu
+                    // algum resultado real — evita poluir o histórico com
+                    // erros de digitação.
+                    val term = query.trim()
+                    val hasResults = state.results.channels.isNotEmpty() ||
+                        state.results.movies.isNotEmpty() ||
+                        state.results.series.isNotEmpty()
+                    if (term.length >= 2 && hasResults) vm.rememberSearch(term)
+                },
+                modifier = Modifier.weight(1f)
+            )
             FilterChip(stringResource(R.string.filter_all), filter == SearchFilter.ALL) { onFilterChange(SearchFilter.ALL) }
             FilterChip(stringResource(R.string.filter_channels), filter == SearchFilter.LIVE) { onFilterChange(SearchFilter.LIVE) }
             FilterChip(stringResource(R.string.filter_movies), filter == SearchFilter.MOVIE) { onFilterChange(SearchFilter.MOVIE) }
@@ -253,7 +258,8 @@ private fun SearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     enabled: Boolean,
-    onSubmit: () -> Unit = {}
+    onSubmit: () -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
     // Mesmo padrão D-pad friendly do LocalFilterField/PinField: o foco
     // sozinho NÃO abre o IME. Só ao apertar OK/Enter no controle é que
@@ -283,8 +289,7 @@ private fun SearchBar(
     // seções (canais/filmes/séries) competindo por altura, encolher o campo
     // libera ~30dp por dobra.
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .border(1.5.dp, borderColor, shape)
@@ -375,15 +380,17 @@ private fun ResultsContent(
     }
 
     // Cards compactos pra caber as 3 linhas (canais/filmes/séries) sem
-    // scroll vertical na primeira dobra. Os tamanhos padrão (Channel 320,
-    // Poster 220) consumiam ~700dp em TV.
+    // scroll vertical na primeira dobra. Mesma largura usada em "Continuar"
+    // na Início (HomePosterWidth) — com 110dp o painel de Filmes/Séries
+    // sozinho já passava de 1/3 da tela e cortava a 3ª linha (Séries) fora
+    // da dobra.
     val dim = rememberTvDim()
     val posterW = when (dim.formFactor) {
-        com.iptv.app.ui.common.FormFactor.Phone -> 90.dp
-        com.iptv.app.ui.common.FormFactor.Tablet -> 100.dp
-        com.iptv.app.ui.common.FormFactor.Tv -> 110.dp
+        com.iptv.app.ui.common.FormFactor.Phone -> 72.dp
+        com.iptv.app.ui.common.FormFactor.Tablet -> 80.dp
+        com.iptv.app.ui.common.FormFactor.Tv -> 84.dp
     }
-    val rowGap = 10.dp
+    val rowGap = 4.dp
     val cardGap = 8.dp
     Column(verticalArrangement = Arrangement.spacedBy(rowGap)) {
         if (results.channels.isNotEmpty()) {
@@ -509,11 +516,11 @@ private fun ResultRow(
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null)
+            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
             Text(
                 "$label ($count)",
                 style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(start = 12.dp, bottom = 12.dp)
+                modifier = Modifier.padding(start = 6.dp, bottom = 4.dp)
             )
         }
         content()
@@ -534,19 +541,24 @@ private fun PreSearchPanel(
         )
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 stringResource(R.string.search_history_title),
                 style = MaterialTheme.typography.titleSmall
             )
+            Box(modifier = Modifier.weight(1f))
+            // Só ícone, empurrado pra ponta oposta ao título — antes era um
+            // botão com texto colado no título, competindo por atenção com
+            // o cabeçalho da seção.
             TouchableButton(onClick = onClear, compact = true) {
-                Text(
-                    stringResource(R.string.search_history_clear),
-                    style = MaterialTheme.typography.labelMedium
+                Icon(
+                    Icons.Filled.DeleteSweep,
+                    contentDescription = stringResource(R.string.search_history_clear),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

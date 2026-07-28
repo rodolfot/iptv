@@ -199,6 +199,8 @@
     <string name="parental_create">Criar</string>
     <string name="parental_min_length">A senha precisa ter pelo menos 4 dígitos</string>
     <string name="parental_mismatch">As senhas não coincidem</string>
+    <string name="parental_next">Próximo</string>
+    <string name="parental_backspace">Apagar</string>
 
     <!-- Settings -->
     <string name="settings_title">Configurações</string>

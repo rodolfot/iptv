@@ -147,6 +147,8 @@
     <string name="parental_create">Erstellen</string>
     <string name="parental_min_length">Die PIN muss mindestens 4 Ziffern haben</string>
     <string name="parental_mismatch">PINs stimmen nicht überein</string>
+    <string name="parental_next">Weiter</string>
+    <string name="parental_backspace">Löschen</string>
 
     <!-- Settings -->
     <string name="settings_title">Einstellungen</string>
