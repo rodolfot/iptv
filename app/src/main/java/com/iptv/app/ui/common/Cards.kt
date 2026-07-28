@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
@@ -362,6 +363,58 @@ fun ChannelCard(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Card compacto de canal (logo quadrada + nome numa faixa embaixo) para
+ * linhas horizontais densas — Início, Favoritos, Lista. Diferente de
+ * [ChannelCard] (320dp, pensado pra grid de Ao Vivo), este recebe a largura
+ * de fora pra caber mais itens por linha e não estourar a tela em altura.
+ */
+@Composable
+fun CompactChannelCard(
+    title: String,
+    logoUrl: String?,
+    width: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit
+) {
+    TouchableCard(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.width(width)
+    ) {
+        Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (logoUrl.isNullOrBlank()) {
+                    Icon(Icons.Filled.Tv, contentDescription = null, modifier = Modifier.size(28.dp))
+                } else {
+                    AsyncImage(
+                        model = logoUrl,
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                    )
+                }
+            }
+            Text(
+                title,
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            )
         }
     }
 }

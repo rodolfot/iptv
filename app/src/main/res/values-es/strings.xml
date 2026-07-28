@@ -339,7 +339,6 @@
     <string name="empty_search_no_results_message">Prueba otras palabras o cambia el filtro entre Canales, Películas y Series.</string>
 
     <!-- Watchlist -->
-    <string name="watchlist_title">Lista para ver</string>
     <string name="watchlist_add">Añadir a la lista</string>
     <string name="watchlist_remove">Quitar de la lista</string>
     <string name="empty_watchlist_title">Tu lista está vacía</string>

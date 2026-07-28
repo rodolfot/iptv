@@ -1,5 +1,11 @@
 package com.iptv.app.ui.favorites
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,13 +14,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items as lazyColumnItems
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
@@ -31,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,10 +47,7 @@ import coil.compose.AsyncImage
 import com.iptv.app.R
 import com.iptv.app.data.db.FavoriteEntity
 import com.iptv.app.domain.model.ContentType
-import com.iptv.app.ui.common.ChannelCard
 import com.iptv.app.ui.common.EmptyState
-import com.iptv.app.ui.common.FormFactor
-import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.PreviewPlayer
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
@@ -75,37 +80,14 @@ fun FavoritesScreen(
     // visualizar episódio aleatório).
     var focusedFavorite by remember { mutableStateOf<FavoriteEntity?>(null) }
 
-    fun play(entry: FavoriteEntity) {
-        onPlay(
-            PlayerArgs(
-                kind = PlayerKind.LIVE,
-                streamId = entry.itemId,
-                title = entry.name,
-                containerExtension = null
-            )
-        )
-    }
-    fun playMovie(entry: FavoriteEntity) {
-        onPlay(
-            PlayerArgs(
-                kind = PlayerKind.MOVIE,
-                streamId = entry.itemId,
-                title = entry.name,
-                containerExtension = entry.containerExtension,
-                posterUrl = entry.logoUrl,
-                categoryId = entry.categoryId
-            )
-        )
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = dim.ScreenPadding, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(stringResource(R.string.tab_favorites), style = MaterialTheme.typography.titleLarge)
-
+        // Sem título de página — a aba "Favoritos" já selecionada no menu
+        // principal deixa claro onde o usuário está.
         if (all.isEmpty()) {
             EmptyState(
                 title = stringResource(R.string.empty_favorites_title),
@@ -115,113 +97,60 @@ fun FavoritesScreen(
             return
         }
 
-        val isPhone = dim.formFactor == FormFactor.Phone
-        if (isPhone) {
-            // Telefone não tem espaço pra painel de preview lateral — só as
-            // seções, ocupando a largura toda.
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                if (channels.isNotEmpty()) {
-                    MediaRowSection(stringResource(R.string.filter_channels), channels.size) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                            items(channels, key = { "live-${it.itemId}" }) { f ->
-                                ChannelCard(title = f.name, number = null, logoUrl = f.logoUrl) { play(f) }
-                            }
-                        }
-                    }
-                }
-                if (movies.isNotEmpty()) {
-                    MediaRowSection(stringResource(R.string.filter_movies), movies.size) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                            items(movies, key = { "movie-${it.itemId}" }) { f ->
-                                PosterCard(
-                                    title = f.name,
-                                    imageUrl = f.logoUrl,
-                                    fallbackIcon = Icons.Filled.Movie
-                                ) { playMovie(f) }
-                            }
-                        }
-                    }
-                }
-                if (series.isNotEmpty()) {
-                    MediaRowSection(stringResource(R.string.filter_series), series.size) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                            items(series, key = { "series-${it.itemId}" }) { f ->
-                                PosterCard(
-                                    title = f.name,
-                                    imageUrl = f.logoUrl,
-                                    fallbackIcon = Icons.Filled.Tv,
-                                    onClick = { /* abertura de série não tem rota aqui — TODO */ }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // TV/Tablet: seções empilhadas à esquerda (canais/filmes/séries em
-            // linhas horizontais, mesmo padrão visual de Filmes/Séries/Ao Vivo)
-            // + painel de preview à direita, atualizado pelo item em foco.
+        // Formato de lista (não cards em linha horizontal): com 30+ favoritos
+        // por categoria, uma linha horizontal de cards só mostra ~5 por vez e
+        // esconde o resto atrás de scroll lateral. Lista vertical compacta
+        // mostra muito mais itens simultaneamente — 3 colunas (canais|filmes|
+        // séries) à esquerda, painel de preview à direita.
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.weight(3f).fillMaxHeight(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
-                    modifier = Modifier.weight(3f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
-                ) {
-                    if (channels.isNotEmpty()) {
-                        MediaRowSection(stringResource(R.string.filter_channels), channels.size) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                                items(channels, key = { "live-${it.itemId}" }) { f ->
-                                    Box(modifier = Modifier.onFocusChanged { if (it.hasFocus) focusedFavorite = f }) {
-                                        ChannelCard(title = f.name, number = null, logoUrl = f.logoUrl) { play(f) }
-                                    }
-                                }
-                            }
-                        }
+                if (channels.isNotEmpty()) FavoritesColumn(
+                    label = stringResource(R.string.filter_channels),
+                    items = channels,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onFocusItem = { focusedFavorite = it },
+                    onPick = { entry ->
+                        onPlay(PlayerArgs(PlayerKind.LIVE, entry.itemId, entry.name, null))
                     }
-                    if (movies.isNotEmpty()) {
-                        MediaRowSection(stringResource(R.string.filter_movies), movies.size) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                                items(movies, key = { "movie-${it.itemId}" }) { f ->
-                                    Box(modifier = Modifier.onFocusChanged { if (it.hasFocus) focusedFavorite = f }) {
-                                        PosterCard(
-                                            title = f.name,
-                                            imageUrl = f.logoUrl,
-                                            fallbackIcon = Icons.Filled.Movie
-                                        ) { playMovie(f) }
-                                    }
-                                }
-                            }
-                        }
+                )
+                if (movies.isNotEmpty()) FavoritesColumn(
+                    label = stringResource(R.string.filter_movies),
+                    items = movies,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onFocusItem = { focusedFavorite = it },
+                    onPick = { entry ->
+                        onPlay(
+                            PlayerArgs(
+                                kind = PlayerKind.MOVIE,
+                                streamId = entry.itemId,
+                                title = entry.name,
+                                containerExtension = entry.containerExtension,
+                                posterUrl = entry.logoUrl,
+                                categoryId = entry.categoryId
+                            )
+                        )
                     }
-                    if (series.isNotEmpty()) {
-                        MediaRowSection(stringResource(R.string.filter_series), series.size) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(dim.CardSpacing)) {
-                                items(series, key = { "series-${it.itemId}" }) { f ->
-                                    Box(modifier = Modifier.onFocusChanged { if (it.hasFocus) focusedFavorite = f }) {
-                                        PosterCard(
-                                            title = f.name,
-                                            imageUrl = f.logoUrl,
-                                            fallbackIcon = Icons.Filled.Tv,
-                                            onClick = { /* abertura de série não tem rota aqui — TODO */ }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                FavoritesPreviewPanel(
-                    focused = focusedFavorite,
-                    vm = vm,
-                    modifier = Modifier.weight(2f).fillMaxHeight()
+                )
+                if (series.isNotEmpty()) FavoritesColumn(
+                    label = stringResource(R.string.filter_series),
+                    items = series,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    onFocusItem = { focusedFavorite = it },
+                    onPick = { /* abertura de série não tem rota aqui — TODO */ }
                 )
             }
+
+            FavoritesPreviewPanel(
+                focused = focusedFavorite,
+                vm = vm,
+                modifier = Modifier.weight(2f).fillMaxHeight()
+            )
         }
     }
 
@@ -239,13 +168,123 @@ fun FavoritesScreen(
     }
 }
 
-/** Cabeçalho "Título (N)" seguido do conteúdo — mesmo padrão usado nas
- *  seções do Início e das telas de categoria. */
 @Composable
-private fun MediaRowSection(label: String, count: Int, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("$label ($count)", style = MaterialTheme.typography.titleSmall)
-        content()
+private fun FavoritesColumn(
+    label: String,
+    items: List<FavoriteEntity>,
+    modifier: Modifier = Modifier,
+    onFocusItem: (FavoriteEntity) -> Unit,
+    onPick: (FavoriteEntity) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = modifier) {
+        Text(
+            "$label (${items.size})",
+            style = MaterialTheme.typography.titleSmall
+        )
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            lazyColumnItems(items, key = { "${it.type}-${it.itemId}" }) { f ->
+                val icon = when (f.type) {
+                    ContentType.LIVE -> Icons.Filled.LiveTv
+                    ContentType.MOVIE -> Icons.Filled.Movie
+                    ContentType.SERIES -> Icons.Filled.Tv
+                }
+                FavoriteListItem(
+                    name = f.name,
+                    imageUrl = f.logoUrl,
+                    fallbackIcon = icon,
+                    onFocus = { onFocusItem(f) },
+                    onClick = { onPick(f) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Linha compacta: thumb de 36dp à esquerda + nome à direita. Foco animado
+ * com barra azul lateral — prioriza densidade (ver o máximo de itens de uma
+ * vez) sobre o tamanho do card, já que listas de favoritos podem ter
+ * dezenas de itens por categoria.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FavoriteListItem(
+    name: String,
+    imageUrl: String?,
+    fallbackIcon: ImageVector,
+    onFocus: () -> Unit,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val primary = MaterialTheme.colorScheme.primary
+    val barWidth by animateDpAsState(
+        targetValue = if (focused) 4.dp else 0.dp,
+        animationSpec = tween(durationMillis = 220),
+        label = "fav-bar"
+    )
+    val bgColor by animateColorAsState(
+        targetValue = if (focused) primary.copy(alpha = 0.18f)
+        else MaterialTheme.colorScheme.surface,
+        animationSpec = tween(durationMillis = 220),
+        label = "fav-bg"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(bgColor)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            }
+            .combinedClickable(onClick = onClick, onLongClick = onClick)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(barWidth)
+                .background(primary)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        fallbackIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                name,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 

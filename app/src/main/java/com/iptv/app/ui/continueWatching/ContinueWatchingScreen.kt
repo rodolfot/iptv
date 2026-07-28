@@ -253,7 +253,7 @@ fun ContinueWatchingScreen(
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(rowSpacing)) {
                 items(recentChannels) { ch ->
-                    ChannelMiniHomeCard(
+                    com.iptv.app.ui.common.CompactChannelCard(
                         title = ch.name,
                         logoUrl = ch.logoUrl,
                         width = HomePosterWidth
@@ -402,62 +402,6 @@ private fun RecommendedSeriesCard(
         overrideWidth = HomePosterWidth
     ) {
         onOpenSeries(item.seriesId, item.name, item.coverUrl)
-    }
-}
-
-/**
- * Card de canal para a tela Início — logo dentro de um quadrado (Fit, sem
- * crop) e nome em uma faixa logo abaixo. Antes usávamos PosterCard com
- * aspect 2:3 + título sobreposto: as logos largas (ESPN, SBT, Discovery)
- * eram cortadas e o nome ficava por cima da imagem.
- */
-@Composable
-private fun ChannelMiniHomeCard(
-    title: String,
-    logoUrl: String?,
-    width: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit
-) {
-    com.iptv.app.ui.common.TouchableCard(
-        onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.width(width)
-    ) {
-        Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                if (logoUrl.isNullOrBlank()) {
-                    Icon(
-                        Icons.Filled.Tv,
-                        contentDescription = null,
-                        modifier = Modifier.size(28.dp)
-                    )
-                } else {
-                    AsyncImage(
-                        model = logoUrl,
-                        contentDescription = title,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize().padding(6.dp)
-                    )
-                }
-            }
-            Text(
-                title,
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xCC000000))
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
-            )
-        }
     }
 }
 

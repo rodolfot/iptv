@@ -6,6 +6,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.1.1] — 2026-07-27
+
+### Fixed
+
+- **Favoritos e Lista voltaram a formato de lista vertical**: os cards em linha horizontal da 2.1.0 usavam o tamanho padrão de `PosterCard`/`ChannelCard` (220–320dp) — só cabiam 1-2 por linha, escondendo a maior parte da coleção atrás de scroll lateral (ex.: só 5 de 30 canais visíveis por vez). Voltou pro formato de lista compacta em 3 colunas (canais|filmes|séries), que mostra muito mais itens simultaneamente (9+ por coluna). Removido também o título de página redundante ("Favoritos"/"Lista" já aparecem selecionados no menu principal), abrindo mais espaço útil.
+
 ## [2.1.0] — 2026-07-27
 
 ### Changed
