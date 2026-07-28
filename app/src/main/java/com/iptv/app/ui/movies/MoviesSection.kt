@@ -49,6 +49,16 @@ import com.iptv.app.ui.parental.ParentalSession
 import com.iptv.app.ui.player.PlayerArgs
 import com.iptv.app.ui.player.PlayerKind
 
+/** Converte um filme da listagem nos args de reprodução do player. */
+internal fun com.iptv.app.domain.model.Movie.toMoviePlayerArgs() = PlayerArgs(
+    kind = PlayerKind.MOVIE,
+    streamId = id,
+    title = name,
+    containerExtension = containerExtension,
+    posterUrl = posterUrl,
+    categoryId = categoryId
+)
+
 @Composable
 fun MoviesSection(
     vm: HomeViewModel,
@@ -56,7 +66,11 @@ fun MoviesSection(
     onPlay: (PlayerArgs) -> Unit,
     onPlayDirect: (PlayerArgs) -> Unit = onPlay,
     selectedCat: String?,
-    onSelectedCatChange: (String?) -> Unit
+    onSelectedCatChange: (String?) -> Unit,
+    // Busca local elevada para a Home: sobrevive à entrada no detalhe/player e
+    // só é limpa ao trocar de categoria ou sair do menu.
+    localFilter: String,
+    onLocalFilterChange: (String) -> Unit
 ) {
     val rawCats by vm.movieCategories.collectAsState()
     val movies by vm.movies.collectAsState()
@@ -76,7 +90,6 @@ fun MoviesSection(
     val dim = rememberTvDim()
     var pendingCategory by remember { mutableStateOf<Category?>(null) }
     var pendingMovie by remember { mutableStateOf<PlayerArgs?>(null) }
-    var localFilter by rememberSaveable(selectedCat) { mutableStateOf("") }
     var categoryFilter by rememberSaveable { mutableStateOf("") }
     var advancedFilters by remember(selectedCat) { mutableStateOf(AdvancedFilters()) }
     var filtersDialogOpen by remember { mutableStateOf(false) }
@@ -126,6 +139,11 @@ fun MoviesSection(
                 error = movies.error,
                 advancedFilters = advancedFilters,
                 onAdvancedFiltersClick = { filtersDialogOpen = true },
+                localFilter = localFilter,
+                onLocalFilterChange = onLocalFilterChange,
+                onSetMovieQueue = { ordered ->
+                    vm.setMovieQueue(ordered.map { it.toMoviePlayerArgs() })
+                },
                 sort = settings.moviesSort,
                 onSortChange = { vm.setSort(SortScope.MOVIES, it) },
                 onCategorySelected = { catId ->
@@ -375,7 +393,7 @@ fun MoviesSection(
             movies.error?.let { ErrorState(message = it, onRetry = { vm.loadMovies(selectedCat, forceRefresh = true) }) }
             LocalFilterField(
                 value = localFilter,
-                onValueChange = { localFilter = it },
+                onValueChange = onLocalFilterChange,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
             val needle = localFilter.trim().lowercase()
@@ -419,16 +437,12 @@ fun MoviesSection(
                         watched = mp?.watched == true,
                         progressPercent = mp?.percent?.takeIf { mp.watched.not() && it in 1..99 }
                     ) {
-                        val args = PlayerArgs(
-                            kind = PlayerKind.MOVIE,
-                            streamId = m.id,
-                            title = m.name,
-                            containerExtension = m.containerExtension,
-                            posterUrl = m.posterUrl,
-                            categoryId = m.categoryId
-                        )
+                        val args = m.toMoviePlayerArgs()
                         if (locked) pendingMovie = args
-                        else onPlay(args)
+                        else {
+                            vm.setMovieQueue(filteredMovies.map { it.toMoviePlayerArgs() })
+                            onPlay(args)
+                        }
                     }
                 }
             }

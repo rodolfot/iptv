@@ -56,6 +56,8 @@
     <string name="recent_channels">Zuletzt gesehene Sender</string>
     <string name="recommended_because_movie">Weil du %1$s gesehen hast</string>
     <string name="recommended_because_series">Weil du %1$s gesehen hast</string>
+    <string name="recommended_top_movies">Empfohlene Filme</string>
+    <string name="recommended_top_series">Empfohlene Serien</string>
 
     <!-- Movie detail -->
     <string name="movie_play">Ansehen</string>
@@ -106,6 +108,14 @@
     <!-- Sort -->
     <string name="sort_title">Sortieren nach</string>
     <string name="sort_button">Sortieren</string>
+
+    <!-- Live view mode -->
+    <string name="live_view_mode_title">Ansicht</string>
+    <string name="live_view_mode_grid">Raster</string>
+    <string name="live_view_mode_list_categories">Liste mit Kategorien</string>
+    <string name="live_view_mode_list_focus">Liste mit Vorschau</string>
+    <string name="live_preview_idle_hint">Sender auswählen und OK drücken, um eine Vorschau zu sehen</string>
+    <string name="live_preview_confirm_hint">Nochmals OK drücken, um im Vollbild zu schauen</string>
 
     <!-- Advanced filters -->
     <string name="filters_button">Filter</string>
@@ -180,6 +190,20 @@
     <string name="settings_display">Anzeige</string>
     <string name="settings_hourly_clock">Stündliche Uhrzeit anzeigen</string>
     <string name="settings_hourly_clock_hint">Zeigt die Uhr 5 Sekunden lang zum Beginn jeder Stunde an.</string>
+    <string name="settings_player_advanced">Erweiterter Player</string>
+    <string name="settings_decoder">Decoder</string>
+    <string name="decoder_auto">Automatisch</string>
+    <string name="decoder_hardware">Hardware erzwingen</string>
+    <string name="decoder_software">Software erzwingen</string>
+    <string name="settings_stream_format">Standard-Senderformat</string>
+    <string name="stream_format_ts">TS (kompatibler)</string>
+    <string name="stream_format_hls">HLS (adaptiv)</string>
+    <string name="settings_external_player">Externer Player</string>
+    <string name="external_player_internal">Interner Player</string>
+    <string name="settings_epg">Programmführer (EPG)</string>
+    <string name="settings_epg_url">Externe XMLTV-URL</string>
+    <string name="settings_epg_url_hint">Leer lassen, um die EPG des Anbieters zu verwenden.</string>
+    <string name="settings_epg_offset">Zeitzonenkorrektur der EPG</string>
     <string name="settings_history">Verlauf</string>
     <string name="settings_history_clear">Verlauf löschen</string>
     <string name="history_dialog_title">Verlauf löschen</string>
@@ -200,6 +224,7 @@
     <string name="player_network_failed">Netzwerkfehler. Prüfe deine Verbindung.</string>
     <string name="player_http_failed">Der Server hat den Stream abgelehnt (HTTP). Verbindungslimit oder Inhalt nicht verfügbar.</string>
     <string name="player_generic_error">Wiedergabefehler: %1$s.</string>
+    <string name="player_live_stream_ended">Der Sender hat die Übertragung gestoppt. Versuchen Sie es gleich noch einmal.</string>
 
     <!-- About / Legal -->
     <string name="about_title">Über TartaTV</string>
@@ -219,6 +244,11 @@
     <!-- Onboarding / acceptance -->
     <string name="settings_language">App-Sprache</string>
     <string name="onboarding_language_title">Sprache wählen</string>
+    <string name="onboarding_device_title">Gerätetyp</string>
+    <string name="onboarding_device_auto">Automatisch erkennen</string>
+    <string name="onboarding_device_tv">Android TV / Smart-TV</string>
+    <string name="onboarding_device_tablet">Tablet</string>
+    <string name="onboarding_device_phone">Smartphone</string>
     <string name="onboarding_title">Willkommen bei TartaTV</string>
     <string name="onboarding_message">TartaTV ist ein Player für IPTV-Listen im Xtream-Codes-Standard — er gibt ausschließlich die Inhalte des Servers wieder, dessen Zugangsdaten du einträgst. Es gibt keinen eingebauten Katalog und keine eigenen Inhalte.\n\nDeine Zugangsdaten und Einstellungen bleiben nur auf deinem Gerät, in verschlüsselter Speicherung. Wir senden keine Daten an uns oder Dritte und verwenden weder Werbung noch Tracking.\n\nBitte lies vor dem Fortfahren die untenstehenden Dokumente. Um die App zu nutzen, musst du den Nutzungsbedingungen und der Datenschutzerklärung zustimmen.</string>
     <string name="onboarding_read_terms">Nutzungsbedingungen lesen</string>
@@ -229,10 +259,20 @@
     <!-- Update -->
     <string name="update_title">Neue Version verfügbar</string>
     <string name="update_message">Version %1$s ist verfügbar. Du nutzt %2$s.</string>
-    <string name="update_open">Download-Seite öffnen</string>
     <string name="update_later">Später</string>
     <string name="update_skip">Diese Version überspringen</string>
     <string name="update_changelog_title">Neuerungen dieser Version</string>
+    <string name="update_downloading">Update wird heruntergeladen… %1$d%%</string>
+    <string name="update_install_now">Jetzt aktualisieren</string>
+    <string name="update_download_failed">Update konnte nicht heruntergeladen werden.</string>
+    <string name="update_permission_needed">Aktivieren Sie \"Unbekannte Apps installieren\" für TartaTV und versuchen Sie es erneut.</string>
+    <string name="update_open_settings">Einstellung öffnen</string>
+    <string name="notif_update_title">Update bereit zur Installation</string>
+    <string name="notif_update_text">Version %1$s heruntergeladen. Zum Installieren tippen.</string>
+    <string name="settings_check_update">Jetzt nach Update suchen</string>
+    <string name="snack_update_available">Update %1$s heruntergeladen — tippen Sie auf die Benachrichtigung, um zu installieren.</string>
+    <string name="snack_update_up_to_date">Sie haben bereits die neueste Version.</string>
+    <string name="snack_update_check_failed">Konnte jetzt nicht nach Updates suchen.</string>
 
     <!-- Profiles -->
     <string name="profiles_title">Profile</string>
@@ -264,6 +304,7 @@
     <string name="notif_channel_catalog">Katalog-Aktualisierung</string>
     <string name="notif_channel_resume">Weiter ansehen</string>
     <string name="notif_channel_errors">Server-Fehler</string>
+    <string name="notif_channel_updates">App-Updates</string>
     <string name="notif_new_episodes_title">Neue Folgen verfügbar</string>
     <string name="notif_new_episodes_text">%1$d Serien haben neue Folgen.</string>
     <string name="notif_catalog_title">Katalog aktualisiert</string>
@@ -311,6 +352,10 @@
     <string name="snack_favorite_removed">Aus Favoriten entfernt.</string>
     <string name="snack_profile_saved">Profil gespeichert.</string>
     <string name="snack_profile_deleted">Profil gelöscht.</string>
+    <string name="snack_refresh_interval_saved">Aktualisierungsintervall gespeichert.</string>
+    <string name="snack_locale_saved">Sprache geändert.</string>
+    <string name="settings_language_label">App-Sprache</string>
+    <string name="settings_locale_system">System</string>
     <string name="snack_profile_switched">Aktives Profil gewechselt.</string>
     <string name="snack_credentials_saved">Zugangsdaten aktualisiert.</string>
     <string name="snack_pin_saved">Eltern-PIN gespeichert.</string>
@@ -322,11 +367,26 @@
     <string name="refresh_phase_series">Serien</string>
     <string name="snack_undo">Rückgängig</string>
     <string name="player_next_in">Nächstes in %1$ds</string>
+    <string name="player_next_movie">Nächster Film</string>
     <string name="player_connecting">Verbindung zum Kanal…</string>
     <string name="player_reconnecting">Verbindung wird wiederhergestellt (Versuch %1$d/3)…</string>
     <string name="player_cannot_play_title">Wiedergabe nicht möglich</string>
     <string name="player_contact_provider">Versuchen Sie es später erneut oder kontaktieren Sie den Listeninhaber.</string>
     <string name="player_retry">Erneut versuchen</string>
+    <string name="player_audio_only">Nur Audio</string>
+    <string name="player_options">Player-Optionen</string>
+    <string name="player_aspect">Seitenverhältnis</string>
+    <string name="player_aspect_fit">Anpassen</string>
+    <string name="player_aspect_zoom">Zoom</string>
+    <string name="player_aspect_fill">Ausfüllen</string>
+    <string name="player_speed">Geschwindigkeit</string>
+    <string name="player_subtitle_style">Untertitelstil</string>
+    <string name="player_subtitle_size">Untertitelgröße</string>
+    <string name="player_stream_format">Senderformat</string>
+    <string name="player_sleep_timer">Ausschalten nach</string>
+    <string name="player_external">In externem Player öffnen</string>
+    <string name="on_label">An</string>
+    <string name="off_label">Aus</string>
 
     <!-- Exit confirmation -->
     <string name="exit_title">App beenden</string>

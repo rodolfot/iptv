@@ -70,6 +70,7 @@
     <string name="notif_channel_catalog">Atualização do catálogo</string>
     <string name="notif_channel_resume">Continuar assistindo</string>
     <string name="notif_channel_errors">Erros do servidor</string>
+    <string name="notif_channel_updates">Atualizações do app</string>
     <string name="notif_new_episodes_title">Novos episódios disponíveis</string>
     <string name="notif_new_episodes_text">%1$d nova(s) série(s) com episódios novos.</string>
     <string name="notif_catalog_title">Catálogo atualizado</string>
@@ -160,6 +161,14 @@
     <string name="sort_title">Ordenar por</string>
     <string name="sort_button">Ordenar</string>
 
+    <!-- Live view mode -->
+    <string name="live_view_mode_title">Visualização</string>
+    <string name="live_view_mode_grid">Grade</string>
+    <string name="live_view_mode_list_categories">Lista com categorias</string>
+    <string name="live_view_mode_list_focus">Lista com preview</string>
+    <string name="live_preview_idle_hint">Selecione um canal e aperte OK para pré-visualizar</string>
+    <string name="live_preview_confirm_hint">Aperte OK de novo para assistir em tela cheia</string>
+
     <!-- Advanced filters -->
     <string name="filters_button">Filtros</string>
     <string name="filters_button_active">Filtros •</string>
@@ -233,6 +242,20 @@
     <string name="settings_display">Exibição</string>
     <string name="settings_hourly_clock">Mostrar horário a cada hora</string>
     <string name="settings_hourly_clock_hint">Exibe o relógio por 5 segundos no início de cada hora.</string>
+    <string name="settings_player_advanced">Player avançado</string>
+    <string name="settings_decoder">Decodificador</string>
+    <string name="decoder_auto">Automático</string>
+    <string name="decoder_hardware">Forçar hardware</string>
+    <string name="decoder_software">Forçar software</string>
+    <string name="settings_stream_format">Formato padrão do canal</string>
+    <string name="stream_format_ts">TS (mais compatível)</string>
+    <string name="stream_format_hls">HLS (adaptativo)</string>
+    <string name="settings_external_player">Player externo</string>
+    <string name="external_player_internal">Player interno</string>
+    <string name="settings_epg">Guia de programação (EPG)</string>
+    <string name="settings_epg_url">URL XMLTV externa</string>
+    <string name="settings_epg_url_hint">Deixe em branco para usar a EPG do provedor.</string>
+    <string name="settings_epg_offset">Correção de fuso da EPG</string>
     <string name="settings_history">Histórico</string>
     <string name="settings_history_clear">Apagar histórico</string>
     <string name="history_dialog_title">Apagar histórico</string>
@@ -253,6 +276,7 @@
     <string name="player_network_failed">Falha de conexão com o servidor. Verifique a internet.</string>
     <string name="player_http_failed">O servidor recusou a transmissão (HTTP). Pode ser limite de conexões ou conteúdo indisponível.</string>
     <string name="player_generic_error">Erro ao reproduzir: %1$s.</string>
+    <string name="player_live_stream_ended">O canal parou de transmitir. Tente novamente em instantes.</string>
 
     <!-- About / Legal -->
     <string name="about_title">Sobre o TartaTV</string>
@@ -287,10 +311,20 @@
     <!-- Update -->
     <string name="update_title">Nova versão disponível</string>
     <string name="update_message">Versão %1$s está disponível. Você está usando %2$s.</string>
-    <string name="update_open">Abrir página de download</string>
     <string name="update_later">Mais tarde</string>
     <string name="update_skip">Pular esta versão</string>
     <string name="update_changelog_title">O que mudou nesta versão</string>
+    <string name="update_downloading">Baixando atualização… %1$d%%</string>
+    <string name="update_install_now">Atualizar agora</string>
+    <string name="update_download_failed">Falha ao baixar a atualização.</string>
+    <string name="update_permission_needed">Ative \"Instalar apps desconhecidos\" para o TartaTV e tente de novo.</string>
+    <string name="update_open_settings">Abrir configuração</string>
+    <string name="notif_update_title">Atualização pronta para instalar</string>
+    <string name="notif_update_text">Versão %1$s baixada. Toque para instalar.</string>
+    <string name="settings_check_update">Verificar atualização agora</string>
+    <string name="snack_update_available">Atualização %1$s baixada — toque na notificação para instalar.</string>
+    <string name="snack_update_up_to_date">Você já está na versão mais recente.</string>
+    <string name="snack_update_check_failed">Não foi possível verificar atualizações agora.</string>
 
     <!-- Empty states -->
     <string name="empty_continue_title">Sua jornada começa aqui</string>
@@ -332,11 +366,26 @@
     <string name="refresh_phase_movies">Filmes</string>
     <string name="refresh_phase_series">Séries</string>
     <string name="player_next_in">Próximo em %1$ds</string>
+    <string name="player_next_movie">Próximo filme</string>
     <string name="player_connecting">Conectando ao canal…</string>
     <string name="player_reconnecting">Reconectando (tentativa %1$d/3)…</string>
     <string name="player_cannot_play_title">Não foi possível reproduzir</string>
     <string name="player_contact_provider">Tente novamente em instantes ou contate o dono da lista.</string>
     <string name="player_retry">Tentar novamente</string>
+    <string name="player_audio_only">Áudio apenas</string>
+    <string name="player_options">Opções do player</string>
+    <string name="player_aspect">Proporção da tela</string>
+    <string name="player_aspect_fit">Ajustar</string>
+    <string name="player_aspect_zoom">Zoom</string>
+    <string name="player_aspect_fill">Preencher</string>
+    <string name="player_speed">Velocidade</string>
+    <string name="player_subtitle_style">Estilo da legenda</string>
+    <string name="player_subtitle_size">Tamanho da legenda</string>
+    <string name="player_stream_format">Formato do canal</string>
+    <string name="player_sleep_timer">Desligar em</string>
+    <string name="player_external">Abrir em player externo</string>
+    <string name="on_label">Ligado</string>
+    <string name="off_label">Desligado</string>
     <string name="snack_undo">Desfazer</string>
 
     <!-- Exit confirmation -->

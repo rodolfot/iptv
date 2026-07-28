@@ -9,6 +9,7 @@ import com.iptv.app.diag.CrashLog
 import com.iptv.app.notify.Notifications
 import com.iptv.app.work.CatalogRefreshWorker
 import com.iptv.app.work.ResumeReminderWorker
+import com.iptv.app.work.UpdateCheckWorker
 import dagger.hilt.android.HiltAndroidApp
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +67,7 @@ class IptvApp : Application(), Configuration.Provider {
             val s = settings.flow.first()
             CatalogRefreshWorker.schedule(this@IptvApp, s.refreshInterval)
             ResumeReminderWorker.schedule(this@IptvApp)
+            UpdateCheckWorker.schedule(this@IptvApp)
         }
     }
 

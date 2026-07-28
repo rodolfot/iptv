@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Auto-update: baixa e instala o APK de uma nova release sem passar
+         por navegador/gerenciador de arquivos. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.software.picture_in_picture" android:required="false" />
@@ -41,7 +44,40 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- Deep links dos cards do canal da Android TV e da busca global. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tartatv" />
+            </intent-filter>
+            <!-- Busca global da Android TV. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
         </activity>
+
+        <!-- Provider de sugestões para a busca global da Android TV. -->
+        <provider
+            android:name=".tv.SearchSuggestionsProvider"
+            android:authorities="${applicationId}.search"
+            android:exported="true" />
+
+        <!-- Expõe o APK baixado em cache/ para o instalador do sistema via
+             content:// URI — API 24+ não aceita mais file:// entre apps. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
 
         <provider
             android:name="androidx.startup.InitializationProvider"

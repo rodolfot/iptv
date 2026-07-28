@@ -80,8 +80,15 @@ class HomeViewModel @Inject constructor(
     private val movieProgressDao: com.iptv.app.data.db.MovieProgressDao,
     private val settings: SettingsStore,
     private val currentProfile: CurrentProfile,
-    private val xtream: com.iptv.app.data.api.XtreamRepository
+    private val xtream: com.iptv.app.data.api.XtreamRepository,
+    private val movieQueue: com.iptv.app.ui.player.MovieQueue
 ) : ViewModel() {
+
+    /** Publica a fila de filmes (na ordem exata que o usuário vê) para o player
+     *  habilitar o botão "Próximo". Chamado pela listagem ao tocar um filme. */
+    fun setMovieQueue(items: List<com.iptv.app.ui.player.PlayerArgs>) {
+        movieQueue.items = items
+    }
 
     /** URL HLS para preview do canal ao vivo no painel lateral. */
     suspend fun previewUrl(channelId: Int): String? = runCatching {
@@ -490,6 +497,10 @@ class HomeViewModel @Inject constructor(
 
     fun setParentalPin(pin: String) {
         viewModelScope.launch { settings.setPin(pin) }
+    }
+
+    fun setLiveViewMode(mode: com.iptv.app.data.prefs.LiveViewMode) {
+        viewModelScope.launch { settings.setLiveViewMode(mode) }
     }
 
     /**

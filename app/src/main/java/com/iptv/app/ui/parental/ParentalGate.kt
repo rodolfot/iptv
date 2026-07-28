@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,11 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.iptv.app.R
 import com.iptv.app.ui.common.TouchableButton
+import com.iptv.app.ui.common.TvSafeTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -82,13 +81,12 @@ fun ParentalPinDialog(
             ) {
                 Text(stringResource(R.string.parental_title), style = MaterialTheme.typography.titleLarge)
                 Text(stringResource(R.string.parental_message), style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(
+                TvSafeTextField(
                     value = pin,
                     onValueChange = { pin = it.filter(Char::isDigit).take(8); error = false },
-                    label = { Text(stringResource(R.string.parental_pass_label)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    label = stringResource(R.string.parental_pass_label),
+                    isPassword = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    isError = error,
                     modifier = Modifier.fillMaxWidth()
                 )
                 if (error) {
@@ -131,22 +129,20 @@ fun ParentalPinSetupDialog(
                     stringResource(R.string.parental_setup_message),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                OutlinedTextField(
+                TvSafeTextField(
                     value = pin,
                     onValueChange = { pin = it.filter(Char::isDigit).take(8); error = null },
-                    label = { Text(stringResource(R.string.parental_new_pass)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    label = stringResource(R.string.parental_new_pass),
+                    isPassword = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    isError = error != null,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                TvSafeTextField(
                     value = confirm,
                     onValueChange = { confirm = it.filter(Char::isDigit).take(8); error = null },
-                    label = { Text(stringResource(R.string.parental_confirm_pass)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    label = stringResource(R.string.parental_confirm_pass),
+                    isPassword = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    isError = error != null,
                     modifier = Modifier.fillMaxWidth()
                 )
                 error?.let {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +16,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -45,7 +50,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.iptv.app.ui.common.ComboBox
+import com.iptv.app.ui.common.ComboColumn
+import com.iptv.app.ui.common.ComboOption
 import com.iptv.app.ui.common.TouchableButton
+import com.iptv.app.ui.common.TvSafeTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.iptv.app.R
@@ -55,12 +64,19 @@ import com.iptv.app.data.db.LiveHistoryDao
 import com.iptv.app.data.db.MovieProgressDao
 import com.iptv.app.data.db.SeriesProgressDao
 import com.iptv.app.data.prefs.CurrentProfile
+import com.iptv.app.data.prefs.DecoderMode
+import com.iptv.app.data.prefs.DeviceProfile
+import com.iptv.app.data.prefs.LiveViewMode
 import com.iptv.app.data.prefs.RefreshInterval
 import com.iptv.app.data.prefs.SettingsStore
+import com.iptv.app.data.prefs.StreamFormat
 import com.iptv.app.ui.common.LocalSnackbar
+import com.iptv.app.ui.common.LocaleManager
+import com.iptv.app.ui.common.FormFactor
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.work.CatalogRefreshWorker
+import com.iptv.app.work.UpdateCheckWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -110,6 +126,7 @@ class SettingsViewModel @Inject constructor(
             if (channels) liveHistoryDao.clearAll(pid)
         }
     }
+
     /**
      * Persiste a escolha; a aplicação efetiva do locale + recreate da Activity
      * é feita pelo caller (precisa do Activity em mãos).
@@ -118,7 +135,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settings.setAppLocale(tag) }
     }
 
-    fun setDeviceProfile(profile: com.iptv.app.data.prefs.DeviceProfile?) {
+    fun setDeviceProfile(profile: DeviceProfile?) {
         viewModelScope.launch { settings.setDeviceProfile(profile) }
     }
 
@@ -131,6 +148,47 @@ class SettingsViewModel @Inject constructor(
             settings.setRefreshInterval(interval)
             CatalogRefreshWorker.schedule(appContext, interval, replace = true)
         }
+    }
+
+    fun setStreamFormat(format: StreamFormat) {
+        viewModelScope.launch { settings.setStreamFormat(format) }
+    }
+
+    fun setDecoderMode(mode: DecoderMode) {
+        viewModelScope.launch { settings.setDecoderMode(mode) }
+    }
+
+    fun setLiveViewMode(mode: LiveViewMode) {
+        viewModelScope.launch { settings.setLiveViewMode(mode) }
+    }
+
+    fun setExternalPlayer(pkg: String?) {
+        viewModelScope.launch { settings.setExternalPlayer(pkg) }
+    }
+
+    fun setEpgUrlOverride(url: String?) {
+        viewModelScope.launch { settings.setEpgUrlOverride(url) }
+    }
+
+    fun setEpgOffsetMinutes(minutes: Int) {
+        viewModelScope.launch { settings.setEpgOffsetMinutes(minutes) }
+    }
+
+    /** Apps de vídeo instalados que respondem a ACTION_VIEW de vídeo — para o
+     *  usuário escolher o player externo preferido (MX Player, VLC, etc.). */
+    fun installedVideoPlayers(): List<Pair<String, String>> {
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+            setDataAndType(android.net.Uri.parse("http://example.com/a.mkv"), "video/*")
+        }
+        val pm = appContext.packageManager
+        val flags = android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+        return runCatching {
+            pm.queryIntentActivities(intent, flags)
+                .filter { it.activityInfo.packageName != appContext.packageName }
+                .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+                .distinctBy { it.first }
+                .sortedBy { it.second.lowercase() }
+        }.getOrDefault(emptyList())
     }
 
     fun addProfile(profile: com.iptv.app.data.prefs.Profile) {
@@ -198,7 +256,6 @@ fun SettingsScreen(
     val refreshedMsg = stringResource(R.string.snack_catalog_refreshed)
     val refreshIntervalSavedMsg = stringResource(R.string.snack_refresh_interval_saved)
     val localeSavedMsg = stringResource(R.string.snack_locale_saved)
-    val languageLabel = stringResource(R.string.settings_language_label)
     val activity = LocalContext.current as? android.app.Activity
     var pin by remember { mutableStateOf("") }
     var currentPin by remember { mutableStateOf("") }
@@ -249,174 +306,157 @@ fun SettingsScreen(
         return
     }
 
-    val isPhone = dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone
+    val isPhone = dim.formFactor == FormFactor.Phone
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        val rootArrangement = if (isPhone) Arrangement.spacedBy(12.dp) else Arrangement.spacedBy(24.dp)
-
-        val leftColumn: @Composable () -> Unit = {
-            Text(stringResource(R.string.settings_server), style = MaterialTheme.typography.titleSmall)
-        if (!editingServer) {
-            Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
-            Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-            ) {
-                TouchableButton(compact = true, onClick = { editingServer = true }) {
-                    Text(stringResource(R.string.settings_change_server))
+    // --- Coluna esquerda: identidade/conta (servidor, PIN parental, geral, sessão) ---
+    val leftColumn: @Composable ColumnScope.() -> Unit = {
+        SettingsSection(title = stringResource(R.string.settings_server)) {
+            if (!editingServer) {
+                Text(stringResource(R.string.settings_host, s.host), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.settings_user, s.username), style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TouchableButton(compact = true, onClick = { editingServer = true }) {
+                        Text(stringResource(R.string.settings_change_server))
+                    }
+                    TouchableButton(compact = true, onClick = { profilesOpen = true }) {
+                        Text(stringResource(R.string.settings_profiles_button))
+                    }
                 }
-                TouchableButton(compact = true, onClick = { profilesOpen = true }) {
-                    Text(stringResource(R.string.settings_profiles_button))
-                }
-            }
-            if (s.profiles.size > 1) {
-                Text(
-                    stringResource(R.string.profiles_active_label, s.profiles.firstOrNull { it.id == s.activeProfileId }?.name ?: "—"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            OutlinedTextField(
-                value = editHost,
-                onValueChange = { editHost = it },
-                label = { Text(stringResource(R.string.login_host)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = editUser,
-                onValueChange = { editUser = it },
-                label = { Text(stringResource(R.string.login_user)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = editPass,
-                onValueChange = { editPass = it },
-                label = { Text(stringResource(R.string.login_pass)) },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            testResult?.let { r ->
-                if (r.ok) {
+                if (s.profiles.size > 1) {
                     Text(
-                        stringResource(R.string.settings_connection_ok),
-                        color = MaterialTheme.colorScheme.primary
+                        stringResource(
+                            R.string.profiles_active_label,
+                            s.profiles.firstOrNull { it.id == s.activeProfileId }?.name ?: "—"
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                } else {
+                }
+            } else {
+                TvSafeTextField(
+                    value = editHost,
+                    onValueChange = { editHost = it },
+                    label = stringResource(R.string.login_host),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TvSafeTextField(
+                    value = editUser,
+                    onValueChange = { editUser = it },
+                    label = stringResource(R.string.login_user),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TvSafeTextField(
+                    value = editPass,
+                    onValueChange = { editPass = it },
+                    label = stringResource(R.string.login_pass),
+                    isPassword = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                testResult?.let { r ->
+                    if (r.ok) {
+                        Text(
+                            stringResource(R.string.settings_connection_ok),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.settings_connection_failed, r.message),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TouchableButton(
+                        compact = true,
+                        enabled = !testing && editHost.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank(),
+                        onClick = { settingsVm.testCredentials(editHost, editUser, editPass) }
+                    ) { Text(stringResource(R.string.settings_test_connection)) }
+                    TouchableButton(
+                        compact = true,
+                        enabled = testResult?.ok == true,
+                        onClick = {
+                            settingsVm.saveCredentials(editHost, editUser, editPass) {
+                                editingServer = false
+                                settingsVm.clearTestResult()
+                                vm.refreshAll()
+                                snackbar?.show(credsSavedMsg)
+                            }
+                        }
+                    ) { Text(stringResource(R.string.settings_save_credentials)) }
+                    TouchableButton(compact = true, onClick = {
+                        editingServer = false
+                        editHost = s.host; editUser = s.username; editPass = s.password
+                        settingsVm.clearTestResult()
+                    }) { Text(stringResource(R.string.cancel)) }
+                }
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_parental_title)) {
+            Text(
+                stringResource(if (s.isPinSet) R.string.settings_pin_set else R.string.settings_pin_unset),
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (s.isPinSet) {
+                PinField(
+                    value = currentPin,
+                    onValueChange = {
+                        currentPin = it.filter(Char::isDigit).take(8)
+                        if (currentPinError) currentPinError = false
+                    },
+                    placeholder = stringResource(R.string.settings_pin_current_label),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (currentPinError) {
                     Text(
-                        stringResource(R.string.settings_connection_failed, r.message),
+                        stringResource(R.string.settings_pin_current_wrong),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
                 }
             }
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-            ) {
-                TouchableButton(
-                    compact = true,
-                    enabled = !testing && editHost.isNotBlank() && editUser.isNotBlank() && editPass.isNotBlank(),
-                    onClick = { settingsVm.testCredentials(editHost, editUser, editPass) }
-                ) { Text(stringResource(R.string.settings_test_connection)) }
-                TouchableButton(
-                    compact = true,
-                    enabled = testResult?.ok == true,
-                    onClick = {
-                        settingsVm.saveCredentials(editHost, editUser, editPass) {
-                            editingServer = false
-                            settingsVm.clearTestResult()
-                            vm.refreshAll()
-                            snackbar?.show(credsSavedMsg)
-                        }
-                    }
-                ) { Text(stringResource(R.string.settings_save_credentials)) }
-                TouchableButton(compact = true, onClick = {
-                    editingServer = false
-                    editHost = s.host; editUser = s.username; editPass = s.password
-                    settingsVm.clearTestResult()
-                }) { Text(stringResource(R.string.cancel)) }
-            }
-        }
-
-        Text(stringResource(R.string.settings_parental_title), style = MaterialTheme.typography.titleSmall)
-        Text(
-            stringResource(if (s.isPinSet) R.string.settings_pin_set else R.string.settings_pin_unset),
-            style = MaterialTheme.typography.bodySmall
-        )
-        if (s.isPinSet) {
             PinField(
-                value = currentPin,
-                onValueChange = {
-                    currentPin = it.filter(Char::isDigit).take(8)
-                    if (currentPinError) currentPinError = false
-                },
-                placeholder = stringResource(R.string.settings_pin_current_label),
+                value = pin,
+                onValueChange = { pin = it.filter(Char::isDigit).take(8) },
+                placeholder = stringResource(
+                    if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
+                ),
                 modifier = Modifier.fillMaxWidth()
             )
-            if (currentPinError) {
-                Text(
-                    stringResource(R.string.settings_pin_current_wrong),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-        PinField(
-            value = pin,
-            onValueChange = { pin = it.filter(Char::isDigit).take(8) },
-            placeholder = stringResource(
-                if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-        val canSavePin = pin.length >= 4 && (!s.isPinSet || currentPin.isNotEmpty())
-        TouchableButton(
-            compact = true,
-            enabled = canSavePin,
-            onClick = {
-                // Quando já existe PIN, exige que o "PIN atual" digitado bata
-                // com o persistido antes de aceitar a troca.
-                if (s.isPinSet && currentPin != (s.parentalPin ?: "")) {
-                    currentPinError = true
-                } else {
-                    settingsVm.setPin(pin)
-                    snackbar?.show(pinSavedMsg)
+            val canSavePin = pin.length >= 4 && (!s.isPinSet || currentPin.isNotEmpty())
+            TouchableButton(
+                compact = true,
+                enabled = canSavePin,
+                onClick = {
+                    // Quando já existe PIN, exige que o "PIN atual" digitado bata
+                    // com o persistido antes de aceitar a troca.
+                    if (s.isPinSet && currentPin != (s.parentalPin ?: "")) {
+                        currentPinError = true
+                    } else {
+                        settingsVm.setPin(pin)
+                        snackbar?.show(pinSavedMsg)
+                    }
                 }
+            ) {
+                Text(stringResource(
+                    if (s.isPinSet) R.string.settings_pin_save_set else R.string.settings_pin_save_unset
+                ))
             }
-        ) {
-            Text(stringResource(
-                if (s.isPinSet) R.string.settings_pin_save_set else R.string.settings_pin_save_unset
-            ))
         }
 
-        } // end leftColumn
-
-        val rightColumn: @Composable () -> Unit = {
+        SettingsSection(title = stringResource(R.string.settings_display)) {
             NotificationsPermissionSection()
 
             Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleSmall)
-            // Combo do idioma direto (sem ComboColumn que duplicava o label
-            // — gerava "Idioma" duas vezes na tela).
             var pendingLocaleTag by remember { mutableStateOf<String?>(null) }
             var localeDialogOpen by remember { mutableStateOf(false) }
             run {
-                val localeOptions = com.iptv.app.ui.common.LocaleManager.available.map {
-                    com.iptv.app.ui.common.ComboOption(
-                        id = it.tag ?: "__system__",
-                        label = it.display
-                    )
+                val localeOptions = LocaleManager.available.map {
+                    ComboOption(id = it.tag ?: "__system__", label = it.display)
                 }
                 val currentKey = s.appLocale ?: "__system__"
                 val current = localeOptions.firstOrNull { it.id == currentKey }
-                com.iptv.app.ui.common.ComboBox(
+                ComboBox(
                     selected = current,
                     options = localeOptions,
                     onSelect = {
@@ -430,12 +470,12 @@ fun SettingsScreen(
                 )
             }
             if (localeDialogOpen) {
-                androidx.compose.material3.AlertDialog(
+                AlertDialog(
                     onDismissRequest = { localeDialogOpen = false },
                     title = { Text(stringResource(R.string.locale_restart_title)) },
                     text = { Text(stringResource(R.string.locale_restart_message)) },
                     confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = {
+                        TextButton(onClick = {
                             localeDialogOpen = false
                             val tag = pendingLocaleTag
                             // 1) Persiste o locale via AppCompatDelegate (no
@@ -447,8 +487,8 @@ fun SettingsScreen(
                             //    Antes usávamos activity.recreate() — em
                             //    algumas TVs ele "trava" porque está dentro
                             //    de um Dialog/Compose state inconsistente.
-                            if (tag == null) com.iptv.app.ui.common.LocaleManager.resetToSystem()
-                            else com.iptv.app.ui.common.LocaleManager.apply(tag)
+                            if (tag == null) LocaleManager.resetToSystem()
+                            else LocaleManager.apply(tag)
                             activity?.let { act ->
                                 val pm = act.packageManager
                                 val intent = pm.getLaunchIntentForPackage(act.packageName)
@@ -469,9 +509,9 @@ fun SettingsScreen(
                         }) { Text(stringResource(R.string.locale_restart_confirm)) }
                     },
                     dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = {
-                            localeDialogOpen = false
-                        }) { Text(stringResource(R.string.exit_no)) }
+                        TextButton(onClick = { localeDialogOpen = false }) {
+                            Text(stringResource(R.string.exit_no))
+                        }
                     }
                 )
             }
@@ -482,31 +522,19 @@ fun SettingsScreen(
                 val tabletLabel = stringResource(R.string.onboarding_device_tablet)
                 val phoneLabel = stringResource(R.string.onboarding_device_phone)
                 val options = listOf(
-                    com.iptv.app.ui.common.ComboOption(id = "__auto__", label = autoLabel),
-                    com.iptv.app.ui.common.ComboOption(
-                        id = com.iptv.app.data.prefs.DeviceProfile.TV.name,
-                        label = tvLabel
-                    ),
-                    com.iptv.app.ui.common.ComboOption(
-                        id = com.iptv.app.data.prefs.DeviceProfile.TABLET.name,
-                        label = tabletLabel
-                    ),
-                    com.iptv.app.ui.common.ComboOption(
-                        id = com.iptv.app.data.prefs.DeviceProfile.PHONE.name,
-                        label = phoneLabel
-                    )
+                    ComboOption(id = "__auto__", label = autoLabel),
+                    ComboOption(id = DeviceProfile.TV.name, label = tvLabel),
+                    ComboOption(id = DeviceProfile.TABLET.name, label = tabletLabel),
+                    ComboOption(id = DeviceProfile.PHONE.name, label = phoneLabel)
                 )
                 val currentKey = s.deviceProfile?.name ?: "__auto__"
                 val current = options.firstOrNull { it.id == currentKey }
-                com.iptv.app.ui.common.ComboColumn(
-                    label = stringResource(R.string.onboarding_device_title)
-                ) {
-                    com.iptv.app.ui.common.ComboBox(
+                ComboColumn(label = stringResource(R.string.onboarding_device_title)) {
+                    ComboBox(
                         selected = current,
                         options = options,
                         onSelect = {
-                            val profile = if (it.id == "__auto__") null
-                                else com.iptv.app.data.prefs.DeviceProfile.valueOf(it.id)
+                            val profile = if (it.id == "__auto__") null else DeviceProfile.valueOf(it.id)
                             settingsVm.setDeviceProfile(profile)
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -514,16 +542,49 @@ fun SettingsScreen(
                 }
             }
 
-            Text(stringResource(R.string.settings_catalog), style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { settingsVm.setShowHourlyClock(!s.showHourlyClock) }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Switch(
+                    checked = s.showHourlyClock,
+                    onCheckedChange = { settingsVm.setShowHourlyClock(it) }
+                )
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(
+                        stringResource(R.string.settings_hourly_clock),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        stringResource(R.string.settings_hourly_clock_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_session)) {
+            TouchableButton(compact = true, onClick = {
+                vm.logout()
+                onLogout()
+            }) { Text(stringResource(R.string.settings_logout)) }
+        }
+    }
+
+    // --- Coluna direita: conteúdo/playback (catálogo, player, EPG, histórico, sobre) ---
+    val rightColumn: @Composable ColumnScope.() -> Unit = {
+        SettingsSection(title = stringResource(R.string.settings_catalog)) {
             run {
                 val intervalOptions = RefreshInterval.values().map {
-                    com.iptv.app.ui.common.ComboOption(it, stringResource(it.labelRes))
+                    ComboOption(it, stringResource(it.labelRes))
                 }
                 val current = intervalOptions.firstOrNull { it.id == s.refreshInterval }
-                com.iptv.app.ui.common.ComboColumn(
-                    label = stringResource(R.string.settings_refresh_interval)
-                ) {
-                    com.iptv.app.ui.common.ComboBox(
+                ComboColumn(label = stringResource(R.string.settings_refresh_interval)) {
+                    ComboBox(
                         selected = current,
                         options = intervalOptions,
                         onSelect = {
@@ -544,8 +605,8 @@ fun SettingsScreen(
                 } ?: stringResource(R.string.settings_refresh_never),
                 style = MaterialTheme.typography.bodySmall
             )
-            val refreshCtx = androidx.compose.ui.platform.LocalContext.current
-            val workProgress by com.iptv.app.work.CatalogRefreshWorker
+            val refreshCtx = LocalContext.current
+            val workProgress by CatalogRefreshWorker
                 .observeProgress(refreshCtx)
                 .collectAsState(initial = null)
             val wasRunning = remember { mutableStateOf(false) }
@@ -557,12 +618,10 @@ fun SettingsScreen(
                 }
                 wasRunning.value = running
             }
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TouchableButton(compact = true, onClick = {
                     snackbar?.show(refreshingMsg)
-                    com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(refreshCtx)
+                    CatalogRefreshWorker.enqueueOneShot(refreshCtx)
                 }) {
                     Text(stringResource(R.string.settings_refresh_now))
                 }
@@ -578,11 +637,11 @@ fun SettingsScreen(
                     "series" -> stringResource(R.string.refresh_phase_series)
                     else -> p.phase
                 }
-                androidx.compose.foundation.layout.Row(
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    androidx.compose.material3.CircularProgressIndicator(
+                    CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.primary
@@ -594,49 +653,157 @@ fun SettingsScreen(
                     )
                 }
             }
+        }
 
-        Text(stringResource(R.string.settings_display), style = MaterialTheme.typography.titleSmall)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { settingsVm.setShowHourlyClock(!s.showHourlyClock) }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            androidx.compose.material3.Switch(
-                checked = s.showHourlyClock,
-                onCheckedChange = { settingsVm.setShowHourlyClock(it) }
-            )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(
-                    stringResource(R.string.settings_hourly_clock),
-                    style = MaterialTheme.typography.bodyMedium
+        SettingsSection(title = stringResource(R.string.settings_player_advanced)) {
+            // Decoder: automático / hardware / software.
+            val decoderOptions = DecoderMode.values().map {
+                ComboOption(
+                    it,
+                    when (it) {
+                        DecoderMode.AUTO -> stringResource(R.string.decoder_auto)
+                        DecoderMode.HARDWARE -> stringResource(R.string.decoder_hardware)
+                        DecoderMode.SOFTWARE -> stringResource(R.string.decoder_software)
+                    }
                 )
-                Text(
-                    stringResource(R.string.settings_hourly_clock_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            ComboColumn(label = stringResource(R.string.settings_decoder)) {
+                ComboBox(
+                    selected = decoderOptions.firstOrNull { it.id == s.decoderMode },
+                    options = decoderOptions,
+                    onSelect = { settingsVm.setDecoderMode(it.id) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            // Player externo preferido.
+            val internalOpt = ComboOption("", stringResource(R.string.external_player_internal))
+            val playerOptions = listOf(internalOpt) +
+                remember { settingsVm.installedVideoPlayers() }
+                    .map { ComboOption(it.first, it.second) }
+            ComboColumn(label = stringResource(R.string.settings_external_player)) {
+                ComboBox(
+                    selected = playerOptions.firstOrNull { it.id == (s.externalPlayerPackage ?: "") }
+                        ?: internalOpt,
+                    options = playerOptions,
+                    onSelect = { settingsVm.setExternalPlayer(it.id.ifBlank { null }) },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
 
-        Text(stringResource(R.string.settings_history), style = MaterialTheme.typography.titleSmall)
-        TouchableButton(compact = true, onClick = { historyDialogOpen = true }) {
-            Text(stringResource(R.string.settings_history_clear))
+        SettingsSection(title = stringResource(R.string.settings_epg)) {
+            // Formato padrão do stream Ao Vivo.
+            val formatOptions = StreamFormat.values().map {
+                ComboOption(
+                    it,
+                    when (it) {
+                        StreamFormat.TS -> stringResource(R.string.stream_format_ts)
+                        StreamFormat.HLS -> stringResource(R.string.stream_format_hls)
+                    }
+                )
+            }
+            ComboColumn(label = stringResource(R.string.settings_stream_format)) {
+                ComboBox(
+                    selected = formatOptions.firstOrNull { it.id == s.streamFormat },
+                    options = formatOptions,
+                    onSelect = { settingsVm.setStreamFormat(it.id) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            // Layout de navegação do Ao Vivo (grade, lista com categorias, lista com preview).
+            val liveViewModeOptions = LiveViewMode.values().map {
+                ComboOption(
+                    it,
+                    when (it) {
+                        LiveViewMode.GRID -> stringResource(R.string.live_view_mode_grid)
+                        LiveViewMode.LIST_WITH_CATEGORIES -> stringResource(R.string.live_view_mode_list_categories)
+                        LiveViewMode.LIST_FOCUS -> stringResource(R.string.live_view_mode_list_focus)
+                    }
+                )
+            }
+            ComboColumn(label = stringResource(R.string.live_view_mode_title)) {
+                ComboBox(
+                    selected = liveViewModeOptions.firstOrNull { it.id == s.liveViewMode },
+                    options = liveViewModeOptions,
+                    onSelect = { settingsVm.setLiveViewMode(it.id) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            var epgUrl by remember(s.epgUrlOverride) { mutableStateOf(s.epgUrlOverride ?: "") }
+            TvSafeTextField(
+                value = epgUrl,
+                onValueChange = {
+                    epgUrl = it
+                    settingsVm.setEpgUrlOverride(it.ifBlank { null })
+                },
+                label = stringResource(R.string.settings_epg_url),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                stringResource(R.string.settings_epg_url_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val offsets = listOf(-180, -120, -60, -30, 0, 30, 60, 120, 180)
+            val offsetOptions = offsets.map {
+                ComboOption(it, if (it == 0) "0 min" else (if (it > 0) "+$it min" else "$it min"))
+            }
+            ComboColumn(label = stringResource(R.string.settings_epg_offset)) {
+                ComboBox(
+                    selected = offsetOptions.firstOrNull { it.id == s.epgOffsetMinutes }
+                        ?: offsetOptions.first { it.id == 0 },
+                    options = offsetOptions,
+                    onSelect = { settingsVm.setEpgOffsetMinutes(it.id) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
-        Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleSmall)
-        androidx.compose.foundation.layout.Row(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-        ) {
-            TouchableButton(compact = true, onClick = { aboutOpen = true }) {
-                // Versão visível direto no botão — antes só aparecia depois de
-                // entrar na tela Sobre. Útil pra suporte ("qual versão você está
-                // usando?") sem precisar navegar.
-                Text(stringResource(
-                    R.string.settings_open_about_with_version,
-                    com.iptv.app.BuildConfig.VERSION_NAME
-                ))
+        SettingsSection(title = stringResource(R.string.settings_history)) {
+            TouchableButton(compact = true, onClick = { historyDialogOpen = true }) {
+                Text(stringResource(R.string.settings_history_clear))
+            }
+        }
+
+        SettingsSection(title = stringResource(R.string.settings_about)) {
+            val ctx = LocalContext.current
+            // Baixa e prepara a instalação da release mais nova em segundo
+            // plano (worker único "update_check_oneshot") — o resultado
+            // chega aqui via WorkInfo, sem precisar de callback direto.
+            val updateWorkInfo by UpdateCheckWorker
+                .observeOneShot(ctx)
+                .collectAsState(initial = null)
+            LaunchedEffect(updateWorkInfo?.id, updateWorkInfo?.state) {
+                val info = updateWorkInfo ?: return@LaunchedEffect
+                when (info.state) {
+                    androidx.work.WorkInfo.State.SUCCEEDED -> {
+                        val found = info.outputData.getBoolean(UpdateCheckWorker.OUTPUT_FOUND, false)
+                        if (found) {
+                            val version = info.outputData.getString(UpdateCheckWorker.OUTPUT_VERSION)
+                            snackbar?.show(ctx.getString(R.string.snack_update_available, version ?: ""))
+                        } else {
+                            snackbar?.show(ctx.getString(R.string.snack_update_up_to_date))
+                        }
+                    }
+                    androidx.work.WorkInfo.State.FAILED -> {
+                        snackbar?.show(ctx.getString(R.string.snack_update_check_failed))
+                    }
+                    else -> Unit
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TouchableButton(compact = true, onClick = { UpdateCheckWorker.checkNow(ctx) }) {
+                    Text(stringResource(R.string.settings_check_update))
+                }
+                TouchableButton(compact = true, onClick = { aboutOpen = true }) {
+                    // Versão visível direto no botão — antes só aparecia depois de
+                    // entrar na tela Sobre. Útil pra suporte ("qual versão você está
+                    // usando?") sem precisar navegar.
+                    Text(stringResource(
+                        R.string.settings_open_about_with_version,
+                        com.iptv.app.BuildConfig.VERSION_NAME
+                    ))
+                }
             }
             // Log de crash local — só visível quando há registros. Sem
             // dependência externa (Firebase/Sentry); o usuário pode copiar e
@@ -650,29 +817,31 @@ fun SettingsScreen(
                 }
             }
         }
+    }
 
-            Text(stringResource(R.string.settings_session), style = MaterialTheme.typography.titleSmall)
-            TouchableButton(compact = true, onClick = {
-                vm.logout()
-                onLogout()
-            }) { Text(stringResource(R.string.settings_logout)) }
-        } // end rightColumn
-
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
         if (isPhone) {
-            leftColumn()
-            rightColumn()
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                leftColumn()
+                rightColumn()
+            }
         } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = rootArrangement
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) { leftColumn() }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) { rightColumn() }
             }
         }
@@ -690,6 +859,34 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Card de agrupamento visual — cada bloco de configurações relacionadas
+ * (Servidor, Segurança, Player…) fica dentro de um card com fundo e cantos
+ * arredondados, em vez de títulos soltos direto no fluxo da tela.
+ */
+@Composable
+private fun SettingsSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        content()
+    }
+}
+
 @Composable
 private fun ClearHistoryDialog(
     onDismiss: () -> Unit,
@@ -699,7 +896,7 @@ private fun ClearHistoryDialog(
     var series by remember { mutableStateOf(true) }
     var channels by remember { mutableStateOf(true) }
     val anySelected = movies || series || channels
-    androidx.compose.material3.AlertDialog(
+    AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.history_dialog_title)) },
         text = {
@@ -728,13 +925,13 @@ private fun ClearHistoryDialog(
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(
+            TextButton(
                 enabled = anySelected,
                 onClick = { onConfirm(movies, series, channels) }
             ) { Text(stringResource(R.string.history_confirm)) }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.cancel))
             }
         }
@@ -750,7 +947,7 @@ private fun HistoryCheckRow(label: String, checked: Boolean, onToggle: () -> Uni
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Checkbox(checked = checked, onCheckedChange = { onToggle() })
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }
@@ -758,7 +955,7 @@ private fun HistoryCheckRow(label: String, checked: Boolean, onToggle: () -> Uni
 @Composable
 private fun NotificationsPermissionSection() {
     if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var granted by remember {
         mutableStateOf(
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -820,7 +1017,7 @@ private fun PinField(
     Row(
         modifier = modifier
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .border(2.dp, borderColor, shape)
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically

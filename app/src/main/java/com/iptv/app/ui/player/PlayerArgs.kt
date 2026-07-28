@@ -43,6 +43,35 @@ data class PlayerArgs(
             return "player/${args.kind.name}/${args.streamId}/$title/$ext/${args.seriesId}/${args.seasonNumber}/$episode/${args.startPositionMs}/$poster/$cat/${args.timeshiftStartMs}/${args.timeshiftDurationMin}"
         }
 
+        /** Deep link usado pelos cards do canal da tela inicial da Android TV:
+         *  tartatv://play?kind=LIVE&id=123&title=...&ext=...&poster=...&cat=... */
+        fun toDeepLink(args: PlayerArgs): String {
+            val b = Uri.Builder()
+                .scheme("tartatv").authority("play")
+                .appendQueryParameter("kind", args.kind.name)
+                .appendQueryParameter("id", args.streamId.toString())
+                .appendQueryParameter("title", args.title)
+            args.containerExtension?.let { b.appendQueryParameter("ext", it) }
+            args.posterUrl?.let { b.appendQueryParameter("poster", it) }
+            args.categoryId?.let { b.appendQueryParameter("cat", it) }
+            return b.build().toString()
+        }
+
+        fun fromDeepLink(uri: Uri): PlayerArgs? {
+            if (uri.scheme != "tartatv" || uri.authority != "play") return null
+            val kind = runCatching { PlayerKind.valueOf(uri.getQueryParameter("kind") ?: "") }
+                .getOrNull() ?: return null
+            val id = uri.getQueryParameter("id")?.toIntOrNull() ?: return null
+            return PlayerArgs(
+                kind = kind,
+                streamId = id,
+                title = uri.getQueryParameter("title").orEmpty(),
+                containerExtension = uri.getQueryParameter("ext"),
+                posterUrl = uri.getQueryParameter("poster"),
+                categoryId = uri.getQueryParameter("cat")
+            )
+        }
+
         fun fromBackStack(entry: NavBackStackEntry): PlayerArgs {
             val a = entry.arguments!!
             return PlayerArgs(

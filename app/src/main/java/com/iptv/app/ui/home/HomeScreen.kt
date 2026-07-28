@@ -143,6 +143,10 @@ fun HomeScreen(
     // player — o usuário caía no grid de categorias.
     var moviesSelectedCat by rememberSaveable { mutableStateOf<String?>(null) }
     var seriesSelectedCat by rememberSaveable { mutableStateOf<String?>(null) }
+    // Busca local de Filmes elevada para cá pelo mesmo motivo de moviesSelectedCat:
+    // o `when` desmonta a seção ao abrir o detalhe do filme e o rememberSaveable
+    // interno se perdia. Mantida até o usuário trocar de categoria ou sair do menu.
+    var moviesLocalFilter by rememberSaveable { mutableStateOf("") }
     val initialLoading by vm.initialLoading.collectAsState()
     val playbackHolder = LocalPlaybackHolder.current
     val miniPlayerFormFactor = com.iptv.app.ui.common.rememberTvDim().formFactor
@@ -242,6 +246,9 @@ fun HomeScreen(
                     openMovie = null
                     openChannel = null
                     openSeries = null
+                    // Sair do menu Filmes limpa a busca local (requisito: manter
+                    // só enquanto o usuário fica no menu/categoria).
+                    if (it != "movies") moviesLocalFilter = ""
                     selectedKey = it
                 },
                 onBack = headerBack
@@ -310,7 +317,13 @@ fun HomeScreen(
                         onPlay = handlePlay,
                         onPlayDirect = onPlay,
                         selectedCat = moviesSelectedCat,
-                        onSelectedCatChange = { moviesSelectedCat = it }
+                        onSelectedCatChange = {
+                            // Trocar de categoria zera a busca local.
+                            if (it != moviesSelectedCat) moviesLocalFilter = ""
+                            moviesSelectedCat = it
+                        },
+                        localFilter = moviesLocalFilter,
+                        onLocalFilterChange = { moviesLocalFilter = it }
                     )
                     "series" -> SeriesSection(
                         vm = vm,

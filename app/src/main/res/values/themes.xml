@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Iptv" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowContentTransitions">true</item>
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- minSdk é 23; abaixo de API 27 este atributo é ignorado pelo
+             sistema (não quebra em runtime), só precisa do ack pro lint. -->
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="27">shortEdges</item>
     </style>
 
     <style name="Theme.Iptv.Splash" parent="Theme.SplashScreen">

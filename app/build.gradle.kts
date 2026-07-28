@@ -137,6 +137,9 @@ dependencies {
     implementation("androidx.tv:tv-foundation:1.0.0-alpha10")
     implementation("androidx.tv:tv-material:1.0.0")
 
+    // Android TV home-screen channels (recommendations row on the launcher)
+    implementation("androidx.tvprovider:tvprovider:1.0.0")
+
     // Media3 / ExoPlayer
     val media3 = "1.4.0"
     implementation("androidx.media3:media3-exoplayer:$media3")

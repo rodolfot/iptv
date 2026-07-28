@@ -16,6 +16,7 @@ object NotificationChannels {
     const val CATALOG = "catalog"
     const val RESUME = "resume"
     const val ERRORS = "errors"
+    const val UPDATES = "updates"
 }
 
 object Notifications {
@@ -44,11 +45,34 @@ object Notifications {
                 context.getString(R.string.notif_channel_errors),
                 NotificationManager.IMPORTANCE_HIGH
             ),
+            NotificationChannel(
+                NotificationChannels.UPDATES,
+                context.getString(R.string.notif_channel_updates),
+                NotificationManager.IMPORTANCE_HIGH
+            ),
         ).forEach(mgr::createNotificationChannel)
     }
 
-    fun show(context: Context, channelId: String, id: Int, title: String, text: String) {
-        val pi = launchIntent(context)
+    fun show(
+        context: Context,
+        channelId: String,
+        id: Int,
+        title: String,
+        text: String,
+        /** Ação ao tocar na notificação. Null = abre o app (padrão). */
+        contentIntent: PendingIntent? = null
+    ) {
+        // API 33+ exige a permissão POST_NOTIFICATIONS concedida em runtime —
+        // sem essa checagem explícita, o notify() abaixo pode lançar
+        // SecurityException se o usuário tiver negado a permissão.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val pi = contentIntent ?: launchIntent(context)
         val notif = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)

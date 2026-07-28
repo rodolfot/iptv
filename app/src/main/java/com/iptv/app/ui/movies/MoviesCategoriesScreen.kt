@@ -68,6 +68,10 @@ fun MoviesCategoriesScreen(
     error: String?,
     advancedFilters: AdvancedFilters,
     onAdvancedFiltersClick: () -> Unit,
+    localFilter: String,
+    onLocalFilterChange: (String) -> Unit,
+    /** Publica a lista ordenada/filtrada visível como fila do player (botão Próximo). */
+    onSetMovieQueue: (List<Movie>) -> Unit,
     sort: SortOption,
     onSortChange: (SortOption) -> Unit,
     onCategorySelected: (String) -> Unit,
@@ -79,9 +83,9 @@ fun MoviesCategoriesScreen(
     movieProgress: Map<Int, com.iptv.app.ui.home.HomeViewModel.MovieWatchState> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
-    // Sem key: a busca persiste mesmo quando o usuário troca de categoria
-    // ou abre o detalhe e volta.
-    var localFilter by rememberSaveable { mutableStateOf("") }
+    // Busca elevada para a Home: sobrevive à entrada no detalhe do filme/player
+    // (o `when` da Home desmonta esta tela) e só é limpa ao trocar de categoria
+    // ou sair do menu Filmes.
     val drawerSelectedRequester = remember { FocusRequester() }
     // Ao entrar na seção, foco vai pro item selecionado do drawer — o
     // usuário pediu pra cair na primeira categoria à esquerda ao descer
@@ -118,7 +122,7 @@ fun MoviesCategoriesScreen(
             ) {
                 LocalFilterField(
                     value = localFilter,
-                    onValueChange = { localFilter = it },
+                    onValueChange = onLocalFilterChange,
                     modifier = Modifier.weight(1f)
                 )
                 SortMenuButton(
@@ -195,9 +199,13 @@ fun MoviesCategoriesScreen(
                         onLongClick = {
                             // Long-press OK toca direto, sem detalhe/sinopse.
                             val locked2 = isCategoryAdult && !isParentalUnlocked
-                            if (!locked2) onMovieDirectPlay(m)
+                            if (!locked2) {
+                                onSetMovieQueue(filtered)
+                                onMovieDirectPlay(m)
+                            }
                         }
                     ) {
+                        onSetMovieQueue(filtered)
                         onMovieClick(m)
                     }
                 }

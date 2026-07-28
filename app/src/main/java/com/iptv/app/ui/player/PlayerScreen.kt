@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package com.iptv.app.ui.player
 
 import android.view.KeyEvent
@@ -5,12 +7,18 @@ import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,6 +70,8 @@ import com.iptv.app.domain.model.toModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -75,7 +85,13 @@ data class PlayerUiState(
     /** Canais irmãos (mesma categoria) para zapping esquerda/direita. */
     val liveSiblings: List<LiveNav> = emptyList(),
     /** Índice do canal atual em [liveSiblings], ou -1 se desconhecido. */
-    val liveIndex: Int = -1
+    val liveIndex: Int = -1,
+    /** streamId do canal Ao Vivo atual (para override de formato), ou -1. */
+    val liveStreamId: Int = -1,
+    /** Filmes irmãos (mesma categoria/filtro) para o botão "Próximo". */
+    val movieSiblings: List<PlayerArgs> = emptyList(),
+    /** Índice do filme atual em [movieSiblings], ou -1 se desconhecido. */
+    val movieIndex: Int = -1
 )
 
 /** Item mínimo para navegação entre canais Ao Vivo via D-pad. */
@@ -107,8 +123,17 @@ class PlayerViewModel @Inject constructor(
     private val liveHistoryDao: com.iptv.app.data.db.LiveHistoryDao,
     private val categoryCache: com.iptv.app.data.db.CategoryCacheDao,
     private val seriesCache: com.iptv.app.data.db.SeriesCacheDao,
-    private val currentProfile: CurrentProfile
+    private val settingsStore: com.iptv.app.data.prefs.SettingsStore,
+    private val currentProfile: CurrentProfile,
+    private val movieQueue: MovieQueue
 ) : ViewModel() {
+
+    /** Configurações observáveis pelo player (decoder, legenda, áudio-only…). */
+    val settings = settingsStore.flow.stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.Eagerly,
+        com.iptv.app.data.prefs.AppSettings()
+    )
 
     /** True quando a categoria é marcada como adulta — conteúdo protegido não
      *  deve entrar nos históricos (canais recentes / continuar assistindo). */
@@ -151,24 +176,13 @@ class PlayerViewModel @Inject constructor(
                     playLive(args.streamId, args.title, siblings, index)
                 }
                 PlayerKind.MOVIE -> {
-                    val url = repo.movieStreamUrl(args.streamId, args.containerExtension)
-                    val savedResume = movieProgressDao.getById(currentProfile.id(), args.streamId)
-                        ?.takeIf { !it.watched }?.positionMs ?: 0L
-                    val resumeMs = if (args.startPositionMs > 0L) args.startPositionMs else savedResume
-                    _state.value = PlayerUiState(
-                        items = listOf(
-                            PlayableItem(
-                                url = url,
-                                title = args.title,
-                                startPositionMs = resumeMs,
-                                movieId = args.streamId,
-                                moviePoster = args.posterUrl,
-                                movieContainer = args.containerExtension,
-                                movieCategory = args.categoryId
-                            )
-                        ),
-                        title = args.title
-                    )
+                    // Fila publicada pela tela de filmes (mesma ordem da lista).
+                    // Se o filme atual não estiver nela (veio da busca, favoritos,
+                    // continuar assistindo…) o índice fica -1 e o botão Próximo
+                    // não aparece.
+                    val siblings = movieQueue.items
+                    val index = siblings.indexOfFirst { it.streamId == args.streamId }
+                    playMovie(args, siblings, index)
                 }
                 PlayerKind.EPISODE -> {
                     runCatching { repo.seriesInfo(args.seriesId) }.onSuccess { info ->
@@ -241,14 +255,19 @@ class PlayerViewModel @Inject constructor(
         liveIndex: Int
     ) {
         val cached = liveCache.getById(streamId)
+        // Formato efetivo: override do canal tem prioridade sobre o padrão.
+        val s = settingsStore.flow.first()
+        val hls = (s.streamFormatOverrides[streamId] ?: s.streamFormat) ==
+            com.iptv.app.data.prefs.StreamFormat.HLS
         // Canal importado via M3U traz a URL direta; senão monta a do Xtream.
-        val url = cached?.streamUrl ?: repo.liveStreamUrl(streamId, hls = false)
+        val url = cached?.streamUrl ?: repo.liveStreamUrl(streamId, hls = hls)
         _state.value = PlayerUiState(
             items = listOf(PlayableItem(url, title)),
             title = title,
             isLive = true,
             liveSiblings = siblings,
-            liveIndex = liveIndex
+            liveIndex = liveIndex,
+            liveStreamId = streamId
         )
         // Histórico: marca este canal como o mais recente assistido, para
         // alimentar a seção "Canais recentes" na Início. trim() logo depois
@@ -282,6 +301,65 @@ class PlayerViewModel @Inject constructor(
         viewModelScope.launch {
             playLive(target.streamId, target.name, s.liveSiblings, newIndex)
         }
+    }
+
+    /** Monta o item de filme (URL + posição de retomada) e publica no estado,
+     *  preservando a fila de irmãos para o botão Próximo. Usado no load inicial
+     *  e ao saltar entre filmes. */
+    private suspend fun playMovie(args: PlayerArgs, siblings: List<PlayerArgs>, index: Int) {
+        val url = repo.movieStreamUrl(args.streamId, args.containerExtension)
+        val savedResume = movieProgressDao.getById(currentProfile.id(), args.streamId)
+            ?.takeIf { !it.watched }?.positionMs ?: 0L
+        val resumeMs = if (args.startPositionMs > 0L) args.startPositionMs else savedResume
+        _state.value = PlayerUiState(
+            items = listOf(
+                PlayableItem(
+                    url = url,
+                    title = args.title,
+                    startPositionMs = resumeMs,
+                    movieId = args.streamId,
+                    moviePoster = args.posterUrl,
+                    movieContainer = args.containerExtension,
+                    movieCategory = args.categoryId
+                )
+            ),
+            title = args.title,
+            movieSiblings = siblings,
+            movieIndex = index
+        )
+    }
+
+    /** Salta para o filme seguinte (+1) ou anterior (-1) da fila atual. No-op nas
+     *  pontas (sem wrap) e quando não há fila. */
+    fun stepMovie(delta: Int) {
+        val s = _state.value
+        if (s.movieIndex < 0 || s.movieSiblings.isEmpty()) return
+        val target = s.movieSiblings.getOrNull(s.movieIndex + delta) ?: return
+        viewModelScope.launch { playMovie(target, s.movieSiblings, s.movieIndex + delta) }
+    }
+
+    /** Troca o formato (HLS/TS) do canal Ao Vivo atual, salva como override e
+     *  recarrega a reprodução com a nova URL. */
+    fun setLiveFormat(format: com.iptv.app.data.prefs.StreamFormat) {
+        val s = _state.value
+        val id = s.liveStreamId
+        if (!s.isLive || id < 0) return
+        viewModelScope.launch {
+            settingsStore.setChannelStreamFormat(id, format)
+            playLive(id, s.title, s.liveSiblings, s.liveIndex)
+        }
+    }
+
+    fun setAudioOnly(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setAudioOnly(enabled) }
+    }
+
+    fun setSubtitleScale(percent: Int) {
+        viewModelScope.launch { settingsStore.setSubtitleScalePercent(percent) }
+    }
+
+    fun setSubtitleStyle(style: com.iptv.app.data.prefs.SubtitleStyle) {
+        viewModelScope.launch { settingsStore.setSubtitleStyle(style) }
     }
 
     fun onTransition(index: Int) {
@@ -360,6 +438,7 @@ fun PlayerScreen(
     vm: PlayerViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsState()
+    val settings by vm.settings.collectAsState()
     val context = LocalContext.current
     val holder = LocalPlaybackHolder.current
     var playbackError by remember { mutableStateOf<String?>(null) }
@@ -373,6 +452,10 @@ fun PlayerScreen(
     var isInitialBuffering by remember(args) { mutableStateOf(true) }
     // Guard contra STATE_ENDED reemitido em sequência (alguns drivers).
     var lastEndedIndex by remember { mutableStateOf(-1) }
+    // Capturado aqui (composable) porque o listener do ExoPlayer abaixo não
+    // pode chamar stringResource — só é lido depois de esgotar as tentativas
+    // de reconexão do STATE_ENDED sem próximo item (ver onPlaybackStateChanged).
+    val liveStreamEndedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_live_stream_ended)
     // Track picker e botão Faixas foram removidos do overlay — o overlay
     // mantém só o botão Voltar (escondido após 5s de inatividade).
 
@@ -389,6 +472,16 @@ fun PlayerScreen(
         holder?.minimized?.value = false
     }
 
+    // Ao saltar de filme (botão Próximo), o `args` da navegação não muda — a
+    // troca é dirigida pelo `state`. Mantém o mini-player apontando para o filme
+    // certo e reexibe o splash de conexão do novo filme.
+    LaunchedEffect(state.movieIndex) {
+        if (state.movieIndex >= 0) {
+            state.movieSiblings.getOrNull(state.movieIndex)?.let { holder?.args?.value = it }
+            isInitialBuffering = true
+        }
+    }
+
     // Enable PiP for this screen, restore previous state on dispose.
     DisposableEffect(Unit) {
         val activity = context as? com.iptv.app.MainActivity
@@ -397,10 +490,23 @@ fun PlayerScreen(
         onDispose { activity?.pipEnabled = previous ?: false }
     }
 
-    val exo = remember(holder) {
-        holder?.ensurePlayer(context)?.apply {
+    // Decoder escolhido nas Configurações — aplicado na construção do player.
+    // Se o modo mudar com um player já ativo no holder, vale no próximo cold start.
+    val decoderMode = settings.decoderMode
+    val exo = remember(holder, decoderMode) {
+        val factory = buildRenderersFactory(context, decoderMode)
+        holder?.ensurePlayer(context, factory, decoderMode.name)?.apply {
             repeatMode = Player.REPEAT_MODE_OFF
-        } ?: ExoPlayer.Builder(context).build().apply { playWhenReady = true }
+        } ?: ExoPlayer.Builder(context)
+            .setRenderersFactory(factory)
+            .build().apply { playWhenReady = true }
+    }
+    // Modo rádio / áudio-only: desliga o renderer de vídeo (economiza banda e
+    // CPU em canais de rádio). Reativo — o toggle aplica na hora.
+    LaunchedEffect(exo, settings.audioOnly) {
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_VIDEO, settings.audioOnly)
+            .build()
     }
     // Manter a CPU/Wi-Fi acordados durante streaming — sem isso, o sistema
     // adormece após ~10min com tela ativa e o playback para.
@@ -515,6 +621,26 @@ fun PlayerScreen(
                         lastEndedIndex = idx
                         exo.seekToNextMediaItem()
                         exo.playWhenReady = true
+                    }
+                } else if (playbackState == Player.STATE_ENDED) {
+                    // Ao Vivo não tem "próximo item" — sem este tratamento, um
+                    // manifesto HLS que momentaneamente parece "terminado"
+                    // (hiccup do encoder do provedor, atraso no refresh do
+                    // #EXT-X-ENDLIST) deixava o canal congelado/pausado
+                    // sozinho, sem nenhum erro disparado e sem chance de
+                    // reconectar. Mesmo fluxo de retry do onPlayerError.
+                    val isLive = state.items.getOrNull(exo.currentMediaItemIndex)
+                        ?.let { it.episodeId == null && it.movieId < 0 } ?: false
+                    if (isLive) {
+                        if (retryAttempts < 3) {
+                            retryAttempts++
+                            isReconnecting = true
+                            exo.prepare()
+                            exo.playWhenReady = true
+                        } else {
+                            isReconnecting = false
+                            playbackError = liveStreamEndedMsg
+                        }
                     }
                 }
                 if (playbackState == Player.STATE_READY) {
@@ -674,6 +800,39 @@ fun PlayerScreen(
             )
         }
     }
+
+    // --- Controles avançados (aspect ratio, velocidade, sleep timer, opções) ---
+    var showOptions by remember { mutableStateOf(false) }
+    val resizeModes = remember {
+        listOf(
+            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT,
+            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+            androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+        )
+    }
+    var resizeModeIndex by rememberSaveable { mutableStateOf(0) }
+    val speeds = remember { listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f) }
+    var speedIndex by rememberSaveable { mutableStateOf(2) }
+    var sleepMinutes by rememberSaveable { mutableStateOf(0) }
+
+    LaunchedEffect(resizeModeIndex, playerView) {
+        playerView.resizeMode = resizeModes[resizeModeIndex]
+    }
+    LaunchedEffect(speedIndex, exo) {
+        exo.setPlaybackSpeed(speeds[speedIndex])
+    }
+    LaunchedEffect(settings.subtitleScalePercent, settings.subtitleStyle, playerView) {
+        applySubtitleStyle(playerView, settings.subtitleScalePercent, settings.subtitleStyle)
+    }
+    // Sleep timer: pausa a reprodução após o tempo escolhido.
+    LaunchedEffect(sleepMinutes) {
+        if (sleepMinutes > 0) {
+            kotlinx.coroutines.delay(sleepMinutes * 60_000L)
+            exo.pause()
+            sleepMinutes = 0
+        }
+    }
+
     val seekStepMs = 10_000L
     Box(
         modifier = Modifier
@@ -827,10 +986,73 @@ fun PlayerScreen(
                         tint = Color.White
                     )
                 }
+                // Engrenagem: abre o painel de opções do player (aspect ratio,
+                // velocidade, legendas, áudio-only, formato, player externo…).
+                com.iptv.app.ui.common.TouchableButton(onClick = { showOptions = true }) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.Tune,
+                        contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_options),
+                        tint = Color.White
+                    )
+                }
+                // Próximo filme da categoria/filtro atual. Só aparece quando há
+                // um próximo na fila publicada pela tela de filmes.
+                val hasNextMovie = state.movieIndex in 0 until state.movieSiblings.lastIndex
+                if (hasNextMovie) {
+                    com.iptv.app.ui.common.TouchableButton(onClick = {
+                        // Salva a posição do filme atual antes de trocar para
+                        // que ele entre no "Continuar assistindo" corretamente.
+                        state.items.getOrNull(exo.currentMediaItemIndex)?.let {
+                            vm.saveProgress(it, exo.currentPosition, exo.duration.coerceAtLeast(0L))
+                        }
+                        vm.stepMovie(1)
+                    }) {
+                        androidx.compose.material3.Icon(
+                            Icons.Filled.SkipNext,
+                            contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_next_movie),
+                            tint = Color.White
+                        )
+                    }
+                }
                 if (titleVisible) {
                     Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
                 }
             }
+        }
+        if (showOptions) {
+            PlayerOptionsDialog(
+                state = state,
+                settings = settings,
+                resizeModeIndex = resizeModeIndex,
+                onCycleResizeMode = { resizeModeIndex = (resizeModeIndex + 1) % resizeModes.size },
+                speed = speeds[speedIndex],
+                onCycleSpeed = { speedIndex = (speedIndex + 1) % speeds.size },
+                sleepMinutes = sleepMinutes,
+                onCycleSleep = {
+                    val opts = listOf(0, 15, 30, 60, 90)
+                    sleepMinutes = opts[(opts.indexOf(sleepMinutes).coerceAtLeast(0) + 1) % opts.size]
+                },
+                onToggleAudioOnly = { vm.setAudioOnly(!settings.audioOnly) },
+                onCycleSubtitleStyle = {
+                    val all = com.iptv.app.data.prefs.SubtitleStyle.values()
+                    vm.setSubtitleStyle(all[(all.indexOf(settings.subtitleStyle) + 1) % all.size])
+                },
+                onSubtitleScale = { vm.setSubtitleScale(it) },
+                onToggleLiveFormat = {
+                    val current = settings.streamFormatOverrides[state.liveStreamId] ?: settings.streamFormat
+                    vm.setLiveFormat(
+                        if (current == com.iptv.app.data.prefs.StreamFormat.HLS)
+                            com.iptv.app.data.prefs.StreamFormat.TS
+                        else com.iptv.app.data.prefs.StreamFormat.HLS
+                    )
+                },
+                onOpenExternal = {
+                    val url = state.items.getOrNull(exo.currentMediaItemIndex)?.url
+                    if (url != null) launchExternalPlayer(context, url, state.title, settings.externalPlayerPackage)
+                    showOptions = false
+                },
+                onDismiss = { showOptions = false }
+            )
         }
         // Banner pequeno no canto inferior direito durante os últimos 10s
         // antes da transição automática. O usuário pediu o aviso pra não
@@ -895,6 +1117,30 @@ fun PlayerScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White,
                         modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+            }
+        }
+        // Modo rádio / áudio-only: sem vídeo, mostra a marca + título no centro
+        // pra tela não ficar preta. Só quando já conectou (não sobrepõe o splash).
+        if (settings.audioOnly && !isInitialBuffering && playbackError == null) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    androidx.compose.material3.Icon(
+                        Icons.Filled.Radio,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                    Text(
+                        androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio_only),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }
@@ -993,5 +1239,172 @@ private fun friendlyPlaybackError(error: PlaybackException): String {
         PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> "Falha de conexão com o servidor. Verifique a internet."
         PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "O servidor recusou a transmissão (HTTP). Pode ser limite de conexões ou conteúdo indisponível."
         else -> "Erro ao reproduzir: ${error.errorCodeName}."
+    }
+}
+
+/** Aplica tamanho + estilo de legenda escolhidos nas Configurações ao PlayerView. */
+private fun applySubtitleStyle(
+    view: PlayerView,
+    scalePercent: Int,
+    style: com.iptv.app.data.prefs.SubtitleStyle
+) {
+    val sub = view.subtitleView ?: return
+    sub.setFractionalTextSize(
+        androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * (scalePercent / 100f)
+    )
+    val white = android.graphics.Color.WHITE
+    val transparent = android.graphics.Color.TRANSPARENT
+    val black = android.graphics.Color.BLACK
+    val caption = when (style) {
+        com.iptv.app.data.prefs.SubtitleStyle.DEFAULT -> androidx.media3.ui.CaptionStyleCompat(
+            white, transparent, transparent,
+            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE, black, null
+        )
+        com.iptv.app.data.prefs.SubtitleStyle.WHITE_ON_BLACK -> androidx.media3.ui.CaptionStyleCompat(
+            white, 0xCC000000.toInt(), transparent,
+            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE, black, null
+        )
+        com.iptv.app.data.prefs.SubtitleStyle.YELLOW -> androidx.media3.ui.CaptionStyleCompat(
+            android.graphics.Color.YELLOW, transparent, transparent,
+            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE, black, null
+        )
+        com.iptv.app.data.prefs.SubtitleStyle.OUTLINE -> androidx.media3.ui.CaptionStyleCompat(
+            white, transparent, transparent,
+            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, black, null
+        )
+    }
+    sub.setStyle(caption)
+    sub.setApplyEmbeddedStyles(false)
+}
+
+/** Abre o stream atual num player externo (MX Player, VLC…). Se o pacote
+ *  preferido não estiver instalado, cai para o seletor padrão do sistema. */
+private fun launchExternalPlayer(
+    context: android.content.Context,
+    url: String,
+    title: String,
+    pkg: String?
+) {
+    fun baseIntent() = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+        setDataAndType(android.net.Uri.parse(url), "video/*")
+        putExtra("title", title)
+        // Extras reconhecidos por MX Player / VLC para herdar o título.
+        putExtra("secure_uri", true)
+        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    val primary = baseIntent().apply { if (!pkg.isNullOrBlank()) setPackage(pkg) }
+    val ok = runCatching { context.startActivity(primary); true }.getOrDefault(false)
+    if (!ok) {
+        runCatching { context.startActivity(baseIntent()) }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun PlayerOptionsDialog(
+    state: PlayerUiState,
+    settings: com.iptv.app.data.prefs.AppSettings,
+    resizeModeIndex: Int,
+    onCycleResizeMode: () -> Unit,
+    speed: Float,
+    onCycleSpeed: () -> Unit,
+    sleepMinutes: Int,
+    onCycleSleep: () -> Unit,
+    onToggleAudioOnly: () -> Unit,
+    onCycleSubtitleStyle: () -> Unit,
+    onSubtitleScale: (Int) -> Unit,
+    onToggleLiveFormat: () -> Unit,
+    onOpenExternal: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.width(460.dp).padding(24.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_options),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                val aspectLabel = when (resizeModeIndex) {
+                    1 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_zoom)
+                    2 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_fill)
+                    else -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_fit)
+                }
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect),
+                    aspectLabel, onCycleResizeMode
+                )
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_speed),
+                    "${speed}x", onCycleSpeed
+                )
+                val onTxt = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.on_label)
+                val offTxt = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.off_label)
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio_only),
+                    if (settings.audioOnly) onTxt else offTxt, onToggleAudioOnly
+                )
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle_style),
+                    settings.subtitleStyle.name, onCycleSubtitleStyle
+                )
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle_size),
+                    "${settings.subtitleScalePercent}%"
+                ) {
+                    val steps = listOf(75, 100, 125, 150, 175, 200)
+                    val next = steps[(steps.indexOf(settings.subtitleScalePercent)
+                        .coerceAtLeast(0) + 1) % steps.size]
+                    onSubtitleScale(next)
+                }
+                if (state.isLive) {
+                    val fmt = settings.streamFormatOverrides[state.liveStreamId] ?: settings.streamFormat
+                    OptionRow(
+                        androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_stream_format),
+                        fmt.name, onToggleLiveFormat
+                    )
+                }
+                val sleepLabel = if (sleepMinutes == 0) offTxt else "$sleepMinutes min"
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_sleep_timer),
+                    sleepLabel, onCycleSleep
+                )
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_external),
+                    "▶", onOpenExternal
+                )
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
+                ) {
+                    TouchableButton(onClick = onDismiss) {
+                        Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.ok))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun OptionRow(label: String, value: String, onClick: () -> Unit) {
+    TouchableButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Box(modifier = Modifier.weight(1f))
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
     }
 }

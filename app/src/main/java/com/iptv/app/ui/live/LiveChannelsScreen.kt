@@ -3,7 +3,6 @@ package com.iptv.app.ui.live
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +22,13 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items as lazyListItems
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,23 +47,30 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.iptv.app.R
+import com.iptv.app.data.prefs.AppSettings
+import com.iptv.app.data.prefs.LiveViewMode
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.model.LiveChannel
 import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.home.HomeViewModel
 
 /**
- * Layout inspirado no Smarters Player Lite:
- *  - Coluna esquerda: lista de categorias (sempre visível).
- *  - Área central/direita: grid de canais com logo grande + nome embaixo.
- *  - Canto inferior direito: PIP de preview do canal focado.
+ * Tela de canais Ao Vivo em TV/Tablet. Suporta 3 layouts (escolhidos nas
+ * Configurações de visualização, [LiveViewMode]):
+ *  - GRID: categorias à esquerda + grid de canais + PIP de preview no canto
+ *    (layout original, inspirado no Smarters Player Lite).
+ *  - LIST_WITH_CATEGORIES: categorias | lista de canais | preview.
+ *  - LIST_FOCUS: lista de canais | preview ocupando o resto da tela, sem
+ *    coluna de categorias (Voltar leva à tela de categorias).
  *
- * OK no canal → abre player full-screen.
- * Long-press → toggle favorito.
+ * Em todos os modos, o preview só começa a tocar quando o usuário confirma
+ * com OK/Enter — navegar com o D-pad apenas move o foco, sem disparar stream
+ * nenhum. Confirmar de novo o canal já em preview abre em tela cheia.
  */
 @Composable
 fun LiveChannelsScreen(
@@ -80,12 +87,75 @@ fun LiveChannelsScreen(
     countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
+    val settings by vm.settingsFlow.collectAsState()
+    val epgNow by vm.epgNow.collectAsState()
+    when (settings.liveViewMode) {
+        LiveViewMode.GRID -> LiveGridLayout(
+            vm = vm,
+            categories = categories,
+            selectedCategoryId = selectedCategoryId,
+            channels = channels,
+            isCategoryAdult = isCategoryAdult,
+            isParentalUnlocked = isParentalUnlocked,
+            loading = loading,
+            settings = settings,
+            onCategorySelected = onCategorySelected,
+            onPlay = onPlay,
+            countByCategory = countByCategory,
+            modifier = modifier
+        )
+        LiveViewMode.LIST_WITH_CATEGORIES -> LiveListWithCategoriesLayout(
+            vm = vm,
+            categories = categories,
+            selectedCategoryId = selectedCategoryId,
+            channels = channels,
+            epgNow = epgNow,
+            isCategoryAdult = isCategoryAdult,
+            isParentalUnlocked = isParentalUnlocked,
+            onCategorySelected = onCategorySelected,
+            onPlay = onPlay,
+            countByCategory = countByCategory,
+            modifier = modifier
+        )
+        LiveViewMode.LIST_FOCUS -> LiveListFocusLayout(
+            vm = vm,
+            categories = categories,
+            selectedCategoryId = selectedCategoryId,
+            channels = channels,
+            epgNow = epgNow,
+            isCategoryAdult = isCategoryAdult,
+            isParentalUnlocked = isParentalUnlocked,
+            onCategorySelected = onCategorySelected,
+            onPlay = onPlay,
+            countByCategory = countByCategory,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun LiveGridLayout(
+    vm: HomeViewModel,
+    categories: List<Category>,
+    selectedCategoryId: String,
+    channels: List<LiveChannel>,
+    isCategoryAdult: Boolean,
+    isParentalUnlocked: Boolean,
+    loading: Boolean,
+    settings: AppSettings,
+    onCategorySelected: (String) -> Unit,
+    onPlay: (LiveChannel) -> Unit,
+    countByCategory: Map<String, Int>,
+    modifier: Modifier = Modifier
+) {
     val favorites by vm.favorites.collectAsState()
     val snackbar = LocalSnackbar.current
-    val favAddedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.snack_favorite_added)
-    val favRemovedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.snack_favorite_removed)
+    val favAddedMsg = stringResource(R.string.snack_favorite_added)
+    val favRemovedMsg = stringResource(R.string.snack_favorite_removed)
 
-    var focusedChannel by remember(selectedCategoryId) { mutableStateOf<LiveChannel?>(null) }
+    // Canal confirmado com OK — só ele toca no PIP. Passar o foco por cima
+    // dos outros tiles não muda isso (ver onClick do ChannelTile).
+    var previewChannel by remember(selectedCategoryId) { mutableStateOf<LiveChannel?>(null) }
     val firstChannelFocus = remember { FocusRequester() }
     val drawerSelectedRequester = remember { FocusRequester() }
     // Sem key: a busca persiste ao voltar de um canal e ao trocar de categoria.
@@ -122,11 +192,9 @@ fun LiveChannelsScreen(
                     .fillMaxHeight()
                     .padding(16.dp)
             ) {
-                // Header com campo de busca + sort à direita — replica
-                // exatamente o header de Filmes/Séries (mesma altura, mesmo
-                // alinhamento). Sem o sort, o header ficava mais curto e
-                // desalinhava as categorias com o grid.
-                val settings by vm.settingsFlow.collectAsState()
+                // Header com campo de busca + sort + visualização à direita —
+                // replica exatamente o header de Filmes/Séries (mesma altura,
+                // mesmo alinhamento).
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -157,9 +225,18 @@ fun LiveChannelsScreen(
                         .filter { it.type == com.iptv.app.domain.model.ContentType.LIVE }
                         .map { it.itemId }
                         .toSet(),
+                    previewChannelId = previewChannel?.id,
                     firstFocusRequester = firstChannelFocus,
-                    onFocusedChannelChanged = { focusedChannel = it },
-                    onClick = onPlay,
+                    onClick = { ch ->
+                        val locked = isCategoryAdult && !isParentalUnlocked
+                        when {
+                            // Conteúdo bloqueado nunca entra em preview — vai
+                            // direto pro callback, que é quem mostra o PIN.
+                            locked -> onPlay(ch)
+                            previewChannel?.id == ch.id -> onPlay(ch)
+                            else -> previewChannel = ch
+                        }
+                    },
                     onLongClick = { ch ->
                         val isFav = favorites.any {
                             it.type == com.iptv.app.domain.model.ContentType.LIVE && it.itemId == ch.id
@@ -183,25 +260,148 @@ fun LiveChannelsScreen(
             } // end Column
         }
 
-        // PIP de preview no canto inferior direito.
-        focusedChannel?.let { channel ->
-            Box(
+        // PIP de preview no canto inferior direito — só aparece depois que o
+        // usuário confirma um canal com OK (ver onClick do ChannelTile).
+        previewChannel?.let { channel ->
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
-                    .width(240.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .border(
-                        2.dp,
-                        MaterialTheme.colorScheme.primary,
-                        RoundedCornerShape(8.dp)
-                    )
+                    .width(240.dp),
+                horizontalAlignment = Alignment.End
             ) {
-                ChannelPreviewPip(channel = channel, vm = vm)
+                Text(
+                    stringResource(R.string.live_preview_confirm_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xCC000000))
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .width(240.dp)
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(
+                            2.dp,
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(8.dp)
+                        )
+                ) {
+                    ChannelPreviewPip(channel = channel, vm = vm)
+                }
             }
         }
     }
+}
+
+/** Categorias | lista de canais | preview — 3 colunas lado a lado. */
+@Composable
+private fun LiveListWithCategoriesLayout(
+    vm: HomeViewModel,
+    categories: List<Category>,
+    selectedCategoryId: String,
+    channels: List<LiveChannel>,
+    epgNow: Map<String, com.iptv.app.data.db.EpgProgrammeEntity>,
+    isCategoryAdult: Boolean,
+    isParentalUnlocked: Boolean,
+    onCategorySelected: (String) -> Unit,
+    onPlay: (LiveChannel) -> Unit,
+    countByCategory: Map<String, Int>,
+    modifier: Modifier = Modifier
+) {
+    val drawerSelectedRequester = remember { FocusRequester() }
+    LaunchedEffect(selectedCategoryId) {
+        kotlinx.coroutines.delay(50)
+        runCatching { drawerSelectedRequester.requestFocus() }
+    }
+    Row(modifier = modifier.fillMaxSize()) {
+        CategoriesDrawer(
+            categories = categories,
+            selectedId = selectedCategoryId,
+            onSelect = onCategorySelected,
+            selectedRequester = drawerSelectedRequester,
+            countByCategory = countByCategory,
+            modifier = Modifier.width(280.dp).fillMaxHeight()
+        )
+        ChannelListWithEpg(
+            vm = vm,
+            channels = channels,
+            epgNow = epgNow,
+            isCategoryAdult = isCategoryAdult,
+            isParentalUnlocked = isParentalUnlocked,
+            onPlay = onPlay,
+            modifier = Modifier.weight(1f).fillMaxHeight().padding(16.dp)
+        )
+    }
+}
+
+/**
+ * Lista de canais | preview ocupando o resto da tela, sem coluna de
+ * categorias. Voltar no controle alterna para um seletor de categoria em
+ * tela cheia (reaproveita o [CategoriesDrawer]).
+ */
+@Composable
+private fun LiveListFocusLayout(
+    vm: HomeViewModel,
+    categories: List<Category>,
+    selectedCategoryId: String,
+    channels: List<LiveChannel>,
+    epgNow: Map<String, com.iptv.app.data.db.EpgProgrammeEntity>,
+    isCategoryAdult: Boolean,
+    isParentalUnlocked: Boolean,
+    onCategorySelected: (String) -> Unit,
+    onPlay: (LiveChannel) -> Unit,
+    countByCategory: Map<String, Int>,
+    modifier: Modifier = Modifier
+) {
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler {
+        showCategoryPicker = !showCategoryPicker
+    }
+
+    if (showCategoryPicker) {
+        val pickerRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(50)
+            runCatching { pickerRequester.requestFocus() }
+        }
+        CategoriesDrawer(
+            categories = categories,
+            selectedId = selectedCategoryId,
+            onSelect = { catId ->
+                onCategorySelected(catId)
+                showCategoryPicker = false
+            },
+            selectedRequester = pickerRequester,
+            countByCategory = countByCategory,
+            modifier = modifier.fillMaxSize()
+        )
+        return
+    }
+
+    val categoryName = categories.firstOrNull { it.id == selectedCategoryId }?.name.orEmpty()
+    ChannelListWithEpg(
+        vm = vm,
+        channels = channels,
+        epgNow = epgNow,
+        isCategoryAdult = isCategoryAdult,
+        isParentalUnlocked = isParentalUnlocked,
+        onPlay = onPlay,
+        header = {
+            Text(
+                categoryName,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+            )
+        },
+        modifier = modifier.fillMaxSize().padding(16.dp)
+    )
 }
 
 @Composable
@@ -227,7 +427,7 @@ private fun CategoriesDrawer(
         // não tem "voltar pro grid de categorias"; a navegação é só entre
         // as categorias e os canais.
         Text(
-            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.section_categories),
+            stringResource(R.string.section_categories),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         )
@@ -253,8 +453,8 @@ private fun ChannelsGrid(
     isCategoryAdult: Boolean,
     isParentalUnlocked: Boolean,
     favoriteIds: Set<Int>,
+    previewChannelId: Int?,
     firstFocusRequester: FocusRequester,
-    onFocusedChannelChanged: (LiveChannel?) -> Unit,
     onClick: (LiveChannel) -> Unit,
     onLongClick: (LiveChannel) -> Unit,
     scrollKey: String,
@@ -297,9 +497,9 @@ private fun ChannelsGrid(
                 channel = channel,
                 locked = locked,
                 isFavorite = channel.id in favoriteIds,
+                isPreviewing = previewChannelId == channel.id,
                 modifier = Modifier
-                    .then(if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier)
-                    .onFocusChanged { if (it.isFocused) onFocusedChannelChanged(channel) },
+                    .then(if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier),
                 onClick = { onClick(channel) },
                 onLongClick = { onLongClick(channel) }
             )
@@ -313,6 +513,7 @@ private fun ChannelTile(
     channel: LiveChannel,
     locked: Boolean,
     isFavorite: Boolean,
+    isPreviewing: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit
@@ -329,7 +530,15 @@ private fun ChannelTile(
             .aspectRatio(2f / 3f)
             .onFocusChanged { focused = it.isFocused }
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .then(
+                    if (isPreviewing) Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                    else Modifier
+                )
+        ) {
             // Logo centralizada na metade superior. Mantenho padding generoso
             // — logos vêm em formatos heterogêneos e cortar fica feio.
             Box(
@@ -350,6 +559,25 @@ private fun ChannelTile(
                         model = channel.logoUrl,
                         contentDescription = channel.name,
                         modifier = Modifier.fillMaxSize().padding(12.dp)
+                    )
+                }
+            }
+            // Indica que este é o canal confirmado com OK (o que está no PIP).
+            if (isPreviewing) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(bottom = 36.dp)
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x99000000)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -379,12 +607,12 @@ private fun ChannelTile(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(androidx.compose.ui.graphics.Color(0xCC000000))
+                    .background(Color(0xCC000000))
                     .padding(horizontal = 6.dp, vertical = 4.dp)
             ) {
                 Text(
                     channel.name,
-                    color = androidx.compose.ui.graphics.Color.White,
+                    color = Color.White,
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -424,8 +652,9 @@ private fun ChannelPreviewPip(channel: LiveChannel, vm: HomeViewModel) {
             exo.release()
         }
     }
+    // O canal já chega aqui confirmado com OK — sem necessidade de debounce
+    // adicional (usuário demonstrou intenção explícita ao confirmar).
     LaunchedEffect(channel.id) {
-        kotlinx.coroutines.delay(600)
         val url = vm.previewUrl(channel.id) ?: return@LaunchedEffect
         exo.setMediaItem(androidx.media3.common.MediaItem.fromUri(url))
         exo.prepare()

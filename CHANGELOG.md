@@ -6,6 +6,31 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-07-27
+
+### Added
+
+- **Auto-update em app**: worker periódico (12h) checa a última release no GitHub, baixa o APK em segundo plano e notifica — só falta o toque de confirmação do instalador do sistema (Android não permite pular essa etapa sem privilégio de sistema). O diálogo de atualização em primeiro plano ganhou o mesmo fluxo com barra de progresso, e Config → Sobre tem um botão "Verificar atualização agora" pra forçar a checagem numa TV específica.
+- **3 visualizações no Ao Vivo** (Config/botão na tela): grade com PIP (original), lista com coluna de categorias + preview, e lista com preview ocupando o resto da tela (sem coluna de categorias — Voltar abre um seletor de categoria em tela cheia). Em todos os modos, o preview só começa a tocar quando o usuário confirma o canal com OK/Enter — mover o foco com o D-pad não dispara stream nenhum; confirmar de novo o canal já em preview abre em tela cheia.
+- **Player externo (MX Player / VLC…)**: opção "Abrir em player externo" no painel de opções do player e seleção do app preferido em Config → Player avançado. Faz handoff do stream atual via `ACTION_VIEW` (com fallback pro seletor do sistema). Saída prática pro erro de HEVC/4K não suportado pelo decoder interno.
+- **Painel de opções do player** (engrenagem na overlay): proporção da tela (Ajustar/Zoom/Preencher), velocidade (0.5×–2×), sleep timer (15/30/60/90 min), áudio-only, estilo/tamanho de legenda e formato do canal — tudo navegável por D-pad.
+- **Seleção de decoder** (Config → Player avançado): Automático / Forçar hardware / Forçar software, via `MediaCodecSelector` na `RenderersFactory`. Forçar software resolve a maioria dos casos de "formato não suportado".
+- **Formato do stream HLS ↔ TS**: padrão global em Config + override por canal direto no player (salvo por canal e reaplicado).
+- **Customização de legenda**: tamanho (75–200%) e presets de estilo (padrão/contorno/fundo preto/amarelo) aplicados ao `SubtitleView`.
+- **Modo rádio / áudio-only**: desliga o renderer de vídeo (economiza banda/CPU) e mostra a marca + título no lugar da tela preta.
+- **EPG externa + correção de fuso**: URL XMLTV própria e offset em minutos (Config → EPG), aplicados no `EpgRepository`.
+- **Integração Android TV**: canal de recomendações na tela inicial do launcher (canais recentes + filmes em andamento) com deep links `tartatv://play?…` que abrem direto no player, e sugestões na busca global do sistema via `SearchSuggestionsProvider`.
+
+### Changed
+
+- **Tela de Configurações reorganizada**: as configurações viviam num fluxo contínuo de títulos soltos, sem separação visual — agora cada tema (Servidor, Controle parental, Geral, Sessão, Catálogo, Player avançado, EPG, Histórico, Sobre) fica num card próprio. A opção de visualização do Ao Vivo saiu do botão na própria tela e passou a morar em Config → EPG, junto do formato do canal.
+
+### Fixed
+
+- **Vídeo pausando sozinho em alguns canais Ao Vivo**: streams de alguns provedores emitem `STATE_ENDED` sem `#EXT-X-ENDLIST` (hiccup do encoder ou atraso no refresh do manifesto), e como Ao Vivo não tem "próximo item" na playlist, o player simplesmente ficava congelado sem nenhum erro disparado. Agora reconecta automaticamente (até 3 tentativas, mesmo fluxo do tratamento de erro existente) antes de mostrar uma mensagem definitiva.
+- **Tela preta ao reabrir o app depois de desligar/religar a TV**: o publicador do canal de recomendações da Android TV (`HomeChannelPublisher`) fazia chamadas síncronas de `ContentResolver` direto na thread principal durante `onCreate`, antes do primeiro frame. Se o processo foi recriado do zero (comum após TV ficar muito tempo desligada) e o launcher/TvProvider do sistema ainda estivesse acordando do standby, a UI thread travava esperando essa chamada — sem ANR, sem input pendente pro watchdog cronometrar, só resolvia forçando parada do app. Agora roda em `Dispatchers.IO`.
+- **Teclado do PIN de conteúdo protegido**: o diálogo de PIN parental usava `OutlinedTextField` cru do Material3, o único lugar do app que ainda não seguia o padrão "OK pra editar, Voltar pra sair" já usado no resto da UI pra D-pad de TV — o teclado virtual abria/fechava sozinho ao passar o foco por cima do campo, e Voltar fechava o diálogo inteiro em vez de só sair da edição. Trocado pelo `TvSafeTextField` já usado em Login/Perfis/Configurações.
+
 ## [1.3.2] — 2026-06-07
 
 ### Added

@@ -1,9 +1,12 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package com.iptv.app.ui.player
 
 import android.content.Context
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.RenderersFactory
 
 /**
  * Activity-scoped holder for the currently active ExoPlayer. Exists so the
@@ -26,19 +29,30 @@ class ActivePlaybackHolder {
     /** True when the user backed out of PlayerScreen but kept playback alive. */
     var minimized = mutableStateOf(false)
 
-    fun ensurePlayer(context: Context): ExoPlayer {
+    /** Modo de decoder usado para construir o player atual. Se mudar nas
+     *  Configurações, o próximo cold start recria o player com a nova fábrica. */
+    var decoderSignature: String? = null
+        private set
+
+    fun ensurePlayer(
+        context: Context,
+        renderersFactory: RenderersFactory? = null,
+        signature: String? = null
+    ): ExoPlayer {
         val existing = player
         if (existing != null) return existing
-        val created = ExoPlayer.Builder(context.applicationContext).build().apply {
-            playWhenReady = true
-        }
+        val builder = ExoPlayer.Builder(context.applicationContext)
+        if (renderersFactory != null) builder.setRenderersFactory(renderersFactory)
+        val created = builder.build().apply { playWhenReady = true }
         player = created
+        decoderSignature = signature
         return created
     }
 
     fun release() {
         player?.release()
         player = null
+        decoderSignature = null
         args.value = null
         minimized.value = false
     }

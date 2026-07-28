@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package com.iptv.app.ui.player
 
 import androidx.compose.foundation.layout.Arrangement

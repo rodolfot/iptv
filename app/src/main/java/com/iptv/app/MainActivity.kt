@@ -2,6 +2,7 @@ package com.iptv.app
 
 import android.app.PictureInPictureParams
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -28,7 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -59,6 +62,22 @@ class MainActivity : ComponentActivity() {
     var pipEnabled: Boolean = false
 
     val playbackHolder = ActivePlaybackHolder()
+
+    @Inject lateinit var homeChannelPublisher: com.iptv.app.tv.HomeChannelPublisher
+
+    /** Deep link pendente (cards do canal da Android TV) a abrir no player. */
+    private val pendingDeepLink = mutableStateOf<PlayerArgs?>(null)
+
+    private fun handleIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        PlayerArgs.fromDeepLink(data)?.let { pendingDeepLink.value = it }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
 
     /**
      * Aplica o locale persistido na Configuration da Activity. ComponentActivity
@@ -123,6 +142,9 @@ class MainActivity : ComponentActivity() {
         // O sistema limpa o flag automaticamente quando a Activity é
         // pausada/destruída.
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        handleIntent(intent)
+        // Publica/atualiza o canal de recomendações na home da Android TV.
+        lifecycleScope.launch { runCatching { homeChannelPublisher.publish() } }
         setContent {
             IptvTheme {
                 Surface(
@@ -138,7 +160,10 @@ class MainActivity : ComponentActivity() {
                         LocalPlaybackHolder provides playbackHolder
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            AppNav()
+                            AppNav(
+                                deepLink = pendingDeepLink.value,
+                                onDeepLinkConsumed = { pendingDeepLink.value = null }
+                            )
                             SnackbarHost(
                                 hostState = snackbarHostState,
                                 modifier = Modifier
@@ -180,7 +205,11 @@ class RootViewModel @Inject constructor(
 }
 
 @Composable
-fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
+fun AppNav(
+    deepLink: PlayerArgs? = null,
+    onDeepLinkConsumed: () -> Unit = {},
+    vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+) {
     val state by vm.state.collectAsState()
     // Override do form factor escolhido no onboarding aplica em toda a árvore.
     CompositionLocalProvider(
@@ -200,6 +229,14 @@ fun AppNav(vm: RootViewModel = androidx.hilt.navigation.compose.hiltViewModel())
             return@CompositionLocalProvider
         }
         val nav = rememberNavController()
+        // Deep link dos cards da Android TV: navega pro player assim que o
+        // usuário está logado (senão ignora — não dá pra tocar sem credenciais).
+        androidx.compose.runtime.LaunchedEffect(deepLink, state.loggedIn) {
+            if (deepLink != null && state.loggedIn) {
+                nav.navigate(PlayerArgs.toRoute(deepLink))
+                onDeepLinkConsumed()
+            }
+        }
         AppNavRoutes(state, nav)
     }
 }

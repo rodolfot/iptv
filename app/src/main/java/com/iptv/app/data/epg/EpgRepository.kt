@@ -18,6 +18,7 @@ class EpgRepository @Inject constructor(
     private val liveCache: LiveCacheDao,
     private val epgDao: EpgDao,
     private val cacheMeta: CacheMetaDao,
+    private val settings: com.iptv.app.data.prefs.SettingsStore,
     private val http: OkHttpClient
 ) {
 
@@ -40,7 +41,14 @@ class EpgRepository @Inject constructor(
         // gracefully — the next worker cycle will retry once the live cache is populated.
         if (knownIds.isEmpty()) return@runCatching 0
 
-        val url = xtream.epgUrl()
+        // Fonte de EPG: URL XMLTV externa configurada pelo usuário tem
+        // prioridade sobre o xmltv.php do provedor Xtream.
+        val s = settings.flow.first()
+        val url = s.epgUrlOverride?.takeIf { it.isNotBlank() } ?: xtream.epgUrl()
+        // Correção de fuso/offset (em minutos) aplicada aos horários: alguns
+        // provedores mandam a EPG num fuso diferente do anunciado.
+        val offsetMs = s.epgOffsetMinutes * 60_000L
+
         val req = Request.Builder().url(url).build()
         val response = http.newCall(req).execute()
         if (!response.isSuccessful) error("EPG HTTP ${response.code}")
@@ -50,10 +58,17 @@ class EpgRepository @Inject constructor(
         body.byteStream().use { input ->
             XmltvParser.parse(
                 input = input,
-                windowStartMs = windowStart,
-                windowEndMs = windowEnd,
+                // Alarga a janela de filtro pelo offset para não descartar
+                // programas que caem na borda depois da correção.
+                windowStartMs = windowStart - kotlin.math.abs(offsetMs),
+                windowEndMs = windowEnd + kotlin.math.abs(offsetMs),
                 knownChannelIds = knownIds
-            ) { p -> collected.add(p) }
+            ) { p ->
+                val shifted = if (offsetMs != 0L) {
+                    p.copy(startMs = p.startMs + offsetMs, stopMs = p.stopMs + offsetMs)
+                } else p
+                collected.add(shifted)
+            }
         }
         epgDao.replaceAll(now, collected)
         epgDao.deleteExpired(windowStart)
