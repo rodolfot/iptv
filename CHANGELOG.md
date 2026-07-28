@@ -6,6 +6,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-07-28
+
+### Fixed
+
+- **Controle remoto travava na Busca depois de digitar**: ao fechar o teclado pelo próprio botão ✓/Done (em vez do Voltar), o campo continuava internamente em modo de edição com o teclado escondido — o foco ficava preso num campo invisível e o D-pad parava de responder na tela inteira. O usuário digitava a busca, via os resultados, mas não conseguia navegar até eles nem sair da tela sem forçar o fechamento do app. Agora o Done sai da edição e o foco volta pro campo, liberando a navegação até os resultados. O mesmo reforço de foco foi aplicado aos campos de texto compartilhados (Login, Perfis, Configurações, filtros de Filmes/Séries), que tinham o mesmo risco latente.
+- **Textos fixos em português apareciam mesmo em outros idiomas** (bug de tradução): "Canal N" (card e detalhe do canal), os rótulos "Ao vivo/Filme/Episódio" do mini player, o título "Episódios — T{n}" e o nome de episódio sem título ("Episódio N") estavam escritos direto no código, ignorando o idioma escolhido. Todos viraram recursos traduzidos (pt, en, es, fr, it, de).
+
+### Changed
+
+- **Detalhe do canal alinhado às telas de detalhe de filme/série**: título em `titleLarge` (era `headlineMedium`), pôster responsivo ao tipo de dispositivo (era fixo em 180dp) e botões compactos — mesma linguagem visual de Filme/Série.
+
 ## [2.3.0] — 2026-07-28
 
 ### Changed

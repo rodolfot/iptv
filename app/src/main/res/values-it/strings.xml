@@ -46,6 +46,13 @@
     <string name="section_series_default">Serie</string>
     <string name="section_seasons">Stagioni</string>
     <string name="season_episodes_suffix">episodi</string>
+    <string name="season_name">Stagione %1$d</string>
+    <string name="episodes_dialog_title">Episodi — %1$s</string>
+    <string name="episode_fallback_title">Episodio %1$d</string>
+    <string name="content_type_live">In diretta</string>
+    <string name="content_type_movie">Film</string>
+    <string name="content_type_episode">Episodio</string>
+    <string name="channel_number">Canale %1$d</string>
     <string name="season_empty_title">Episodi non disponibili</string>
     <string name="season_empty_message">Questa stagione non ha restituito episodi dal server. Potrebbe essere una limitazione del provider — prova un\'altra stagione o riprova più tardi.</string>
 

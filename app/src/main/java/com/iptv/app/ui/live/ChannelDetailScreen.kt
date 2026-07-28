@@ -139,17 +139,24 @@ fun ChannelDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = dim.ScreenPadding, vertical = 24.dp)
+            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Back moved up to the app top bar.
 
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        // Poster e fontes responsivos ao form factor — mesmo padrão de
+        // MovieDetailScreen/SeriesDetailScreen (antes era fixo em 180dp).
+        val posterSize = when (dim.formFactor) {
+            com.iptv.app.ui.common.FormFactor.Phone -> 120.dp
+            com.iptv.app.ui.common.FormFactor.Tablet -> 160.dp
+            com.iptv.app.ui.common.FormFactor.Tv -> 180.dp
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(if (dim.formFactor == com.iptv.app.ui.common.FormFactor.Phone) 12.dp else 20.dp)) {
             Box(
                 modifier = Modifier
-                    .width(180.dp)
-                    .height(180.dp)
+                    .width(posterSize)
+                    .height(posterSize)
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center
@@ -160,13 +167,25 @@ fun ChannelDetailScreen(
                     AsyncImage(model = channel.logoUrl, contentDescription = channel.name)
                 }
             }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                Text(channel.name, style = MaterialTheme.typography.headlineMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                Text(
+                    channel.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
                 channel.num?.let {
-                    Text("Canal $it", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.channel_number, it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TouchableButton(onClick = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    TouchableButton(compact = true, onClick = {
                         onPlay(
                             PlayerArgs(
                                 kind = PlayerKind.LIVE,
@@ -178,7 +197,7 @@ fun ChannelDetailScreen(
                     }) {
                         Text(stringResource(R.string.channel_play))
                     }
-                    TouchableButton(onClick = {
+                    TouchableButton(compact = true, onClick = {
                         val wasFavorite = state.isFavorite
                         vm.toggleFavorite(channel)
                         snackbar?.show(if (wasFavorite) removedMsg else addedMsg)
@@ -193,13 +212,13 @@ fun ChannelDetailScreen(
                         modifier = Modifier.padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        TouchableButton(onClick = {
+                        TouchableButton(compact = true, onClick = {
                             onPlay(timeshiftArgs(channel, minutesAgo = 30))
                         }) { Text(stringResource(R.string.channel_timeshift_30)) }
-                        TouchableButton(onClick = {
+                        TouchableButton(compact = true, onClick = {
                             onPlay(timeshiftArgs(channel, minutesAgo = 60))
                         }) { Text(stringResource(R.string.channel_timeshift, 1)) }
-                        TouchableButton(onClick = {
+                        TouchableButton(compact = true, onClick = {
                             onPlay(timeshiftArgs(channel, minutesAgo = 120))
                         }) { Text(stringResource(R.string.channel_timeshift, 2)) }
                     }

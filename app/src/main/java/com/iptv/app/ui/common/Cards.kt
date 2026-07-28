@@ -328,7 +328,7 @@ fun ChannelCard(
                 Column {
                     if (number != null) {
                         Text(
-                            "Canal $number",
+                            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.channel_number, number),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

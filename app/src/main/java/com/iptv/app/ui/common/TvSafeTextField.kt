@@ -54,7 +54,9 @@ fun TvSafeTextField(
     isPassword: Boolean = false
 ) {
     var editing by remember { mutableStateOf(false) }
+    var wasEditing by remember { mutableStateOf(false) }
     val editorFocus = remember { FocusRequester() }
+    val displayFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(editing) {
@@ -63,7 +65,14 @@ fun TvSafeTextField(
             keyboard?.show()
         } else {
             keyboard?.hide()
+            // Restaura o foco pro campo não-editável ao SAIR da edição. Sem
+            // isso o BasicTextField sai da composição levando o foco pra
+            // null e o D-pad fica morto na tela. Só no true→false real —
+            // não na composição inicial (editing já nasce false), pra não
+            // roubar o foco ao abrir a tela.
+            if (wasEditing) runCatching { displayFocus.requestFocus() }
         }
+        wasEditing = editing
     }
 
     val shape = RoundedCornerShape(10.dp)
@@ -117,6 +126,7 @@ fun TvSafeTextField(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(displayFocus)
                         .onPreviewKeyEvent { e ->
                             if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                             when (e.key) {

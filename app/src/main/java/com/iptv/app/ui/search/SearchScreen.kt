@@ -21,6 +21,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -266,7 +269,9 @@ private fun SearchBar(
     // entramos em modo edição (e o teclado aparece). Antes, ao entrar em
     // Buscar o BasicTextField já recebia foco e disparava o teclado.
     var editing by remember { mutableStateOf(false) }
+    var wasEditing by remember { mutableStateOf(false) }
     val editorFocus = remember { FocusRequester() }
+    val displayFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(editing) {
@@ -279,7 +284,14 @@ private fun SearchBar(
             // Avisa a tela para persistir a palavra inteira no histórico
             // (a palavra inteira, não cada prefixo digitado).
             onSubmit()
+            // Restaura o foco pro campo não-editável ao SAIR da edição. Sem
+            // isso, ao fechar o IME (Back) o BasicTextField sai da composição
+            // e o foco vira null — o controle remoto fica morto na tela e o
+            // usuário não consegue navegar até os resultados. Só no true→false
+            // real, não na composição inicial.
+            if (wasEditing) runCatching { displayFocus.requestFocus() }
         }
+        wasEditing = editing
     }
 
     val shape = RoundedCornerShape(10.dp)
@@ -308,6 +320,12 @@ private fun SearchBar(
                 enabled = enabled,
                 singleLine = true,
                 textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                // O "Done"/✓ do teclado fecha o IME — sem tratar isso, o
+                // campo continuava em modo edição (editing=true) com o IME
+                // fechado, prendendo o foco: o D-pad ficava morto e o usuário
+                // não alcançava os resultados. Agora o Done sai da edição.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { editing = false }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(editorFocus)
@@ -338,6 +356,7 @@ private fun SearchBar(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .focusRequester(displayFocus)
                     .onPreviewKeyEvent { e ->
                         if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false
                         when (e.key) {

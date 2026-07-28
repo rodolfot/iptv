@@ -936,7 +936,7 @@ private fun EpisodesDialog(
                 .padding(16.dp)
         ) {
             Text(
-                "Episódios — $seasonLabel",
+                stringResource(R.string.episodes_dialog_title, seasonLabel),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -997,8 +997,9 @@ private fun EpisodeRow(
     // Título sintetizado se o provedor não enviou um — alguns servidores
     // entregam só id/episodeNum sem o nome real do episódio. Cair em
     // "Episódio X" deixa pelo menos algo legível.
-    val displayTitle = episode.title.takeIf { it.isNotBlank() && it != "Episódio ${episode.episodeNum}" }
-        ?: "Episódio ${episode.episodeNum}"
+    val fallbackTitle = stringResource(R.string.episode_fallback_title, episode.episodeNum)
+    val displayTitle = episode.title.takeIf { it.isNotBlank() && it != fallbackTitle }
+        ?: fallbackTitle
     // Quando o episódio não tem poster próprio, usa a capa da série para
     // não deixar um quadrado cinza com ícone genérico.
     val poster = episode.poster?.takeIf { it.isNotBlank() } ?: fallbackPoster

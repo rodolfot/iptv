@@ -61,7 +61,9 @@ fun LocalFilterField(
     modifier: Modifier = Modifier
 ) {
     var editing by remember { mutableStateOf(false) }
+    var wasEditing by remember { mutableStateOf(false) }
     val editorFocus = remember { FocusRequester() }
+    val displayFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(editing) {
@@ -70,7 +72,11 @@ fun LocalFilterField(
             keyboard?.show()
         } else {
             keyboard?.hide()
+            // Restaura o foco pro campo não-editável ao SAIR da edição — sem
+            // isso o foco vira null ao fechar o IME e o D-pad fica morto.
+            if (wasEditing) runCatching { displayFocus.requestFocus() }
         }
+        wasEditing = editing
     }
 
     val shape = RoundedCornerShape(10.dp)
@@ -140,6 +146,7 @@ fun LocalFilterField(
                 else TextStyle(color = Color.White, fontSize = 18.sp),
                 modifier = Modifier
                     .weight(1f)
+                    .focusRequester(displayFocus)
                     .onFocusChanged { isFocused = it.isFocused }
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyUp) return@onPreviewKeyEvent false

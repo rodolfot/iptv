@@ -46,6 +46,13 @@
     <string name="section_series_default">Serien</string>
     <string name="section_seasons">Staffeln</string>
     <string name="season_episodes_suffix">Folgen</string>
+    <string name="season_name">Staffel %1$d</string>
+    <string name="episodes_dialog_title">Folgen — %1$s</string>
+    <string name="episode_fallback_title">Folge %1$d</string>
+    <string name="content_type_live">Live</string>
+    <string name="content_type_movie">Film</string>
+    <string name="content_type_episode">Folge</string>
+    <string name="channel_number">Kanal %1$d</string>
     <string name="season_empty_title">Folgen nicht verfügbar</string>
     <string name="season_empty_message">Diese Staffel hat keine Folgen vom Server zurückgegeben. Möglicherweise eine Anbieter-Einschränkung — versuche eine andere Staffel oder später erneut.</string>
 

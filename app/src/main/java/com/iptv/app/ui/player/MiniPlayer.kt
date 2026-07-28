@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import coil.compose.AsyncImage
+import com.iptv.app.R
 import kotlinx.coroutines.delay
 
 /**
@@ -97,11 +99,13 @@ fun MiniPlayer(
                 maxLines = 1
             )
             Text(
-                when (args.kind) {
-                    PlayerKind.LIVE -> "Ao vivo"
-                    PlayerKind.MOVIE -> "Filme"
-                    PlayerKind.EPISODE -> "Episódio"
-                },
+                stringResource(
+                    when (args.kind) {
+                        PlayerKind.LIVE -> R.string.content_type_live
+                        PlayerKind.MOVIE -> R.string.content_type_movie
+                        PlayerKind.EPISODE -> R.string.content_type_episode
+                    }
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
