@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -56,7 +58,11 @@ import androidx.media3.ui.PlayerView
 import com.iptv.app.ui.common.TouchableButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.iptv.app.data.api.XtreamRepository
+import com.iptv.app.data.cache.toDomain
 import com.iptv.app.data.db.EpisodeProgressDao
 import com.iptv.app.data.db.EpisodeProgressEntity
 import com.iptv.app.data.db.LiveCacheDao
@@ -67,6 +73,7 @@ import com.iptv.app.data.db.SeriesProgressEntity
 import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.domain.model.Episode
 import com.iptv.app.domain.model.toModel
+import com.iptv.app.domain.sort.sorted
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -166,11 +173,15 @@ class PlayerViewModel @Inject constructor(
                         )
                         return@launch
                     }
-                    // Canais irmãos da mesma categoria, na ordem do drawer, para
-                    // permitir zapping com esquerda/direita do controle.
+                    // Canais irmãos da mesma categoria, na mesma ordem da lista
+                    // (ordenação escolhida pelo usuário), para o zapping com
+                    // esquerda/direita seguir a numeração que ele vê na tela.
+                    val liveSort = settingsStore.flow.first().liveSort
                     val siblings = cached?.categoryId
                         ?.let { catId -> liveCache.getByCategory(catId) }
-                        ?.map { LiveNav(it.streamId, it.name) }
+                        ?.map { it.toDomain() }
+                        ?.sorted(liveSort)
+                        ?.map { LiveNav(it.id, it.name) }
                         ?: emptyList()
                     val index = siblings.indexOfFirst { it.streamId == args.streamId }
                     playLive(args.streamId, args.title, siblings, index)
@@ -497,9 +508,36 @@ fun PlayerScreen(
         val factory = buildRenderersFactory(context, decoderMode)
         holder?.ensurePlayer(context, factory, decoderMode.name)?.apply {
             repeatMode = Player.REPEAT_MODE_OFF
-        } ?: ExoPlayer.Builder(context)
-            .setRenderersFactory(factory)
-            .build().apply { playWhenReady = true }
+        } ?: newStreamingPlayer(context, factory).apply { playWhenReady = true }
+    }
+    // Reconexão do Ao Vivo: até LIVE_MAX_RETRIES tentativas com intervalo
+    // crescente (1s, 2s, 3s, 3s…). Antes eram 3 tentativas imediatas, que se
+    // esgotavam em 1-2s num servidor momentaneamente lento; e como o
+    // prepare() era chamado sem voltar à borda ao vivo, uma queda longa caía
+    // em BehindLiveWindow de novo e o overlay parecia travado.
+    val retryScope = androidx.compose.runtime.rememberCoroutineScope()
+    val retryJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    val reconnectLive: (String) -> Unit = remember(exo) {
+        { failureMessage ->
+            retryJob[0]?.cancel()
+            if (retryAttempts < LIVE_MAX_RETRIES) {
+                retryAttempts++
+                isReconnecting = true
+                val waitMs = retryAttempts.coerceAtMost(3) * 1_000L
+                retryJob[0] = retryScope.launch {
+                    kotlinx.coroutines.delay(waitMs)
+                    // prepare() só age em IDLE — o vigia de travamento chama
+                    // isto com o player ainda em BUFFERING.
+                    if (exo.playbackState != Player.STATE_IDLE) exo.stop()
+                    if (exo.isCurrentMediaItemLive) exo.seekToDefaultPosition()
+                    exo.prepare()
+                    exo.playWhenReady = true
+                }
+            } else {
+                isReconnecting = false
+                playbackError = failureMessage
+            }
+        }
     }
     // Modo rádio / áudio-only: desliga o renderer de vídeo (economiza banda e
     // CPU em canais de rádio). Reativo — o toggle aplica na hora.
@@ -530,6 +568,15 @@ fun PlayerScreen(
     LaunchedEffect(state.items) {
         if (state.items.isEmpty()) return@LaunchedEffect
         if (preparedFor == state.items) return@LaunchedEffect
+        // Mídia nova (inclui zapping): orçamento de reconexão zerado e overlay
+        // de conexão com cronômetro até o primeiro frame.
+        if (preparedFor != null) {
+            retryJob[0]?.cancel()
+            retryAttempts = 0
+            isReconnecting = false
+            playbackError = null
+            isInitialBuffering = true
+        }
         val mediaItems = state.items.map { MediaItem.fromUri(it.url) }
         exo.setMediaItems(mediaItems, state.currentIndex, state.items.getOrNull(state.currentIndex)?.startPositionMs ?: 0L)
         exo.prepare()
@@ -588,17 +635,14 @@ fun PlayerScreen(
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                // Para canais Live: tenta de novo até 3 vezes antes de
+                // Para canais Live: reconecta (até LIVE_MAX_RETRIES) antes de
                 // mostrar erro definitivo. Antes qualquer falha imediata
                 // (ex.: lentidão do provider) mostrava "Não foi possível
                 // reproduzir" sem o usuário ter chance de reconectar.
                 val isLive = state.items.getOrNull(exo.currentMediaItemIndex)
                     ?.let { it.episodeId == null && it.movieId < 0 } ?: false
-                if (isLive && retryAttempts < 3) {
-                    retryAttempts++
-                    isReconnecting = true
-                    exo.prepare()
-                    exo.playWhenReady = true
+                if (isLive) {
+                    reconnectLive(friendlyPlaybackError(error))
                 } else {
                     isReconnecting = false
                     playbackError = friendlyPlaybackError(error)
@@ -631,17 +675,7 @@ fun PlayerScreen(
                     // reconectar. Mesmo fluxo de retry do onPlayerError.
                     val isLive = state.items.getOrNull(exo.currentMediaItemIndex)
                         ?.let { it.episodeId == null && it.movieId < 0 } ?: false
-                    if (isLive) {
-                        if (retryAttempts < 3) {
-                            retryAttempts++
-                            isReconnecting = true
-                            exo.prepare()
-                            exo.playWhenReady = true
-                        } else {
-                            isReconnecting = false
-                            playbackError = liveStreamEndedMsg
-                        }
-                    }
+                    if (isLive) reconnectLive(liveStreamEndedMsg)
                 }
                 if (playbackState == Player.STATE_READY) {
                     // Conectou: zera o contador, tira overlay de reconexão e
@@ -657,6 +691,7 @@ fun PlayerScreen(
         }
         exo.addListener(listener)
         onDispose {
+            retryJob[0]?.cancel()
             val item = state.items.getOrNull(exo.currentMediaItemIndex)
             if (item != null) {
                 vm.saveProgress(
@@ -673,6 +708,90 @@ fun PlayerScreen(
                 exo.release()
             }
         }
+    }
+
+    // Vigia de travamento (Ao Vivo): carregando por LIVE_STALL_TIMEOUT_S sem
+    // chegar nenhum dado novo = conexão presa. Trata como queda e reconecta —
+    // antes o overlay podia ficar parado indefinidamente sem nenhum erro para
+    // disparar a reconexão.
+    LaunchedEffect(exo, state.isLive) {
+        if (!state.isLive) return@LaunchedEffect
+        var lastBuffered = Long.MIN_VALUE
+        var stalledSec = 0
+        while (true) {
+            kotlinx.coroutines.delay(1_000L)
+            val waiting = exo.playbackState == Player.STATE_BUFFERING &&
+                exo.playWhenReady && playbackError == null
+            val buffered = exo.bufferedPosition
+            if (!waiting || buffered != lastBuffered) {
+                lastBuffered = buffered
+                stalledSec = 0
+                continue
+            }
+            if (++stalledSec >= LIVE_STALL_TIMEOUT_S) {
+                stalledSec = 0
+                lastBuffered = Long.MIN_VALUE
+                reconnectLive(liveStreamEndedMsg)
+            }
+        }
+    }
+
+    // Cronômetro do carregamento: segundos desde que o canal começou a
+    // conectar (ou reconectar) sem ter mostrado vídeo ainda. Continua contando
+    // na passagem de "conectando" para "reconectando".
+    val showingLoader = (isInitialBuffering || isReconnecting) && playbackError == null
+    var loadingElapsedSec by remember { mutableStateOf(0L) }
+    LaunchedEffect(showingLoader) {
+        if (!showingLoader) return@LaunchedEffect
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        loadingElapsedSec = 0L
+        while (true) {
+            kotlinx.coroutines.delay(1_000L)
+            loadingElapsedSec = (android.os.SystemClock.elapsedRealtime() - startedAt) / 1_000L
+        }
+    }
+
+    // TV desligada / app em segundo plano. Antes o player só era pausado e, ao
+    // religar a TV, a tela voltava congelada no último quadro: o canal ao vivo
+    // tinha ficado para trás da janela do servidor e nada retomava sozinho.
+    // Agora o Ao Vivo solta a conexão ao parar e volta sintonizado na borda
+    // ao vivo; filme/episódio salva a posição e retoma de onde estava.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(exo, lifecycleOwner) {
+        var resumeOnStart = false
+        val observer = LifecycleEventObserver { _, event ->
+            val activity = context as? android.app.Activity
+            val inPip = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N &&
+                activity?.isInPictureInPictureMode == true
+            when (event) {
+                Lifecycle.Event.ON_STOP -> if (!inPip) {
+                    resumeOnStart = exo.playWhenReady || isInitialBuffering || isReconnecting
+                    retryJob[0]?.cancel()
+                    state.items.getOrNull(exo.currentMediaItemIndex)?.let {
+                        vm.saveProgress(it, exo.currentPosition, exo.duration.coerceAtLeast(0L))
+                    }
+                    if (state.isLive) exo.stop() else exo.pause()
+                }
+                Lifecycle.Event.ON_START -> if (resumeOnStart && exo.mediaItemCount > 0) {
+                    resumeOnStart = false
+                    if (state.isLive) {
+                        retryAttempts = 0
+                        isReconnecting = false
+                        playbackError = null
+                        isInitialBuffering = true
+                        if (exo.playbackState != Player.STATE_IDLE) exo.stop()
+                        exo.seekToDefaultPosition()
+                        exo.prepare()
+                    } else if (exo.playbackState == Player.STATE_IDLE) {
+                        exo.prepare()
+                    }
+                    exo.playWhenReady = true
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // The mini-player overlay can't be reached with a D-pad, so on TV/Tablet
@@ -1118,6 +1237,19 @@ fun PlayerScreen(
                         color = Color.White,
                         modifier = Modifier.padding(top = 16.dp)
                     )
+                    // Nome do canal: no zapping o overlay também aparece e o
+                    // usuário precisa saber para onde está indo.
+                    if (state.title.isNotBlank()) {
+                        Text(
+                            state.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp, start = 32.dp, end = 32.dp)
+                        )
+                    }
+                    LoadingStopwatch(loadingElapsedSec)
                 }
             }
         }
@@ -1146,9 +1278,9 @@ fun PlayerScreen(
             }
         }
         if (isReconnecting) {
-            // Overlay de reconexão: até 3 tentativas em silêncio, com
-            // indicador de progresso. Sem ele o usuário ficava encarando
-            // tela preta sem saber se o app travou.
+            // Overlay de reconexão: tentativa atual/máximo + cronômetro. Sem
+            // ele o usuário ficava encarando tela preta sem saber se o app
+            // travou.
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
                 contentAlignment = Alignment.Center
@@ -1158,12 +1290,14 @@ fun PlayerScreen(
                     Text(
                         androidx.compose.ui.res.stringResource(
                             com.iptv.app.R.string.player_reconnecting,
-                            retryAttempts
+                            retryAttempts,
+                            LIVE_MAX_RETRIES
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White,
                         modifier = Modifier.padding(top = 16.dp)
                     )
+                    LoadingStopwatch(loadingElapsedSec)
                 }
             }
         }
@@ -1203,10 +1337,14 @@ fun PlayerScreen(
                     androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
                         TouchableButton(onClick = {
                             // Tentar de novo manualmente: reseta contador e
-                            // tenta preparar o player novamente.
+                            // tenta preparar o player novamente (na borda ao
+                            // vivo, se for canal).
                             retryAttempts = 0
                             playbackError = null
-                            isReconnecting = true
+                            isReconnecting = false
+                            isInitialBuffering = true
+                            if (exo.playbackState != Player.STATE_IDLE) exo.stop()
+                            if (exo.isCurrentMediaItemLive) exo.seekToDefaultPosition()
                             exo.prepare()
                             exo.playWhenReady = true
                         }) { Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_retry)) }
@@ -1218,6 +1356,34 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+}
+
+/** Tentativas de reconexão automática de um canal ao vivo antes do erro. */
+private const val LIVE_MAX_RETRIES = 10
+
+/** Segundos "carregando" sem chegar dado novo até considerar a conexão presa. */
+private const val LIVE_STALL_TIMEOUT_S = 20
+
+/** Cronômetro mm:ss exibido enquanto o canal conecta/reconecta. */
+@Composable
+private fun LoadingStopwatch(elapsedSec: Long) {
+    androidx.compose.foundation.layout.Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 12.dp)
+    ) {
+        androidx.compose.material3.Icon(
+            Icons.Filled.Timer,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.8f),
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            String.format(java.util.Locale.ROOT, "%02d:%02d", elapsedSec / 60, elapsedSec % 60),
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White.copy(alpha = 0.8f),
+            modifier = Modifier.padding(start = 6.dp)
+        )
     }
 }
 

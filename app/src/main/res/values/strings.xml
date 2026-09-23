@@ -378,7 +378,7 @@
     <string name="player_next_in">Próximo em %1$ds</string>
     <string name="player_next_movie">Próximo filme</string>
     <string name="player_connecting">Conectando ao canal…</string>
-    <string name="player_reconnecting">Reconectando (tentativa %1$d/3)…</string>
+    <string name="player_reconnecting">Reconectando (tentativa %1$d/%2$d)…</string>
     <string name="player_cannot_play_title">Não foi possível reproduzir</string>
     <string name="player_contact_provider">Tente novamente em instantes ou contate o dono da lista.</string>
     <string name="player_retry">Tentar novamente</string>

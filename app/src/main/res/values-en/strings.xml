@@ -379,7 +379,7 @@
     <string name="player_next_in">Next in %1$ds</string>
     <string name="player_next_movie">Next movie</string>
     <string name="player_connecting">Connecting to channel…</string>
-    <string name="player_reconnecting">Reconnecting (attempt %1$d/3)…</string>
+    <string name="player_reconnecting">Reconnecting (attempt %1$d/%2$d)…</string>
     <string name="player_cannot_play_title">Cannot play this stream</string>
     <string name="player_contact_provider">Try again shortly or contact the playlist owner.</string>
     <string name="player_retry">Retry</string>

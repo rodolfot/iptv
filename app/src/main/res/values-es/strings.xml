@@ -379,7 +379,7 @@
     <string name="player_next_in">Siguiente en %1$ds</string>
     <string name="player_next_movie">Siguiente película</string>
     <string name="player_connecting">Conectando al canal…</string>
-    <string name="player_reconnecting">Reconectando (intento %1$d/3)…</string>
+    <string name="player_reconnecting">Reconectando (intento %1$d/%2$d)…</string>
     <string name="player_cannot_play_title">No se pudo reproducir</string>
     <string name="player_contact_provider">Inténtalo de nuevo en breve o contacta al dueño de la lista.</string>
     <string name="player_retry">Reintentar</string>
