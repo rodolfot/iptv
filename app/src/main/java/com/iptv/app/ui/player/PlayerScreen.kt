@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -61,6 +62,7 @@ import androidx.compose.material3.Text
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.Tracks
 import com.iptv.app.data.api.XtreamRepository
 import com.iptv.app.data.cache.toDomain
 import com.iptv.app.data.db.EpisodeProgressDao
@@ -467,8 +469,10 @@ fun PlayerScreen(
     // pode chamar stringResource — só é lido depois de esgotar as tentativas
     // de reconexão do STATE_ENDED sem próximo item (ver onPlaybackStateChanged).
     val liveStreamEndedMsg = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_live_stream_ended)
-    // Track picker e botão Faixas foram removidos do overlay — o overlay
-    // mantém só o botão Voltar (escondido após 5s de inatividade).
+    // Faixas (áudio/legenda/vídeo) do item atual — alimentam o seletor de
+    // áudio aberto pelo painel de opções (engrenagem).
+    var tracks by remember { mutableStateOf(Tracks.EMPTY) }
+    var showTracks by remember { mutableStateOf(false) }
 
     LaunchedEffect(args) {
         vm.load(args)
@@ -634,6 +638,10 @@ fun PlayerScreen(
                 playbackError = null
             }
 
+            override fun onTracksChanged(newTracks: Tracks) {
+                tracks = newTracks
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 // Para canais Live: reconecta (até LIVE_MAX_RETRIES) antes de
                 // mostrar erro definitivo. Antes qualquer falha imediata
@@ -690,6 +698,7 @@ fun PlayerScreen(
 
         }
         exo.addListener(listener)
+        tracks = exo.currentTracks
         onDispose {
             retryJob[0]?.cancel()
             val item = state.items.getOrNull(exo.currentMediaItemIndex)
@@ -1199,7 +1208,19 @@ fun PlayerScreen(
                     if (url != null) launchExternalPlayer(context, url, state.title, settings.externalPlayerPackage)
                     showOptions = false
                 },
+                tracks = tracks,
+                onOpenTracks = {
+                    showOptions = false
+                    showTracks = true
+                },
                 onDismiss = { showOptions = false }
+            )
+        }
+        if (showTracks) {
+            TrackPickerDialog(
+                player = exo,
+                tracks = tracks,
+                onDismiss = { showTracks = false }
             )
         }
         // Banner pequeno no canto inferior direito durante os últimos 10s
@@ -1509,6 +1530,8 @@ private fun PlayerOptionsDialog(
     onSubtitleScale: (Int) -> Unit,
     onToggleLiveFormat: () -> Unit,
     onOpenExternal: () -> Unit,
+    tracks: Tracks,
+    onOpenTracks: () -> Unit,
     onDismiss: () -> Unit
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
@@ -1517,13 +1540,29 @@ private fun PlayerOptionsDialog(
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
-                modifier = Modifier.width(460.dp).padding(24.dp),
+                modifier = Modifier
+                    .width(460.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    .padding(24.dp),
                 verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_options),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(bottom = 8.dp)
+                )
+                // Seleção de faixa de áudio (idioma) e legenda — abre o
+                // seletor com todas as faixas do conteúdo atual.
+                val offLabel = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.off_label)
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio),
+                    selectedTrackLabel(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) ?: "—",
+                    onOpenTracks
+                )
+                OptionRow(
+                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle),
+                    selectedTrackLabel(tracks, androidx.media3.common.C.TRACK_TYPE_TEXT) ?: offLabel,
+                    onOpenTracks
                 )
                 val aspectLabel = when (resizeModeIndex) {
                     1 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_zoom)
