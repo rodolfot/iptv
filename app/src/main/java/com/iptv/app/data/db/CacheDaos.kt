@@ -115,6 +115,24 @@ interface LiveCacheDao {
             insertFts(it.streamId, it.name)
         }
     }
+
+    @Query("SELECT streamId FROM live_cache WHERE categoryId = :categoryId")
+    suspend fun idsInCategory(categoryId: String): List<Int>
+
+    @Query("DELETE FROM live_cache WHERE categoryId = :categoryId")
+    suspend fun deleteCategory(categoryId: String)
+
+    /**
+     * Troca o conteúdo de UMA categoria pelo que o provedor devolveu agora.
+     * Só o upsert deixava para trás canais que saíram da categoria — com a
+     * numeração antiga, eles apareciam fora de ordem no meio da lista.
+     */
+    @Transaction
+    suspend fun replaceCategory(categoryId: String, items: List<LiveChannelCacheEntity>) {
+        idsInCategory(categoryId).forEach { deleteFts(it) }
+        deleteCategory(categoryId)
+        upsertAll(items)
+    }
 }
 
 @Dao

@@ -179,19 +179,26 @@ class CatalogCacheRepository @Inject constructor(
      *  movie per-category — usado pelo Worker que popula em background. */
     suspend fun refreshLiveStreamsForCategory(categoryId: String): Result<Int> = runCatching {
         if (activeProvider() == ProviderType.M3U) return@runCatching 0
-        val items = api.liveStreams(categoryId).map {
-            LiveChannelCacheEntity(
-                streamId = it.streamId,
-                num = it.num,
-                name = it.name,
-                logoUrl = it.streamIcon,
-                categoryId = it.categoryId ?: categoryId,
-                epgChannelId = it.epgChannelId,
-                addedTimestamp = it.added?.toLongOrNull() ?: 0L,
-                tvArchive = (it.tvArchive ?: 0) > 0
-            )
-        }
-        live.upsertAll(items)
+        val items = api.liveStreams(categoryId)
+            // Canal que também está nesta categoria mas cuja categoria
+            // principal é outra: fica com a categoria dele (como no refresh
+            // completo). Antes era gravado lá com o `num` desta resposta —
+            // numeração de outra categoria, fora de ordem na lista.
+            .filter { it.categoryId == null || it.categoryId == categoryId }
+            .map {
+                LiveChannelCacheEntity(
+                    streamId = it.streamId,
+                    num = it.num,
+                    name = it.name,
+                    logoUrl = it.streamIcon,
+                    categoryId = it.categoryId ?: categoryId,
+                    epgChannelId = it.epgChannelId,
+                    addedTimestamp = it.added?.toLongOrNull() ?: 0L,
+                    tvArchive = (it.tvArchive ?: 0) > 0
+                )
+            }
+        // Resposta vazia pode ser soluço do provedor: mantém o que já havia.
+        if (items.isNotEmpty()) live.replaceCategory(categoryId, items)
         items.size
     }
 

@@ -4,11 +4,26 @@ import com.iptv.app.domain.model.LiveChannel
 import com.iptv.app.domain.model.Movie
 import com.iptv.app.domain.model.Series
 
+/**
+ * Ordem por número do canal (`num` do provedor). Canais sem número vão para o
+ * fim, em ordem alfabética — antes caíam no `streamId`, que é um ID interno de
+ * outra escala e embaralhava esses canais no meio da numeração.
+ */
+private val byChannelNumber: Comparator<LiveChannel> =
+    compareBy<LiveChannel> { it.num == null }
+        .thenBy { it.num ?: 0 }
+        .thenBy { it.name.lowercase() }
+
+private val byChannelNumberDesc: Comparator<LiveChannel> =
+    compareBy<LiveChannel> { it.num == null }
+        .thenByDescending { it.num ?: 0 }
+        .thenBy { it.name.lowercase() }
+
 fun List<LiveChannel>.sorted(option: SortOption): List<LiveChannel> = when (option) {
     SortOption.NAME_ASC -> sortedBy { it.name.lowercase() }
     SortOption.NAME_DESC -> sortedByDescending { it.name.lowercase() }
-    SortOption.ID_ASC -> sortedBy { it.num ?: it.id }
-    SortOption.ID_DESC -> sortedByDescending { it.num ?: it.id }
+    SortOption.ID_ASC -> sortedWith(byChannelNumber)
+    SortOption.ID_DESC -> sortedWith(byChannelNumberDesc)
     SortOption.ADDED_DATE_DESC -> sortedByDescending { it.addedTimestamp }
     SortOption.ADDED_DATE_ASC -> sortedBy { it.addedTimestamp }
     else -> sortedBy { it.name.lowercase() }

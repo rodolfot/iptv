@@ -25,7 +25,8 @@ data class AppSettings(
     val isPinSet: Boolean = false,
     val isLoggedIn: Boolean = false,
     val termsAccepted: Boolean = false,
-    val liveSort: SortOption = SortOption.NAME_ASC,
+    /** Ao Vivo abre na ordem numérica do provedor (como numa TV). */
+    val liveSort: SortOption = SortOption.ID_ASC,
     val moviesSort: SortOption = SortOption.ADDED_DATE_DESC,
     val seriesSort: SortOption = SortOption.ADDED_DATE_DESC,
     val favoritesSort: SortOption = SortOption.NAME_ASC,
@@ -163,7 +164,7 @@ class SettingsStore @Inject constructor(
             isPinSet = secure.isPinSet(),
             isLoggedIn = secure.isLoggedIn() && secure.getHost().isNotBlank(),
             termsAccepted = p[Keys.TERMS_ACCEPTED] == true,
-            liveSort = SortOption.fromName(p[Keys.LIVE_SORT]) ?: SortOption.NAME_ASC,
+            liveSort = SortOption.fromName(p[Keys.LIVE_SORT]) ?: SortOption.ID_ASC,
             moviesSort = SortOption.fromName(p[Keys.MOVIES_SORT]) ?: SortOption.ADDED_DATE_DESC,
             seriesSort = SortOption.fromName(p[Keys.SERIES_SORT]) ?: SortOption.ADDED_DATE_DESC,
             favoritesSort = SortOption.fromName(p[Keys.FAV_SORT]) ?: SortOption.NAME_ASC,
