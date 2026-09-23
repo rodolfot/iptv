@@ -200,7 +200,7 @@
     <string name="settings_connection_failed">Error: %1$s</string>
     <string name="settings_display">Pantalla</string>
     <string name="settings_hourly_clock">Mostrar hora cada hora</string>
-    <string name="settings_hourly_clock_hint">Muestra el reloj durante 5 segundos al inicio de cada hora.</string>
+    <string name="settings_hourly_clock_hint">Muestra el reloj durante 10 segundos al inicio de cada hora, en cualquier pantalla (incluido el reproductor).</string>
     <string name="settings_player_advanced">Reproductor avanzado</string>
     <string name="settings_decoder">Decodificador</string>
     <string name="decoder_auto">Automático</string>

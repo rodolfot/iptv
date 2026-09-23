@@ -200,7 +200,7 @@
     <string name="settings_connection_failed">Errore: %1$s</string>
     <string name="settings_display">Schermo</string>
     <string name="settings_hourly_clock">Mostra l\'orario ogni ora</string>
-    <string name="settings_hourly_clock_hint">Mostra l\'orologio per 5 secondi all\'inizio di ogni ora.</string>
+    <string name="settings_hourly_clock_hint">Mostra l\'orologio per 10 secondi all\'inizio di ogni ora, in qualsiasi schermata (anche nel player).</string>
     <string name="settings_player_advanced">Player avanzato</string>
     <string name="settings_decoder">Decodificatore</string>
     <string name="decoder_auto">Automatico</string>

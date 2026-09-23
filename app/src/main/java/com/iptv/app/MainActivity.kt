@@ -13,8 +13,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -182,6 +187,8 @@ data class RootState(
     val termsAccepted: Boolean = false,
     val loggedIn: Boolean = false,
     val deviceProfile: com.iptv.app.data.prefs.DeviceProfile? = null,
+    /** Chip de horário a cada hora cheia (Configurações). */
+    val showHourlyClock: Boolean = false,
     /** Falso até o primeiro emit do DataStore. Sem isso, o NavHost arranca em
      *  "onboarding" com base no estado default e dá um flash da tela de
      *  boas-vindas antes do estado real chegar (termos já aceitos). */
@@ -198,6 +205,7 @@ class RootViewModel @Inject constructor(
                 termsAccepted = it.termsAccepted,
                 loggedIn = it.isLoggedIn && it.host.isNotBlank(),
                 deviceProfile = it.deviceProfile,
+                showHourlyClock = it.showHourlyClock,
                 loaded = true
             )
         }
@@ -237,7 +245,24 @@ fun AppNav(
                 onDeepLinkConsumed()
             }
         }
-        AppNavRoutes(state, nav)
+        Box(modifier = Modifier.fillMaxSize()) {
+            AppNavRoutes(state, nav)
+            // Relógio de hora em hora na raiz: aparece em qualquer tela,
+            // inclusive por cima do player (antes só existia dentro da Home).
+            if (state.loggedIn) {
+                com.iptv.app.ui.common.HourlyClockChip(
+                    enabled = state.showHourlyClock,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                            )
+                        )
+                        .padding(top = 64.dp, end = 16.dp)
+                )
+            }
+        }
     }
 }
 

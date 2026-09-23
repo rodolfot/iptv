@@ -353,19 +353,8 @@ fun HomeScreen(
                 }
             }
         }
-        // Chip de horário (opt-in): aparece 5s no início de cada hora cheia.
-        // Posicionado abaixo da TopBar para não conflitar com o banner/menu.
-        val appSettings by vm.settingsFlow.collectAsState()
-        if (appSettings.showHourlyClock) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                    .padding(top = 64.dp, end = 12.dp)
-            ) {
-                com.iptv.app.ui.common.HourlyClockChip(enabled = true)
-            }
-        }
+        // O chip de horário de hora em hora fica na raiz do app (AppNav), para
+        // aparecer também no player.
         if (showMiniPlayer && playbackHolder != null) {
             Box(
                 modifier = Modifier

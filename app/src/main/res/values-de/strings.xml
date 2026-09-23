@@ -200,7 +200,7 @@
     <string name="settings_connection_failed">Fehler: %1$s</string>
     <string name="settings_display">Anzeige</string>
     <string name="settings_hourly_clock">Stündliche Uhrzeit anzeigen</string>
-    <string name="settings_hourly_clock_hint">Zeigt die Uhr 5 Sekunden lang zum Beginn jeder Stunde an.</string>
+    <string name="settings_hourly_clock_hint">Zeigt die Uhr 10 Sekunden lang zum Beginn jeder Stunde an, auf jedem Bildschirm (auch im Player).</string>
     <string name="settings_player_advanced">Erweiterter Player</string>
     <string name="settings_decoder">Decoder</string>
     <string name="decoder_auto">Automatisch</string>

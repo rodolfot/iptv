@@ -200,7 +200,7 @@
     <string name="settings_connection_failed">Failed: %1$s</string>
     <string name="settings_display">Display</string>
     <string name="settings_hourly_clock">Show time every hour</string>
-    <string name="settings_hourly_clock_hint">Shows the clock for 5 seconds at the start of every hour.</string>
+    <string name="settings_hourly_clock_hint">Shows the clock for 10 seconds at the start of every hour, on any screen (including the player).</string>
     <string name="settings_player_advanced">Advanced player</string>
     <string name="settings_decoder">Decoder</string>
     <string name="decoder_auto">Automatic</string>

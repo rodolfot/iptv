@@ -200,7 +200,7 @@
     <string name="settings_connection_failed">Échec : %1$s</string>
     <string name="settings_display">Affichage</string>
     <string name="settings_hourly_clock">Afficher l\'heure toutes les heures</string>
-    <string name="settings_hourly_clock_hint">Affiche l\'horloge pendant 5 secondes au début de chaque heure.</string>
+    <string name="settings_hourly_clock_hint">Affiche l\'horloge pendant 10 secondes au début de chaque heure, sur tous les écrans (y compris le lecteur).</string>
     <string name="settings_player_advanced">Lecteur avancé</string>
     <string name="settings_decoder">Décodeur</string>
     <string name="decoder_auto">Automatique</string>

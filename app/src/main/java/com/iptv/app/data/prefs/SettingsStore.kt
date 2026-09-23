@@ -42,9 +42,10 @@ data class AppSettings(
      */
     val deviceProfile: DeviceProfile? = null,
     /**
-     * Quando true, a Home mostra o horário atual num pequeno chip no canto
-     * superior direito por 5 segundos no início de cada hora cheia.
-     * Default false: o usuário pediu opt-in pra não poluir a UI.
+     * Quando true, o app mostra o horário atual num chip no canto superior
+     * direito por 10 segundos no início de cada hora cheia, em qualquer tela
+     * (inclusive no player). Default false: o usuário pediu opt-in pra não
+     * poluir a UI.
      */
     val showHourlyClock: Boolean = false,
 

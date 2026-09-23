@@ -252,7 +252,7 @@
     <string name="settings_connection_failed">Falha: %1$s</string>
     <string name="settings_display">Exibição</string>
     <string name="settings_hourly_clock">Mostrar horário a cada hora</string>
-    <string name="settings_hourly_clock_hint">Exibe o relógio por 5 segundos no início de cada hora.</string>
+    <string name="settings_hourly_clock_hint">Exibe o relógio por 10 segundos no início de cada hora, em qualquer tela (inclusive no player).</string>
     <string name="settings_player_advanced">Player avançado</string>
     <string name="settings_decoder">Decodificador</string>
     <string name="decoder_auto">Automático</string>
