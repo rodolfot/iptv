@@ -17,6 +17,8 @@ import com.iptv.app.domain.model.ContentType
 import com.iptv.app.domain.model.toModel
 import com.iptv.app.data.prefs.SettingsStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,6 +35,30 @@ class CatalogCacheRepository @Inject constructor(
     private val detail: com.iptv.app.data.db.DetailCacheDao,
     private val settings: SettingsStore
 ) {
+
+    /**
+     * Um refresh completo do catálogo por vez. Antes a Home disparava
+     * `refreshAll` a cada volta do player enquanto o Worker rodava o seu
+     * `refreshAllByCategory` — vários downloads do catálogo inteiro em
+     * paralelo, disputando memória e banda (TV lenta até forçar a parada).
+     */
+    private val fullRefreshLock = Mutex()
+
+    /**
+     * Roda [block] com o lock de refresh completo. Se outro refresh completo
+     * já estiver em andamento, espera ele terminar e não baixa tudo de novo.
+     */
+    private suspend fun exclusiveFullRefresh(block: suspend () -> List<Throwable>): List<Throwable> {
+        if (!fullRefreshLock.tryLock()) {
+            fullRefreshLock.withLock { }
+            return emptyList()
+        }
+        return try {
+            block()
+        } finally {
+            fullRefreshLock.unlock()
+        }
+    }
 
     /** Active profile's provider — decides Xtream vs. M3U dispatch. */
     private suspend fun activeProvider(): ProviderType {
@@ -249,7 +275,7 @@ class CatalogCacheRepository @Inject constructor(
     /** Refresh everything sequentially — chamada antiga, mantida pra
      *  compatibilidade mas evite usar em catálogos grandes (50k+ filmes
      *  numa única request dão timeout). Prefira `refreshAllByCategory`. */
-    suspend fun refreshAll(): List<Throwable> {
+    suspend fun refreshAll(): List<Throwable> = exclusiveFullRefresh {
         val errors = mutableListOf<Throwable>()
         listOf(
             refreshLiveCategories(),
@@ -259,7 +285,7 @@ class CatalogCacheRepository @Inject constructor(
             refreshMovieStreams(),
             refreshSeriesList()
         ).forEach { r -> r.exceptionOrNull()?.let(errors::add) }
-        return errors
+        errors
     }
 
     data class BootstrapProgress(
@@ -282,7 +308,7 @@ class CatalogCacheRepository @Inject constructor(
      */
     suspend fun refreshAllByCategory(
         onProgress: suspend (BootstrapProgress) -> Unit = {}
-    ): List<Throwable> {
+    ): List<Throwable> = exclusiveFullRefresh {
         val errors = mutableListOf<Throwable>()
 
         onProgress(BootstrapProgress("categories", 0, 3))
@@ -326,7 +352,7 @@ class CatalogCacheRepository @Inject constructor(
         // entrada em qualquer série/filme busque dados frescos do servidor.
         runCatching { detail.clearAll() }.exceptionOrNull()?.let(errors::add)
 
-        return errors
+        errors
     }
 
     /* ----------------- Search (FTS) ----------------- */

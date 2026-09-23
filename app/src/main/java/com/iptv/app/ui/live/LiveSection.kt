@@ -88,6 +88,16 @@ fun LiveSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadLiveCategories()
     }
+    // Categoria restaurada (volta do player, ou processo recriado pelo sistema
+    // com a TV em standby): o rememberSaveable devolve a seleção, mas a lista
+    // do ViewModel pode estar vazia — e o auto-load abaixo só roda quando não
+    // há seleção. Sem isto a grade ficava em branco.
+    LaunchedEffect(Unit) {
+        val restored = selectedCat
+        if (restored != null && channels.items.isEmpty() && !channels.loading) {
+            vm.loadChannels(restored)
+        }
+    }
     // Em TV/Tablet, pula a tela de "grid de categorias" e abre direto a
     // primeira (que já tem categorias no drawer lateral do LiveChannelsScreen).
     // Em phone segue mostrando o grid (não tem espaço para drawer).

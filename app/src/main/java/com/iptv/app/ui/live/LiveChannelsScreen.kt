@@ -173,7 +173,10 @@ private fun LiveGridLayout(
 
     // Foco inicial na 1ª categoria selecionada do drawer ao entrar — antes
     // o foco caía direto no primeiro canal do grid.
-    LaunchedEffect(selectedCategoryId) {
+    // Reexecuta quando as categorias chegam — com a gaveta ainda vazia o
+    // pedido de foco se perdia (ex.: app restaurado) e o controle não
+    // navegava em lugar nenhum.
+    LaunchedEffect(selectedCategoryId, categories.isNotEmpty()) {
         kotlinx.coroutines.delay(50)
         runCatching { drawerSelectedRequester.requestFocus() }
     }
@@ -329,7 +332,10 @@ private fun LiveListWithCategoriesLayout(
     modifier: Modifier = Modifier
 ) {
     val drawerSelectedRequester = remember { FocusRequester() }
-    LaunchedEffect(selectedCategoryId) {
+    // Reexecuta quando as categorias chegam — com a gaveta ainda vazia o
+    // pedido de foco se perdia (ex.: app restaurado) e o controle não
+    // navegava em lugar nenhum.
+    LaunchedEffect(selectedCategoryId, categories.isNotEmpty()) {
         kotlinx.coroutines.delay(50)
         runCatching { drawerSelectedRequester.requestFocus() }
     }

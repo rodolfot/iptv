@@ -90,7 +90,10 @@ fun MoviesCategoriesScreen(
     // Ao entrar na seção, foco vai pro item selecionado do drawer — o
     // usuário pediu pra cair na primeira categoria à esquerda ao descer
     // do menu superior.
-    LaunchedEffect(selectedCategoryId) {
+    // Reexecuta quando as categorias chegam — com a gaveta ainda vazia o
+    // pedido de foco se perdia (ex.: app restaurado) e o controle não
+    // navegava em lugar nenhum.
+    LaunchedEffect(selectedCategoryId, categories.isNotEmpty()) {
         // Pequeno atraso pra esperar a composição assentar antes de pedir
         // foco — sem isso o requester pode ainda não estar attached.
         kotlinx.coroutines.delay(50)

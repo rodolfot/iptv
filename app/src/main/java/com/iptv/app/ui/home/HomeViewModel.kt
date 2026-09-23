@@ -228,12 +228,18 @@ class HomeViewModel @Inject constructor(
     private val _initialLoading = MutableStateFlow(false)
     val initialLoading = _initialLoading.asStateFlow()
 
+    /** A Home chama [bootstrapCatalog] toda vez que volta à composição (ex.:
+     *  ao sair do player) — a checagem só precisa rodar uma vez por sessão. */
+    private var bootstrapped = false
+
     /**
      * Run on Home entry. If the cache is completely empty (first run, post-clear, or
      * forced manual refresh), block the UI with the loading screen until refresh finishes.
      * Otherwise, return immediately and let the per-section loaders handle stale-while-revalidate.
      */
     fun bootstrapCatalog(force: Boolean = false) {
+        if (bootstrapped && !force) return
+        bootstrapped = true
         viewModelScope.launch {
             val movieCount = movieDao.observeAll().firstOrEmpty().size
             val seriesCount = seriesDao.observeAll().firstOrEmpty().size
@@ -250,12 +256,14 @@ class HomeViewModel @Inject constructor(
             // configurado pelo usuário. Se sim, faz refresh em background
             // (sem bloquear a UI). O Worker periódico só roda quando o
             // sistema permite — aqui garantimos que abrir o app também
-            // dispara o refresh.
+            // dispara o refresh. Por categoria (como o Worker): o pico de
+            // memória é uma categoria por vez, não o catálogo inteiro num
+            // único JSON — que pesava em TVs com pouca RAM.
             val last = cache.lastUpdatedAt()
             val ttl = settings.flow.first().refreshInterval.ttlMs
             val stale = last == null || (System.currentTimeMillis() - last) > ttl
             if (stale) {
-                runCatching { cache.refreshAll() }
+                runCatching { cache.refreshAllByCategory() }
                 _lastUpdatedAt.value = cache.lastUpdatedAt()
             }
         }

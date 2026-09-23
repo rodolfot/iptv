@@ -323,6 +323,16 @@ fun SeriesSection(
     LaunchedEffect(Unit) {
         if (cats.items.isEmpty()) vm.loadSeriesCategories()
     }
+    // Categoria restaurada (volta do player, ou processo recriado pelo sistema
+    // com a TV em standby): o rememberSaveable devolve a seleção, mas a lista
+    // do ViewModel pode estar vazia — e o auto-load abaixo só roda quando não
+    // há seleção. Sem isto a grade ficava em branco.
+    LaunchedEffect(Unit) {
+        val restored = selectedCat
+        if (restored != null && series.items.isEmpty() && !series.loading) {
+            vm.loadSeries(restored)
+        }
+    }
     // TV/Tablet: pula o grid de categorias e abre direto a primeira.
     val isTvLike = dim.formFactor != com.iptv.app.ui.common.FormFactor.Phone
     LaunchedEffect(cats.items, isTvLike) {
