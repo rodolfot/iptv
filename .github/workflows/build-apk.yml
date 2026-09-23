@@ -19,6 +19,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # O padrão da v3 ("tools platform-tools") quebra com o cmdline-tools
+          # 16.0 das imagens atuais do runner: o pacote legado "tools" não
+          # existe mais e o sdkmanager sai com erro antes do build.
+          packages: platform-tools
 
       - name: Cache Gradle
         uses: actions/cache@v4
