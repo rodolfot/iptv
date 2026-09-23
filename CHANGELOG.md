@@ -6,6 +6,29 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-09-23
+
+### Fixed
+
+- **App travado ao religar a TV** (#6): com um canal aberto, desligar a TV só pausava o player; ao religar, a tela voltava congelada no último quadro e, ao voltar ao menu, a grade podia aparecer vazia e sem foco. Agora o Ao Vivo solta a conexão quando o app sai de primeiro plano e é ressintonizado na borda ao vivo ao voltar; filme/episódio salva a posição e retoma de onde parou. A categoria restaurada recarrega os itens e o foco inicial da gaveta de categorias é refeito quando as categorias chegam.
+- **Relógio de hora em hora não aparecia** (#7): o chip vivia só na Home (sumia no player) e o agendamento usava o relógio de uptime, que para durante o standby da TV. Agora fica na raiz do app — aparece também sobre o player —, checa o relógio de parede e fica 10s na tela, maior. Continua opt-in em Configurações.
+- **Reconexão do canal parecia travada** (#8): 10 tentativas (eram 3) com intervalo crescente de 1s/2s/3s, sempre voltando à borda ao vivo, e um vigia que reconecta quando o canal fica 20s carregando sem receber nenhum dado. O overlay mostra "tentativa N/10".
+- **Canais demorando para abrir** (#9): o player passa a usar OkHttp com o mesmo User-Agent da API e redirects http↔https (antes mandava o UA "Dalvik" e não seguia redirect entre protocolos), começa a tocar com 1s de buffer (era 2,5s) e a prévia é derrubada antes de abrir o canal em tela cheia — contas Xtream com limite de 1 conexão faziam o player esperar o servidor liberar a conexão da prévia.
+- **Canais fora de ordem** (#11): ordenar por ID usa só o número do canal — os sem número vão para o fim, em ordem alfabética, em vez de caírem no ID interno no meio da numeração; o refresh por categoria substitui a categoria inteira (não deixa mais canais antigos com a numeração velha); e o zapping ←/→ no player segue a ordem da lista.
+- **Sem ponteiro no player em tela cheia** (#12): ↑/↓ mostram os controles e focam Voltar; ←/→ passam por Voltar, Opções e Próximo; ↓ devolve o foco ao vídeo.
+- **TV lenta depois de vários liga/desliga** (#16): as prévias continuavam baixando e decodificando com a TV desligada; o catálogo inteiro era baixado de novo a cada volta do player, em paralelo com o refresh em segundo plano; e o buffer do player podia passar de 100 MB de memória. Agora as prévias param em segundo plano, roda um refresh completo por vez (por categoria, com pico de memória de uma categoria) e o buffer tem teto de 32 MB (8 MB nas prévias).
+
+### Added
+
+- **Seletor de áudio e legenda** (#15): linhas "Áudio" e "Legenda" no painel de opções do player (engrenagem). Os idiomas aparecem pelo nome ("Inglês", "Español"…), a faixa em uso fica destacada e o idioma escolhido é lembrado no próximo episódio/canal.
+- **Cronômetro de carregamento** (#10): mm:ss nos overlays "Conectando" e "Reconectando", do pedido do canal até o primeiro quadro — também no zapping, junto com o nome do canal.
+
+### Changed
+
+- **Favoritos no padrão das demais telas** (#13): gaveta com Canais, Filmes e Séries (com contagem) e grade de cards de 95dp com busca, como Filmes/Séries/Ao Vivo; no celular, chips + grade. Série favorita agora abre a série (antes o clique não fazia nada) e segurar OK remove dos favoritos. Saiu o painel de prévia, que abria stream só de passar o foco.
+- **Fontes** (#14): escala mais compacta — títulos e corpo menores para aproveitar a tela —, menu superior mantido em 12sp e a menor fonte do app (11sp) reservada a sinopse e descrição.
+- **Ao Vivo abre na ordem numérica do provedor** por padrão. Quem já escolheu outra ordenação mantém a escolha.
+
 ## [3.0.0] — 2026-07-28
 
 ### Added
