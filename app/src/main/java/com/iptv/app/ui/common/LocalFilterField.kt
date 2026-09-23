@@ -98,7 +98,7 @@ fun LocalFilterField(
                 value = value,
                 onValueChange = onValueChange,
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { editing = false }),
                 modifier = Modifier
@@ -143,7 +143,7 @@ fun LocalFilterField(
                 text = value.ifEmpty { stringResource(R.string.search_in_category) },
                 color = if (value.isEmpty()) Color(0x80FFFFFF) else Color.White,
                 style = if (value.isEmpty()) MaterialTheme.typography.bodyMedium
-                else TextStyle(color = Color.White, fontSize = 18.sp),
+                else TextStyle(color = Color.White, fontSize = 14.sp),
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(displayFocus)

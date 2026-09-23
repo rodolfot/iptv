@@ -319,7 +319,7 @@ private fun SearchBar(
                 onValueChange = onQueryChange,
                 enabled = enabled,
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
                 // O "Done"/✓ do teclado fecha o IME — sem tratar isso, o
                 // campo continuava em modo edição (editing=true) com o IME
                 // fechado, prendendo o foco: o D-pad ficava morto e o usuário

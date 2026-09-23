@@ -46,23 +46,28 @@ private val IptvColors = darkColorScheme(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val IptvTypography = Typography(
-    // Tipografia compactada: -4sp em cada nível (mínimo 10sp). O usuário
-    // reclamou que tudo estava grande demais — antes labelSmall=14sp; agora
-    // 10sp. Headlines/displays também caem proporcionalmente.
-    displayLarge = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Bold),
-    displayMedium = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold),
-    headlineLarge = TextStyle(fontSize = 36.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
-    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 18.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp),
-    bodySmall = TextStyle(fontSize = 12.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    // Escala compacta para TV: títulos e textos de corpo menores para
+    // aproveitar a tela (fonte grande demais desperdiçava espaço), menu
+    // superior mantido em 12sp (labelMedium) e a menor fonte do app (11sp)
+    // reservada a sinopse/descrição — textos longos. Antes havia rótulos em
+    // 10sp, menores que a própria sinopse, e corpo/títulos em 18–22sp.
+    displayLarge = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Bold),
+    displayMedium = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold),
+    headlineLarge = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+    headlineSmall = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 14.sp),
+    bodyMedium = TextStyle(fontSize = 13.sp),
+    // Sinopse, descrição de canal/programa e metadados longos. É o menor
+    // tamanho do app — nada fica abaixo dele.
+    bodySmall = TextStyle(fontSize = 11.sp),
+    labelLarge = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+    // Menu superior (abas) — tamanho aprovado pelo usuário, não mexer.
     labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium)
+    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium)
 )
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -98,20 +103,23 @@ private val IptvColorsM3 = m3DarkColorScheme(
 )
 
 private val IptvTypographyM3 = M3Typography(
-    displayLarge = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Bold),
-    displayMedium = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold),
-    headlineLarge = TextStyle(fontSize = 36.sp, fontWeight = FontWeight.SemiBold),
-    headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
-    headlineSmall = TextStyle(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Medium),
-    titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 18.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp),
-    bodySmall = TextStyle(fontSize = 12.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    displayLarge = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Bold),
+    displayMedium = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold),
+    headlineLarge = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold),
+    headlineMedium = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold),
+    headlineSmall = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
+    titleLarge = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+    titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+    titleSmall = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+    bodyLarge = TextStyle(fontSize = 14.sp),
+    bodyMedium = TextStyle(fontSize = 13.sp),
+    // Sinopse, descrição de canal/programa e metadados longos. É o menor
+    // tamanho do app — nada fica abaixo dele.
+    bodySmall = TextStyle(fontSize = 11.sp),
+    labelLarge = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+    // Menu superior (abas) — tamanho aprovado pelo usuário, não mexer.
     labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium)
+    labelSmall = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Medium)
 )
 
 private val IptvShapesM3 = M3Shapes(

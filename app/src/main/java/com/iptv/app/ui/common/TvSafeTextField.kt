@@ -107,7 +107,7 @@ fun TvSafeTextField(
                     visualTransformation = transform,
                     keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { editing = false }),
-                    textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(editorFocus)

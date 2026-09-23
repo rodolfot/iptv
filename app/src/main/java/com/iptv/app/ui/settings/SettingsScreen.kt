@@ -1034,7 +1034,7 @@ private fun PinField(
                     imeAction = androidx.compose.ui.text.input.ImeAction.Done
                 ),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { editing = false }),
-                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 18.sp),
+                textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontSize = 14.sp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(editorFocus)

@@ -1108,7 +1108,7 @@ private fun EpisodeRow(
                 episode.plot?.takeIf { it.isNotBlank() }?.let { plot ->
                     Text(
                         plot,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
