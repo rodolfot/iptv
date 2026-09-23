@@ -845,6 +845,18 @@ fun PlayerScreen(
     // ficava visível indefinidamente.
     var backVisible by remember { mutableStateOf(true) }
     var interactionTick by remember { mutableStateOf(0) }
+    // ↑/↓ no vídeo levam o foco para o 1º botão da barra (Voltar). Antes o
+    // foco ficava sempre no vídeo e não havia "ponteiro" visível para chegar
+    // em Voltar/Opções/Próximo — só um ↓ acidental às vezes entrava na barra.
+    val overlayFirstButton = remember { FocusRequester() }
+    var focusOverlayRequest by remember { mutableStateOf(0) }
+    LaunchedEffect(focusOverlayRequest) {
+        if (focusOverlayRequest == 0) return@LaunchedEffect
+        backVisible = true
+        // Espera a barra compor antes de pedir o foco.
+        kotlinx.coroutines.delay(50)
+        runCatching { overlayFirstButton.requestFocus() }
+    }
     LaunchedEffect(interactionTick) {
         backVisible = true
         kotlinx.coroutines.delay(5000)
@@ -1005,6 +1017,20 @@ fun PlayerScreen(
                             true
                         }
                     }
+                    Key.DirectionUp, Key.DirectionDown -> {
+                        if (overlayHasFocus) {
+                            if (evt.key == Key.DirectionDown) {
+                                // Descer da barra devolve o foco ao vídeo
+                                // (OK volta a pausar/retomar).
+                                runCatching { focusRequester.requestFocus() }
+                                true
+                            } else false
+                        } else {
+                            playerView.showController()
+                            focusOverlayRequest++
+                            true
+                        }
+                    }
                     Key.DirectionCenter, Key.Enter, Key.Spacebar, Key.MediaPlayPause -> {
                         if (overlayHasFocus && evt.key != Key.MediaPlayPause) {
                             // Let the focused overlay button (Back, Tracks)
@@ -1098,7 +1124,10 @@ fun PlayerScreen(
             ) {
                 // Goes through onMinimize() so a back press here still surfaces
                 // the mini-player rather than killing playback.
-                com.iptv.app.ui.common.TouchableButton(onClick = onMinimize) {
+                com.iptv.app.ui.common.TouchableButton(
+                    onClick = onMinimize,
+                    modifier = Modifier.focusRequester(overlayFirstButton)
+                ) {
                     androidx.compose.material3.Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.back),
