@@ -41,9 +41,7 @@ class ActivePlaybackHolder {
     ): ExoPlayer {
         val existing = player
         if (existing != null) return existing
-        val builder = ExoPlayer.Builder(context.applicationContext)
-        if (renderersFactory != null) builder.setRenderersFactory(renderersFactory)
-        val created = builder.build().apply { playWhenReady = true }
+        val created = newStreamingPlayer(context, renderersFactory).apply { playWhenReady = true }
         player = created
         decoderSignature = signature
         return created

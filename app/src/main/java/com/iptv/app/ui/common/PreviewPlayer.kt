@@ -16,46 +16,51 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import com.iptv.app.ui.player.newStreamingPlayer
 
 /**
- * Player de prévia compartilhado pelas telas de Canais ao Vivo e Favoritos.
+ * ExoPlayer das prévias (PIP da grade do Ao Vivo, painel da lista com EPG e
+ * [PreviewPlayer]).
  *
  * Comportamento:
- *  - Debounce de 600ms ao mudar `streamUrl` — D-pad rápido não dispara
- *    request por canal/filme intermediário.
- *  - Áudio sempre ligado (a prévia é funcional, não decorativa).
+ *  - Áudio ligado (a prévia é funcional, não decorativa) e buffer pequeno.
  *  - Retry automático até 5x quando o stream falha (provedores Xtream
  *    derrubam conexão ao trocar rápido).
- *  - Libera o ExoPlayer no onDispose — sem isso o áudio continuaria ao
- *    sair da seção.
- *
- * `streamUrl` null significa "limpar preview" (sem mídia).
+ *  - Para o stream quando o app sai de primeiro plano (TV desligada, botão
+ *    Home) e volta ao vivo ao retornar. Antes a prévia continuava baixando e
+ *    decodificando com a TV desligada, segurando conexão e memória — depois de
+ *    alguns liga/desliga a TV ficava lenta até forçar a parada do app.
+ *  - Libera o ExoPlayer no onDispose — sem isso o áudio continuaria ao sair
+ *    da seção.
  */
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-fun PreviewPlayer(
-    streamUrl: String?,
-    modifier: Modifier = Modifier
-) {
+fun rememberPreviewExoPlayer(): ExoPlayer {
     val context = LocalContext.current
     val exo = remember {
-        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+        newStreamingPlayer(context, preview = true).apply {
             volume = 1f
             playWhenReady = true
         }
     }
     DisposableEffect(exo) {
-        val listener = object : androidx.media3.common.Player.Listener {
+        val listener = object : Player.Listener {
             private var attempts = 0
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            override fun onPlayerError(error: PlaybackException) {
                 if (attempts >= 5) return
                 attempts++
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                    exo.seekToDefaultPosition()
+                }
                 exo.prepare()
             }
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == androidx.media3.common.Player.STATE_READY) {
-                    attempts = 0
-                }
+                if (playbackState == Player.STATE_READY) attempts = 0
             }
         }
         exo.addListener(listener)
@@ -64,8 +69,38 @@ fun PreviewPlayer(
             exo.release()
         }
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(exo, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> exo.stop()
+                Lifecycle.Event.ON_START -> if (exo.mediaItemCount > 0 &&
+                    exo.playbackState == Player.STATE_IDLE
+                ) {
+                    exo.seekToDefaultPosition()
+                    exo.prepare()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    return exo
+}
+
+/**
+ * Prévia 16:9 de uma URL arbitrária (usada em Favoritos). Debounce de 600ms
+ * ao mudar `streamUrl` — D-pad rápido não dispara request por item
+ * intermediário. `streamUrl` null limpa a prévia.
+ */
+@Composable
+fun PreviewPlayer(
+    streamUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val exo = rememberPreviewExoPlayer()
     LaunchedEffect(streamUrl) {
-        // Debounce: só carrega após 600ms parado na mesma URL.
         kotlinx.coroutines.delay(600)
         if (streamUrl == null) {
             exo.stop()

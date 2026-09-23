@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -242,7 +241,14 @@ private fun LiveGridLayout(
                             // Conteúdo bloqueado nunca entra em preview — vai
                             // direto pro callback, que é quem mostra o PIN.
                             locked -> onPlay(ch)
-                            previewChannel?.id == ch.id -> onPlay(ch)
+                            previewChannel?.id == ch.id -> {
+                                // Derruba a prévia antes de abrir em tela cheia:
+                                // muitas contas Xtream aceitam 1 conexão por vez
+                                // e o player esperava o servidor liberar a da
+                                // prévia — daí canais levando 20s+ para abrir.
+                                previewChannel = null
+                                onPlay(ch)
+                            }
                             else -> previewChannel = ch
                         }
                     },
@@ -633,34 +639,9 @@ private fun ChannelTile(
     }
 }
 
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun ChannelPreviewPip(channel: LiveChannel, vm: HomeViewModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val exo = remember {
-        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
-            volume = 1f
-            playWhenReady = true
-        }
-    }
-    DisposableEffect(exo) {
-        val listener = object : androidx.media3.common.Player.Listener {
-            private var attempts = 0
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                if (attempts >= 5) return
-                attempts++
-                exo.prepare()
-            }
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == androidx.media3.common.Player.STATE_READY) attempts = 0
-            }
-        }
-        exo.addListener(listener)
-        onDispose {
-            exo.removeListener(listener)
-            exo.release()
-        }
-    }
+    val exo = com.iptv.app.ui.common.rememberPreviewExoPlayer()
     // O canal já chega aqui confirmado com OK — sem necessidade de debounce
     // adicional (usuário demonstrou intenção explícita ao confirmar).
     LaunchedEffect(channel.id) {
