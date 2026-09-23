@@ -343,7 +343,6 @@
     <string name="empty_continue_action">Filme durchstöbern</string>
     <string name="empty_favorites_title">Noch keine Favoriten</string>
     <string name="empty_favorites_message">Nutze die Favoriten-Schaltfläche in den Detailansichten von Filmen, Serien und Sendern, um sie hier zu sammeln.</string>
-    <string name="favorites_preview_hint">Wählen Sie einen Kanal oder Film, um die Vorschau zu sehen.</string>
     <string name="empty_search_title">Was möchtest du sehen?</string>
     <string name="empty_search_message">Suche nach Name, Genre, Besetzung oder Inhalt. Sofort und auch offline.</string>
     <string name="empty_search_no_results_title">Nichts gefunden</string>

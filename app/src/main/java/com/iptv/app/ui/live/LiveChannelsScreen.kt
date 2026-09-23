@@ -528,9 +528,11 @@ private fun ChannelsGrid(
     }
 }
 
+/** Tile de canal da grade (logo inteira + nome na barra). Também usado em
+ *  Favoritos para os canais terem a mesma cara nas duas telas. */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelTile(
+internal fun ChannelTile(
     channel: LiveChannel,
     locked: Boolean,
     isFavorite: Boolean,

@@ -95,11 +95,6 @@ class HomeViewModel @Inject constructor(
         xtream.liveStreamUrl(channelId, hls = false)
     }.getOrNull()
 
-    /** URL do filme para preview no painel de Favoritos. */
-    suspend fun moviePreviewUrl(movieId: Int, container: String?): String? = runCatching {
-        xtream.movieStreamUrl(movieId, container)
-    }.getOrNull()
-
     private val _epgNow = MutableStateFlow<Map<String, EpgProgrammeEntity>>(emptyMap())
     val epgNow = _epgNow.asStateFlow()
 

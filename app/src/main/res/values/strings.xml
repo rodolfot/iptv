@@ -343,7 +343,6 @@
     <string name="empty_continue_action">Explorar filmes</string>
     <string name="empty_favorites_title">Sem favoritos ainda</string>
     <string name="empty_favorites_message">Use o botão Favoritar nos detalhes de filmes, séries e canais para guardá-los aqui.</string>
-    <string name="favorites_preview_hint">Selecione um canal ou filme para ver a prévia.</string>
     <string name="empty_search_title">O que você quer ver hoje?</string>
     <string name="empty_search_message">Busque por nome, gênero, elenco ou sinopse. A busca é instantânea e funciona offline.</string>
     <string name="empty_search_no_results_title">Nada encontrado</string>

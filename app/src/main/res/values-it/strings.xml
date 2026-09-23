@@ -343,7 +343,6 @@
     <string name="empty_continue_action">Sfoglia film</string>
     <string name="empty_favorites_title">Nessun preferito</string>
     <string name="empty_favorites_message">Usa il pulsante Preferito nei dettagli di film, serie e canali per salvarli qui.</string>
-    <string name="favorites_preview_hint">Seleziona un canale o un film per vedere l\'anteprima.</string>
     <string name="empty_search_title">Cosa vuoi guardare?</string>
     <string name="empty_search_message">Cerca per nome, genere, cast o trama. Istantaneo e funziona offline.</string>
     <string name="empty_search_no_results_title">Nessun risultato</string>

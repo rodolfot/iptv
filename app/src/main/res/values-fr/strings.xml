@@ -343,7 +343,6 @@
     <string name="empty_continue_action">Parcourir les films</string>
     <string name="empty_favorites_title">Aucun favori</string>
     <string name="empty_favorites_message">Utilisez le bouton Favori dans les détails des films, séries et chaînes pour les conserver ici.</string>
-    <string name="favorites_preview_hint">Sélectionnez une chaîne ou un film pour afficher l\'aperçu.</string>
     <string name="empty_search_title">Que voulez-vous regarder ?</string>
     <string name="empty_search_message">Recherchez par nom, genre, distribution ou synopsis. Instantané et fonctionne hors ligne.</string>
     <string name="empty_search_no_results_title">Aucun résultat</string>

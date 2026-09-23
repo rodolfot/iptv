@@ -343,7 +343,6 @@
     <string name="empty_continue_action">Browse movies</string>
     <string name="empty_favorites_title">No favorites yet</string>
     <string name="empty_favorites_message">Use the Favorite button on movie, series, and channel detail screens to keep them here.</string>
-    <string name="favorites_preview_hint">Select a channel or movie to see the preview.</string>
     <string name="empty_search_title">What do you want to watch?</string>
     <string name="empty_search_message">Search by name, genre, cast, or plot. It\'s instant and works offline.</string>
     <string name="empty_search_no_results_title">Nothing found</string>

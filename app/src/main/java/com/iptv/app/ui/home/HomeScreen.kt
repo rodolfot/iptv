@@ -341,7 +341,13 @@ fun HomeScreen(
                         selectedCat = seriesSelectedCat,
                         onSelectedCatChange = { seriesSelectedCat = it }
                     )
-                    "favorites" -> FavoritesScreen(vm = vm, parental = parental, onPlay = handlePlay)
+                    "favorites" -> FavoritesScreen(
+                        vm = vm,
+                        onPlay = handlePlay,
+                        onOpenSeries = { id, title, cover ->
+                            openSeries = SeriesOpenArgs(id, title, cover)
+                        }
+                    )
                     "watchlist" -> WatchlistScreen(
                         vm = vm,
                         onPlay = handlePlay,
