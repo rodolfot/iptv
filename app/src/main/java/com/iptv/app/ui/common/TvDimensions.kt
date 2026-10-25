@@ -16,8 +16,21 @@ import com.iptv.app.data.prefs.DeviceProfile
 
 enum class FormFactor { Phone, Tablet, Tv }
 
+/**
+ * Classe de hardware detectada no boot — mais específica que [FormFactor]
+ * (que só escolhe o conjunto de medidas). Telas e o player consultam isto para
+ * comportamentos que não são de layout: regras de direção e botões do volante
+ * na central multimídia, margem de overscan e D-pad na TV, gestos no touch.
+ */
+enum class DeviceClass { TV, PHONE, TABLET, AUTOMOTIVE }
+
 data class TvDimensions(
     val formFactor: FormFactor,
+    val deviceClass: DeviceClass = when (formFactor) {
+        FormFactor.Phone -> DeviceClass.PHONE
+        FormFactor.Tablet -> DeviceClass.TABLET
+        FormFactor.Tv -> DeviceClass.TV
+    },
     /**
      * Quando true, telas devem usar componentes Material3 padrão (com
      * `clickable`/`combinedClickable`) em vez de `androidx.tv.material3.*`.
@@ -135,6 +148,7 @@ fun rememberTvDim(): TvDimensions {
             DeviceProfile.TV -> TvDefaults
             DeviceProfile.TABLET -> TabletDefaults
             DeviceProfile.PHONE -> PhoneDefaults
+            DeviceProfile.CAR -> carDims(LocalConfiguration.current.smallestScreenWidthDp)
         }
     }
     val configuration = LocalConfiguration.current
@@ -149,13 +163,17 @@ fun rememberTvDim(): TvDimensions {
     return when {
         // Multimídia de carro: touch puro. Mapeamos pra Tablet (layout médio)
         // em vez de Phone pra aproveitar a tela maior.
-        isCar -> if (sw < 600) PhoneDefaults else TabletDefaults
+        isCar -> carDims(sw)
         isLeanback -> TvDefaults
         sw < 600 -> PhoneDefaults
         sw < 840 -> TabletDefaults
         else -> TvDefaults
     }
 }
+
+/** Central multimídia: touch, medidas de celular/tablet conforme a tela. */
+private fun carDims(sw: Int): TvDimensions =
+    (if (sw < 600) PhoneDefaults else TabletDefaults).copy(deviceClass = DeviceClass.AUTOMOTIVE)
 
 /**
  * Static defaults (TV-sized) — kept for non-Composable contexts only.

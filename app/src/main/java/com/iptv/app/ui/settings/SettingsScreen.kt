@@ -76,7 +76,6 @@ import com.iptv.app.ui.common.FormFactor
 import com.iptv.app.ui.common.rememberTvDim
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.work.CatalogRefreshWorker
-import com.iptv.app.work.UpdateCheckWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -141,6 +140,22 @@ class SettingsViewModel @Inject constructor(
 
     fun setShowHourlyClock(enabled: Boolean) {
         viewModelScope.launch { settings.setShowHourlyClock(enabled) }
+    }
+
+    fun setOverscanPercent(percent: Int) {
+        viewModelScope.launch { settings.setOverscanPercent(percent) }
+    }
+
+    fun setShowAdultInRecents(enabled: Boolean) {
+        viewModelScope.launch { settings.setShowAdultInRecents(enabled) }
+    }
+
+    fun setAudioPassthrough(enabled: Boolean) {
+        viewModelScope.launch { settings.setAudioPassthrough(enabled) }
+    }
+
+    fun setDrivingAudioOnly(enabled: Boolean) {
+        viewModelScope.launch { settings.setDrivingAudioOnly(enabled) }
     }
 
     fun setRefreshInterval(interval: RefreshInterval) {
@@ -442,6 +457,31 @@ fun SettingsScreen(
                     if (s.isPinSet) R.string.settings_pin_save_set else R.string.settings_pin_save_unset
                 ))
             }
+
+            // Conteúdo adulto em "Assistidos recentemente" / "Continuar
+            // assistindo". Desligado por padrão; LIGAR pede o PIN parental
+            // (desligar não pede — é a direção mais restritiva).
+            var adultRecentsPinOpen by remember { mutableStateOf(false) }
+            SettingsSwitchRow(
+                checked = s.showAdultInRecents,
+                title = stringResource(R.string.settings_adult_in_recents),
+                hint = stringResource(R.string.settings_adult_in_recents_hint),
+                onToggle = { enable ->
+                    if (enable) adultRecentsPinOpen = true
+                    else settingsVm.setShowAdultInRecents(false)
+                }
+            )
+            if (adultRecentsPinOpen) {
+                com.iptv.app.ui.parental.ParentalPinDialog(
+                    expectedPin = s.parentalPin,
+                    onUnlocked = {
+                        adultRecentsPinOpen = false
+                        settingsVm.setShowAdultInRecents(true)
+                    },
+                    onCancel = { adultRecentsPinOpen = false },
+                    onPinCreated = { settingsVm.setPin(it) }
+                )
+            }
         }
 
         SettingsSection(title = stringResource(R.string.settings_display)) {
@@ -521,11 +561,13 @@ fun SettingsScreen(
                 val tvLabel = stringResource(R.string.onboarding_device_tv)
                 val tabletLabel = stringResource(R.string.onboarding_device_tablet)
                 val phoneLabel = stringResource(R.string.onboarding_device_phone)
+                val carLabel = stringResource(R.string.onboarding_device_car)
                 val options = listOf(
                     ComboOption(id = "__auto__", label = autoLabel),
                     ComboOption(id = DeviceProfile.TV.name, label = tvLabel),
                     ComboOption(id = DeviceProfile.TABLET.name, label = tabletLabel),
-                    ComboOption(id = DeviceProfile.PHONE.name, label = phoneLabel)
+                    ComboOption(id = DeviceProfile.PHONE.name, label = phoneLabel),
+                    ComboOption(id = DeviceProfile.CAR.name, label = carLabel)
                 )
                 val currentKey = s.deviceProfile?.name ?: "__auto__"
                 val current = options.firstOrNull { it.id == currentKey }
@@ -542,28 +584,55 @@ fun SettingsScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { settingsVm.setShowHourlyClock(!s.showHourlyClock) }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Switch(
-                    checked = s.showHourlyClock,
-                    onCheckedChange = { settingsVm.setShowHourlyClock(it) }
-                )
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(
-                        stringResource(R.string.settings_hourly_clock),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        stringResource(R.string.settings_hourly_clock_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            SettingsSwitchRow(
+                checked = s.showHourlyClock,
+                title = stringResource(R.string.settings_hourly_clock),
+                hint = stringResource(R.string.settings_hourly_clock_hint),
+                onToggle = { settingsVm.setShowHourlyClock(it) }
+            )
+
+            // Margem contra overscan — só faz sentido em TV.
+            if (com.iptv.app.ui.common.isRealTv()) {
+                val overscanOptions = listOf(0, 2, 3, 5, 7, 10).map { pct ->
+                    ComboOption(
+                        pct,
+                        if (pct == 0) stringResource(R.string.settings_overscan_none)
+                        else stringResource(R.string.settings_overscan_percent, pct)
                     )
                 }
+                ComboColumn(label = stringResource(R.string.settings_overscan)) {
+                    ComboBox(
+                        selected = overscanOptions.firstOrNull { it.id == s.overscanPercent },
+                        options = overscanOptions,
+                        onSelect = { settingsVm.setOverscanPercent(it.id) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Text(
+                    stringResource(R.string.settings_overscan_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Central multimídia: só áudio com o veículo em movimento.
+            if (dim.deviceClass == com.iptv.app.ui.common.DeviceClass.AUTOMOTIVE) {
+                val locationPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+                ) { granted -> if (granted) settingsVm.setDrivingAudioOnly(true) }
+                val permCtx = LocalContext.current
+                SettingsSwitchRow(
+                    checked = s.drivingAudioOnly,
+                    title = stringResource(R.string.settings_driving_audio_only),
+                    hint = stringResource(R.string.settings_driving_audio_only_hint),
+                    onToggle = { enable ->
+                        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                            permCtx, android.Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        if (!enable || granted) settingsVm.setDrivingAudioOnly(enable)
+                        else locationPermission.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                    }
+                )
             }
         }
 
@@ -689,6 +758,13 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+            // Dolby Atmos / DTS: bitstream para o receiver ou PCM no aparelho.
+            SettingsSwitchRow(
+                checked = s.audioPassthrough,
+                title = stringResource(R.string.settings_audio_passthrough),
+                hint = stringResource(R.string.settings_audio_passthrough_hint),
+                onToggle = { settingsVm.setAudioPassthrough(it) }
+            )
         }
 
         SettingsSection(title = stringResource(R.string.settings_epg)) {
@@ -760,6 +836,10 @@ fun SettingsScreen(
             }
         }
 
+        SettingsSection(title = stringResource(R.string.premium_title)) {
+            PremiumSettingsContent()
+        }
+
         SettingsSection(title = stringResource(R.string.settings_history)) {
             TouchableButton(compact = true, onClick = { historyDialogOpen = true }) {
                 Text(stringResource(R.string.settings_history_clear))
@@ -768,32 +848,25 @@ fun SettingsScreen(
 
         SettingsSection(title = stringResource(R.string.settings_about)) {
             val ctx = LocalContext.current
-            // Baixa e prepara a instalação da release mais nova em segundo
-            // plano (worker único "update_check_oneshot") — o resultado
-            // chega aqui via WorkInfo, sem precisar de callback direto.
-            val updateWorkInfo by UpdateCheckWorker
-                .observeOneShot(ctx)
-                .collectAsState(initial = null)
-            LaunchedEffect(updateWorkInfo?.id, updateWorkInfo?.state) {
-                val info = updateWorkInfo ?: return@LaunchedEffect
-                when (info.state) {
-                    androidx.work.WorkInfo.State.SUCCEEDED -> {
-                        val found = info.outputData.getBoolean(UpdateCheckWorker.OUTPUT_FOUND, false)
-                        if (found) {
-                            val version = info.outputData.getString(UpdateCheckWorker.OUTPUT_VERSION)
-                            snackbar?.show(ctx.getString(R.string.snack_update_available, version ?: ""))
-                        } else {
+            // Mesmo ViewModel (escopo da Activity) do diálogo de atualização
+            // da Home: achando versão nova, o diálogo de baixar/instalar abre
+            // direto. Antes isto disparava o worker, que só notificava — e a
+            // notificação não aparece na Android TV.
+            val updateVm = com.iptv.app.ui.update.rememberUpdateViewModel()
+            LaunchedEffect(updateVm) {
+                updateVm.manualResult.collect { result ->
+                    when (result) {
+                        is com.iptv.app.update.UpdateCheckResult.Available ->
+                            snackbar?.show(ctx.getString(R.string.snack_update_available, result.info.versionName))
+                        com.iptv.app.update.UpdateCheckResult.UpToDate ->
                             snackbar?.show(ctx.getString(R.string.snack_update_up_to_date))
-                        }
+                        is com.iptv.app.update.UpdateCheckResult.Failed ->
+                            snackbar?.show(ctx.getString(R.string.snack_update_check_failed))
                     }
-                    androidx.work.WorkInfo.State.FAILED -> {
-                        snackbar?.show(ctx.getString(R.string.snack_update_check_failed))
-                    }
-                    else -> Unit
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TouchableButton(compact = true, onClick = { UpdateCheckWorker.checkNow(ctx) }) {
+                TouchableButton(compact = true, onClick = { updateVm.checkNow() }) {
                     Text(stringResource(R.string.settings_check_update))
                 }
                 TouchableButton(compact = true, onClick = { aboutOpen = true }) {
@@ -865,6 +938,39 @@ fun SettingsScreen(
  * (Servidor, Segurança, Player…) fica dentro de um card com fundo e cantos
  * arredondados, em vez de títulos soltos direto no fluxo da tela.
  */
+/** Linha de configuração liga/desliga: switch + título + dica. A linha
+ *  inteira é clicável/focável (D-pad e toque). */
+@Composable
+private fun SettingsSwitchRow(
+    checked: Boolean,
+    title: String,
+    hint: String?,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle(!checked) }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Switch(
+            checked = checked,
+            onCheckedChange = { onToggle(it) }
+        )
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            if (!hint.isNullOrBlank()) {
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SettingsSection(
     title: String,

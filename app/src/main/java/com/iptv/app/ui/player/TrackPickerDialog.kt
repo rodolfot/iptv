@@ -218,15 +218,17 @@ private fun videoLabel(f: Format): String? {
 }
 
 private fun audioLabel(f: Format): String? {
-    val name = f.label?.takeIf { it.isNotBlank() } ?: languageName(f.language) ?: return null
+    val name = f.label?.takeIf { it.isNotBlank() } ?: languageName(f.language)
+    // Codec imersivo identificado (Dolby Atmos, DTS-HD…) — ajuda a escolher
+    // entre duas faixas do mesmo idioma (#18).
+    val codec = ImmersiveAudio.familyOf(f).label.ifBlank { null }
+    if (name == null && codec == null) return null
     val channels = when (f.channelCount) {
-        1 -> " · Mono"
-        2 -> " · 2.0"
-        6 -> " · 5.1"
-        8 -> " · 7.1"
-        else -> ""
+        1 -> "Mono"
+        2 -> "2.0"
+        else -> ImmersiveAudio.channelsLabel(f.channelCount)
     }
-    return "$name$channels"
+    return listOfNotNull(name, codec, channels).joinToString(" · ")
 }
 
 private fun subtitleLabel(f: Format): String? =

@@ -10,10 +10,17 @@
     <!-- Auto-update: baixa e instala o APK de uma nova release sem passar
          por navegador/gerenciador de arquivos. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Central multimídia (opt-in em Configurações): velocidade do GPS para
+         a regra "só áudio com o veículo em movimento". Pedida em tempo de
+         execução só quando o usuário liga a opção. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.software.picture_in_picture" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <application
         android:name=".IptvApp"

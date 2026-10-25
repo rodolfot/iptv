@@ -47,6 +47,22 @@ android {
             "String", "UPDATE_REPO_NAME",
             "\"${(project.findProperty("UPDATE_REPO_NAME") as String?) ?: ""}\""
         )
+
+        // Monetização (#29). Vazios = recurso desligado: sem servidor de licenças
+        // a tela Premium avisa que a ativação não está disponível, e sem
+        // configuração de anúncios nenhum anúncio é exibido. Ver server/README.md.
+        buildConfigField(
+            "String", "LICENSE_API_URL",
+            "\"${(project.findProperty("LICENSE_API_URL") as String?) ?: ""}\""
+        )
+        buildConfigField(
+            "String", "LICENSE_PUBLIC_KEY",
+            "\"${(project.findProperty("LICENSE_PUBLIC_KEY") as String?) ?: ""}\""
+        )
+        buildConfigField(
+            "String", "ADS_CONFIG_URL",
+            "\"${(project.findProperty("ADS_CONFIG_URL") as String?) ?: ""}\""
+        )
     }
 
     signingConfigs {

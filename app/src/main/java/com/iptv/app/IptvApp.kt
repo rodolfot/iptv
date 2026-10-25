@@ -20,10 +20,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
-class IptvApp : Application(), Configuration.Provider {
+class IptvApp : Application(), Configuration.Provider, coil.ImageLoaderFactory {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var settings: SettingsStore
+    @Inject lateinit var license: com.iptv.app.premium.LicenseManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -42,6 +43,43 @@ class IptvApp : Application(), Configuration.Provider {
             .getString(LOCALE_KEY, null)
         val ctx = applyLocaleToContext(base, localeTag)
         super.attachBaseContext(ctx)
+    }
+
+    /**
+     * ImageLoader do Coil afinado para listas longas de logos/pôsteres rolando
+     * rápido no D-pad (#25):
+     *  - no máximo 4 downloads/decodificações em paralelo — rolar 300 canais
+     *    disparava centenas de requisições e decodes de uma vez, disputando CPU
+     *    com a UI; os que saem da tela são cancelados pelo próprio AsyncImage;
+     *  - cache em memória menor (15% do heap) e RGB_565 em aparelhos com pouca
+     *    RAM — logos não precisam de canal alfa de 32 bits;
+     *  - sem crossfade (cada fade é uma animação por card durante a rolagem);
+     *  - ignora `Cache-Control: no-cache` dos servidores de logo dos painéis,
+     *    para não baixar a mesma imagem a cada volta da lista.
+     */
+    override fun newImageLoader(): coil.ImageLoader {
+        val lowRam = (getSystemService(ACTIVITY_SERVICE) as? android.app.ActivityManager)
+            ?.isLowRamDevice == true
+        @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+        val io = Dispatchers.IO.limitedParallelism(4)
+        return coil.ImageLoader.Builder(this)
+            .memoryCache {
+                coil.memory.MemoryCache.Builder(this)
+                    .maxSizePercent(if (lowRam) 0.10 else 0.15)
+                    .build()
+            }
+            .diskCache {
+                coil.disk.DiskCache.Builder()
+                    .directory(cacheDir.resolve("image_cache"))
+                    .maxSizeBytes(64L * 1024 * 1024)
+                    .build()
+            }
+            .fetcherDispatcher(io)
+            .decoderDispatcher(io)
+            .allowRgb565(lowRam)
+            .crossfade(false)
+            .respectCacheHeaders(false)
+            .build()
     }
 
     override fun onCreate() {
@@ -64,6 +102,8 @@ class IptvApp : Application(), Configuration.Provider {
         CrashLog.install(this)
         Notifications.ensureChannels(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            // Revalida a licença Premium offline logo no boot (#29).
+            runCatching { license.load() }
             val s = settings.flow.first()
             CatalogRefreshWorker.schedule(this@IptvApp, s.refreshInterval)
             ResumeReminderWorker.schedule(this@IptvApp)

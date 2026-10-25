@@ -190,6 +190,10 @@ fun OnboardingScreen(
                     com.iptv.app.ui.common.ComboOption(
                         id = com.iptv.app.data.prefs.DeviceProfile.PHONE.name,
                         label = phoneLabel
+                    ),
+                    com.iptv.app.ui.common.ComboOption(
+                        id = com.iptv.app.data.prefs.DeviceProfile.CAR.name,
+                        label = stringResource(R.string.onboarding_device_car)
                     )
                 )
                 val currentKey = settingsState.deviceProfile?.name ?: "__auto__"

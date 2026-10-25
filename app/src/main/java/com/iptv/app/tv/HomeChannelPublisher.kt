@@ -10,6 +10,7 @@ import androidx.tvprovider.media.tv.PreviewProgram
 import androidx.tvprovider.media.tv.TvContractCompat
 import com.iptv.app.R
 import com.iptv.app.data.db.LiveHistoryDao
+import com.iptv.app.domain.model.ContentType
 import com.iptv.app.data.db.MovieProgressDao
 import com.iptv.app.data.prefs.CurrentProfile
 import com.iptv.app.ui.player.PlayerArgs
@@ -34,6 +35,7 @@ import javax.inject.Singleton
 class HomeChannelPublisher @Inject constructor(
     @ApplicationContext private val context: Context,
     private val liveHistoryDao: LiveHistoryDao,
+    private val categoryCache: com.iptv.app.data.db.CategoryCacheDao,
     private val movieProgressDao: MovieProgressDao,
     private val currentProfile: CurrentProfile
 ) {
@@ -73,8 +75,16 @@ class HomeChannelPublisher @Inject constructor(
 
         val pid = currentProfile.id()
         val newIds = ArrayList<Long>()
+        // A tela inicial da TV é vista por todos da casa: conteúdo adulto nunca
+        // vai para lá, independente da opção de "Assistidos recentemente"
+        // (o histórico agora grava esses itens e só filtra na exibição).
+        val adultLive = categoryCache.get(ContentType.LIVE).filter { it.isAdult }.map { it.id }.toSet()
+        val adultMovies = categoryCache.get(ContentType.MOVIE).filter { it.isAdult }.map { it.id }.toSet()
 
-        liveHistoryDao.observeRecent(pid, limit = 10).first().forEach { ch ->
+        liveHistoryDao.observeRecent(pid, limit = 30).first()
+            .filterNot { it.categoryId != null && it.categoryId in adultLive }
+            .take(10)
+            .forEach { ch ->
             val args = PlayerArgs(
                 kind = PlayerKind.LIVE,
                 streamId = ch.channelId,
@@ -92,7 +102,10 @@ class HomeChannelPublisher @Inject constructor(
             runCatching { helper.publishPreviewProgram(program) }.getOrNull()?.let { newIds.add(it) }
         }
 
-        movieProgressDao.observeInProgress(pid, limit = 10).first().forEach { mv ->
+        movieProgressDao.observeInProgress(pid, limit = 30).first()
+            .filterNot { it.categoryId != null && it.categoryId in adultMovies }
+            .take(10)
+            .forEach { mv ->
             val args = PlayerArgs(
                 kind = PlayerKind.MOVIE,
                 streamId = mv.movieId,

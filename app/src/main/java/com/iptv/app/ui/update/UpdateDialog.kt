@@ -18,6 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,12 +37,15 @@ import androidx.compose.material3.Text
 import com.iptv.app.BuildConfig
 import com.iptv.app.R
 import com.iptv.app.data.prefs.SettingsStore
+import com.iptv.app.update.UpdateCheckResult
 import com.iptv.app.update.UpdateChecker
 import com.iptv.app.update.UpdateInfo
 import com.iptv.app.update.UpdateInstaller
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
@@ -66,15 +72,37 @@ class UpdateViewModel @Inject constructor(
     val stage = _stage.asStateFlow()
     private var checked = false
 
+    /** Resultado do "Verificar atualização agora" para a tela de Configurações
+     *  dar o feedback (snackbar) — o diálogo em si abre sozinho via [info]. */
+    private val _manualResult = MutableSharedFlow<UpdateCheckResult>(extraBufferCapacity = 1)
+    val manualResult = _manualResult.asSharedFlow()
+
     fun checkOnce() {
         if (checked) return
         checked = true
         viewModelScope.launch {
-            val release = checker.check() ?: return@launch
+            val release = (checker.checkDetailed() as? UpdateCheckResult.Available)?.info ?: return@launch
             // Respect a previously-skipped version: only re-prompt when a newer one ships.
             val skipped = settings.skippedUpdate()
             if (skipped == release.versionName) return@launch
             _info.value = release
+        }
+    }
+
+    /**
+     * Checagem pedida pelo usuário nas Configurações. Diferente do automático,
+     * ignora a versão "pulada" e abre o diálogo de instalação — antes só
+     * aparecia um snackbar "nova versão disponível" e a instalação dependia da
+     * notificação do sistema, que na Android TV não aparece.
+     */
+    fun checkNow() {
+        viewModelScope.launch {
+            val result = checker.checkDetailed()
+            if (result is UpdateCheckResult.Available) {
+                _stage.value = UpdateStage.Idle
+                _info.value = result.info
+            }
+            _manualResult.tryEmit(result)
         }
     }
 
@@ -119,12 +147,29 @@ class UpdateViewModel @Inject constructor(
     }
 }
 
+/** ViewModel de atualização com escopo da Activity — o diálogo (na Home) e o
+ *  botão "Verificar agora" (Configurações) compartilham a mesma instância. */
 @Composable
-fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
+fun rememberUpdateViewModel(): UpdateViewModel {
+    val owner = LocalContext.current as? androidx.lifecycle.ViewModelStoreOwner
+    return if (owner != null) hiltViewModel(owner) else hiltViewModel()
+}
+
+@Composable
+fun UpdatePromptHost(vm: UpdateViewModel = rememberUpdateViewModel()) {
     LaunchedEffect(Unit) { vm.checkOnce() }
     val info by vm.info.collectAsState()
     val stage by vm.stage.collectAsState()
     val ctx = LocalContext.current
+    // Foco inicial no botão principal: na TV o diálogo abria sem nenhum botão
+    // focado e o primeiro toque no D-pad só "acordava" o foco.
+    val primaryFocus = remember { FocusRequester() }
+    LaunchedEffect(info != null, stage) {
+        if (info != null) {
+            kotlinx.coroutines.delay(100)
+            runCatching { primaryFocus.requestFocus() }
+        }
+    }
     info?.let { update ->
         Dialog(onDismissRequest = { vm.dismiss() }) {
             Surface(
@@ -198,7 +243,10 @@ fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
                         }
                         when (val s = stage) {
                             UpdateStage.Idle -> {
-                                TouchableButton(onClick = { vm.downloadUpdate() }) {
+                                TouchableButton(
+                                    onClick = { vm.downloadUpdate() },
+                                    modifier = Modifier.focusRequester(primaryFocus)
+                                ) {
                                     Text(stringResource(R.string.update_install_now))
                                 }
                             }
@@ -206,22 +254,34 @@ fun UpdatePromptHost(vm: UpdateViewModel = hiltViewModel()) {
                                 TouchableButton(onClick = { vm.dismiss() }) {
                                     Text(stringResource(R.string.update_later))
                                 }
-                                TouchableButton(onClick = { vm.downloadUpdate() }) {
+                                TouchableButton(
+                                    onClick = { vm.downloadUpdate() },
+                                    modifier = Modifier.focusRequester(primaryFocus)
+                                ) {
                                     Text(stringResource(R.string.retry))
                                 }
                             }
                             is UpdateStage.ReadyToInstall -> {
                                 if (vm.canRequestInstall(ctx)) {
-                                    TouchableButton(onClick = {
+                                    TouchableButton(modifier = Modifier.focusRequester(primaryFocus), onClick = {
                                         vm.installIntent(ctx)?.let { intent ->
-                                            runCatching { ctx.startActivity(intent) }
+                                            // Alguns TV boxes não resolvem ACTION_VIEW de APK;
+                                            // ACTION_INSTALL_PACKAGE cobre esses instaladores.
+                                            runCatching { ctx.startActivity(intent) }.onFailure {
+                                                runCatching {
+                                                    @Suppress("DEPRECATION")
+                                                    ctx.startActivity(
+                                                        Intent(intent).setAction(Intent.ACTION_INSTALL_PACKAGE)
+                                                    )
+                                                }
+                                            }
                                         }
                                         vm.dismiss()
                                     }) {
                                         Text(stringResource(R.string.update_install_now))
                                     }
                                 } else {
-                                    TouchableButton(onClick = {
+                                    TouchableButton(modifier = Modifier.focusRequester(primaryFocus), onClick = {
                                         runCatching { ctx.startActivity(vm.unknownSourcesSettingsIntent(ctx)) }
                                     }) {
                                         Text(stringResource(R.string.update_open_settings))

@@ -1,6 +1,6 @@
 TERMOS DE USO — TartaTV
 
-Última atualização: 5 de maio de 2026.
+Última atualização: 25 de outubro de 2026.
 
 Estes Termos regem o uso do aplicativo TartaTV ("o Aplicativo"). Ao instalar, abrir ou usar o Aplicativo, você concorda integralmente com estes Termos. Se você não concorda, não use o Aplicativo.
 
@@ -31,6 +31,12 @@ Estes Termos regem o uso do aplicativo TartaTV ("o Aplicativo"). Ao instalar, ab
 6. LIMITAÇÃO DE RESPONSABILIDADE
 6.1 Na máxima extensão permitida pela legislação aplicável, o titular do TartaTV não responderá por danos diretos, indiretos, lucros cessantes, perda de dados, ou qualquer outro dano decorrente do uso ou da impossibilidade de uso do Aplicativo.
 6.2 O risco quanto à legalidade, adequação e qualidade do conteúdo acessado pelas listas inseridas pelo usuário é exclusivamente do usuário.
+
+6-A. VERSÃO GRATUITA, ANÚNCIOS E LICENÇA PREMIUM
+6-A.1 O Aplicativo pode ser oferecido em versão gratuita com anúncios (banners discretos na interface e vídeos curtos antes e depois da reprodução) e em versão Premium, sem anúncios, liberada por uma chave de ativação.
+6-A.2 Cada chave de ativação é vinculada a um único dispositivo, identificado pelo endereço MAC da rede ou, quando o sistema não o informa, por um identificador derivado do aparelho, exibido em Configurações → Premium. Uma chave já vinculada não pode ser usada em outro dispositivo.
+6-A.3 É proibido contornar, modificar ou desativar o mecanismo de licença ou de anúncios. Licenças obtidas ou usadas dessa forma são inválidas.
+6-A.4 A licença Premium remove os anúncios do Aplicativo; ela não dá acesso a nenhum conteúdo, lista ou servidor IPTV.
 
 7. ATUALIZAÇÕES E DESCONTINUAÇÃO
 7.1 O titular pode atualizar o Aplicativo para corrigir falhas, adicionar funcionalidades, ou cumprir requisitos legais, sem aviso prévio.

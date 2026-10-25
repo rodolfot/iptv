@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items as lazyListItems
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -56,6 +56,8 @@ import com.iptv.app.data.prefs.LiveViewMode
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.model.LiveChannel
 import com.iptv.app.ui.common.LocalSnackbar
+import com.iptv.app.ui.common.focusMemoryItem
+import com.iptv.app.ui.common.restoreFocusFrom
 import com.iptv.app.ui.home.HomeViewModel
 
 /**
@@ -182,25 +184,44 @@ private fun LiveGridLayout(
     }
 
     val needle = localFilter.trim().lowercase()
-    val filteredChannels = if (needle.isBlank()) channels
-    else channels.filter { it.name.lowercase().contains(needle) }
+    val filteredChannels = remember(channels, needle) {
+        if (needle.isBlank()) channels else channels.filter { it.name.lowercase().contains(needle) }
+    }
+    // Conjunto calculado uma vez por mudança nos favoritos — antes era
+    // refeito (filter + map + toSet) a cada recomposição da tela.
+    val favoriteIds = remember(favorites) {
+        favorites.filter { it.type == com.iptv.app.domain.model.ContentType.LIVE }
+            .map { it.itemId }
+            .toSet()
+    }
+    val drawerMemory = com.iptv.app.ui.common.rememberFocusMemory()
+    // Memória da grade por categoria (#27), compartilhada com a gaveta para
+    // o → da gaveta voltar ao último canal focado.
+    val gridMemory = com.iptv.app.ui.common.rememberFocusMemory("live-grid:$selectedCategoryId")
+    val dim = com.iptv.app.ui.common.rememberTvDim()
+    val categoryName = categories.firstOrNull { it.id == selectedCategoryId }?.name.orEmpty()
 
     Box(modifier = modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            // Painel esquerdo: lista de categorias permanente.
-            CategoriesDrawer(
-                categories = categories,
-                selectedId = selectedCategoryId,
-                onSelect = onCategorySelected,
-                selectedRequester = drawerSelectedRequester,
-                countByCategory = countByCategory,
-                modifier = Modifier.width(280.dp).fillMaxHeight()
-            )
-
+        com.iptv.app.ui.common.CollapsibleDrawerLayout(
+            collapsible = !dim.useTouchUi,
+            collapsedLabel = categoryName,
+            drawer = {
+                // Painel esquerdo: lista de categorias permanente.
+                CategoriesDrawer(
+                    categories = categories,
+                    selectedId = selectedCategoryId,
+                    onSelect = onCategorySelected,
+                    selectedRequester = drawerSelectedRequester,
+                    memory = drawerMemory,
+                    onExitRight = { gridMemory.enterTarget() },
+                    countByCategory = countByCategory,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        ) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
+                    .fillMaxSize()
                     .padding(16.dp)
             ) {
                 // Header com campo de busca + sort + visualização à direita —
@@ -232,12 +253,11 @@ private fun LiveGridLayout(
                     channels = filteredChannels,
                     isCategoryAdult = isCategoryAdult,
                     isParentalUnlocked = isParentalUnlocked,
-                    favoriteIds = favorites
-                        .filter { it.type == com.iptv.app.domain.model.ContentType.LIVE }
-                        .map { it.itemId }
-                        .toSet(),
+                    favoriteIds = favoriteIds,
                     previewChannelId = previewChannel?.id,
                     firstFocusRequester = firstChannelFocus,
+                    focusMemory = gridMemory,
+                    onExitLeft = { drawerMemory.enterTarget(selectedCategoryId) },
                     onClick = { ch ->
                         val locked = isCategoryAdult && !isParentalUnlocked
                         when {
@@ -256,9 +276,7 @@ private fun LiveGridLayout(
                         }
                     },
                     onLongClick = { ch ->
-                        val isFav = favorites.any {
-                            it.type == com.iptv.app.domain.model.ContentType.LIVE && it.itemId == ch.id
-                        }
+                        val isFav = ch.id in favoriteIds
                         vm.toggleFavorite(
                             com.iptv.app.data.db.FavoriteEntity(
                                 profileId = "",
@@ -281,37 +299,47 @@ private fun LiveGridLayout(
         // PIP de preview no canto inferior direito — só aparece depois que o
         // usuário confirma um canal com OK (ver onClick do ChannelTile).
         previewChannel?.let { channel ->
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .width(240.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                Text(
-                    stringResource(R.string.live_preview_confirm_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    modifier = Modifier
-                        .padding(bottom = 4.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xCC000000))
-                        .padding(horizontal = 6.dp, vertical = 3.dp)
+            LivePreviewPip(
+                channel = channel,
+                vm = vm,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Miniplayer de prévia (canto inferior direito) com a dica "OK de novo abre em
+ * tela cheia". Usado na grade do Ao Vivo e em Favoritos → Canais.
+ */
+@Composable
+internal fun LivePreviewPip(channel: LiveChannel, vm: HomeViewModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.width(240.dp),
+        horizontalAlignment = Alignment.End
+    ) {
+        Text(
+            stringResource(R.string.live_preview_confirm_hint),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier
+                .padding(bottom = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xCC000000))
+                .padding(horizontal = 6.dp, vertical = 3.dp)
+        )
+        Box(
+            modifier = Modifier
+                .width(240.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(8.dp))
+                .border(
+                    2.dp,
+                    MaterialTheme.colorScheme.primary,
+                    RoundedCornerShape(8.dp)
                 )
-                Box(
-                    modifier = Modifier
-                        .width(240.dp)
-                        .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(
-                            2.dp,
-                            MaterialTheme.colorScheme.primary,
-                            RoundedCornerShape(8.dp)
-                        )
-                ) {
-                    ChannelPreviewPip(channel = channel, vm = vm)
-                }
-            }
+        ) {
+            ChannelPreviewPip(channel = channel, vm = vm)
         }
     }
 }
@@ -339,15 +367,26 @@ private fun LiveListWithCategoriesLayout(
         kotlinx.coroutines.delay(50)
         runCatching { drawerSelectedRequester.requestFocus() }
     }
-    Row(modifier = modifier.fillMaxSize()) {
-        CategoriesDrawer(
-            categories = categories,
-            selectedId = selectedCategoryId,
-            onSelect = onCategorySelected,
-            selectedRequester = drawerSelectedRequester,
-            countByCategory = countByCategory,
-            modifier = Modifier.width(280.dp).fillMaxHeight()
-        )
+    val drawerMemory = com.iptv.app.ui.common.rememberFocusMemory()
+    val listMemory = com.iptv.app.ui.common.rememberFocusMemory(selectedCategoryId)
+    val dim = com.iptv.app.ui.common.rememberTvDim()
+    com.iptv.app.ui.common.CollapsibleDrawerLayout(
+        collapsible = !dim.useTouchUi,
+        collapsedLabel = categories.firstOrNull { it.id == selectedCategoryId }?.name.orEmpty(),
+        modifier = modifier,
+        drawer = {
+            CategoriesDrawer(
+                categories = categories,
+                selectedId = selectedCategoryId,
+                onSelect = onCategorySelected,
+                selectedRequester = drawerSelectedRequester,
+                memory = drawerMemory,
+                onExitRight = { listMemory.enterTarget() },
+                countByCategory = countByCategory,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    ) {
         ChannelListWithEpg(
             vm = vm,
             channels = channels,
@@ -355,7 +394,9 @@ private fun LiveListWithCategoriesLayout(
             isCategoryAdult = isCategoryAdult,
             isParentalUnlocked = isParentalUnlocked,
             onPlay = onPlay,
-            modifier = Modifier.weight(1f).fillMaxHeight().padding(16.dp)
+            onExitLeft = { drawerMemory.enterTarget(selectedCategoryId) },
+            focusMemory = listMemory,
+            modifier = Modifier.fillMaxSize().padding(16.dp)
         )
     }
 }
@@ -398,6 +439,7 @@ private fun LiveListFocusLayout(
                 showCategoryPicker = false
             },
             selectedRequester = pickerRequester,
+            memory = com.iptv.app.ui.common.rememberFocusMemory(),
             countByCategory = countByCategory,
             modifier = modifier.fillMaxSize()
         )
@@ -431,6 +473,8 @@ private fun CategoriesDrawer(
     selectedId: String,
     onSelect: (String) -> Unit,
     selectedRequester: FocusRequester,
+    memory: com.iptv.app.ui.common.FocusMemory,
+    onExitRight: (() -> FocusRequester)? = null,
     countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
@@ -452,8 +496,16 @@ private fun CategoriesDrawer(
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
         )
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            lazyListItems(categories) { cat ->
+        // Ao entrar na gaveta (vindo da grade ou do menu superior) o foco cai
+        // na última categoria focada — ou na selecionada —, não na categoria
+        // que estiver geometricamente mais perto.
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .restoreFocusFrom(memory, fallbackKey = { selectedId }, onExitRight = onExitRight)
+        ) {
+            lazyListItems(categories, key = { it.id }) { cat ->
                 val isSelected = cat.id == selectedId
                 com.iptv.app.ui.common.DrawerCategoryItem(
                     name = cat.name,
@@ -461,7 +513,9 @@ private fun CategoriesDrawer(
                     isAdult = cat.isAdult,
                     count = countByCategory[cat.id],
                     onClick = { onSelect(cat.id) },
-                    modifier = if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier
+                    modifier = Modifier
+                        .focusMemoryItem(memory, cat.id)
+                        .then(if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier)
                 )
             }
         }
@@ -479,6 +533,8 @@ private fun ChannelsGrid(
     onClick: (LiveChannel) -> Unit,
     onLongClick: (LiveChannel) -> Unit,
     scrollKey: String,
+    focusMemory: com.iptv.app.ui.common.FocusMemory = com.iptv.app.ui.common.rememberFocusMemory(scrollKey),
+    onExitLeft: (() -> FocusRequester)? = null,
     modifier: Modifier = Modifier
 ) {
     val locked = isCategoryAdult && !isParentalUnlocked
@@ -504,22 +560,31 @@ private fun ChannelsGrid(
     }
     // Mesmo grid de Filmes/Séries: 95dp Adaptive + gap 6 + contentPadding
     // só vertical (o padding lateral é absorvido pelo Column pai).
+    // Memória de foco por categoria (#27): voltar da gaveta para a grade cai
+    // no último canal focado; na primeira entrada (ou após trocar de
+    // categoria), no primeiro canal visível no topo — sem saltos de rolagem.
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Adaptive(95.dp),
         contentPadding = PaddingValues(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = modifier
+        modifier = modifier.restoreFocusFrom(
+            memory = focusMemory,
+            fallbackKey = { firstFullyVisibleKey(gridState) },
+            onExitLeft = onExitLeft
+        )
     ) {
-        items(items = channels, key = { it.id }) { channel ->
-            val index = channels.indexOf(channel)
+        // itemsIndexed: antes cada item chamava channels.indexOf(channel) —
+        // O(n) por card, O(n²) por rolagem em categorias com centenas de canais.
+        itemsIndexed(items = channels, key = { _, ch -> ch.id }) { index, channel ->
             ChannelTile(
                 channel = channel,
                 locked = locked,
                 isFavorite = channel.id in favoriteIds,
                 isPreviewing = previewChannelId == channel.id,
                 modifier = Modifier
+                    .focusMemoryItem(focusMemory, channel.id)
                     .then(if (index == 0) Modifier.focusRequester(firstFocusRequester) else Modifier),
                 onClick = { onClick(channel) },
                 onLongClick = { onLongClick(channel) }
@@ -527,6 +592,11 @@ private fun ChannelsGrid(
         }
     }
 }
+
+/** Chave do primeiro item cujo topo está dentro da área visível da grade. */
+internal fun firstFullyVisibleKey(state: androidx.compose.foundation.lazy.grid.LazyGridState): Any? =
+    state.layoutInfo.visibleItemsInfo.firstOrNull { it.offset.y >= 0 }?.key
+        ?: state.layoutInfo.visibleItemsInfo.firstOrNull()?.key
 
 /** Tile de canal da grade (logo inteira + nome na barra). Também usado em
  *  Favoritos para os canais terem a mesma cara nas duas telas. */

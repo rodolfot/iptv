@@ -76,6 +76,7 @@ class ContinueWatchingViewModel @Inject constructor(
     private val episodeProgressDao: EpisodeProgressDao,
     private val liveHistoryDao: com.iptv.app.data.db.LiveHistoryDao,
     private val categoryCache: com.iptv.app.data.db.CategoryCacheDao,
+    private val seriesCache: com.iptv.app.data.db.SeriesCacheDao,
     private val currentProfile: CurrentProfile,
     private val recommender: Recommender,
     private val xtream: com.iptv.app.data.api.XtreamRepository,
@@ -85,27 +86,41 @@ class ContinueWatchingViewModel @Inject constructor(
         .map { currentProfile.id() }
         .distinctUntilChanged()
 
-    // Conjunto de ids de categorias adultas por tipo — usado para esconder
-    // conteúdo protegido dos históricos, inclusive entradas gravadas antes
-    // do filtro existir.
-    private fun adultIds(type: ContentType) = categoryCache.observe(type)
-        .map { cats -> cats.filter { it.isAdult }.map { it.id }.toSet() }
+    /** Opção "Mostrar conteúdo adulto em Assistidos recentemente" (Configurações
+     *  → Controle parental). Desligada por padrão. */
+    private val showAdult = settings.flow
+        .map { it.showAdultInRecents }
         .distinctUntilChanged()
+
+    // Conjunto de ids de categorias adultas por tipo — o filtro roda na
+    // consulta (não na gravação), então alternar a opção mostra/esconde na
+    // hora, inclusive o que foi assistido antes. Vazio quando a opção está
+    // ligada.
+    private fun hiddenCategoryIds(type: ContentType) = combine(
+        categoryCache.observe(type)
+            .map { cats -> cats.filter { it.isAdult }.map { it.id }.toSet() }
+            .distinctUntilChanged(),
+        showAdult
+    ) { adult, show -> if (show) emptySet() else adult }
 
     val movies = combine(
         profileIdFlow.flatMapLatest { movieProgressDao.observeInProgress(it) },
-        adultIds(ContentType.MOVIE)
-    ) { list, adult -> list.filterNot { it.categoryId != null && it.categoryId in adult } }
+        hiddenCategoryIds(ContentType.MOVIE)
+    ) { list, hidden -> list.filterNot { it.categoryId != null && it.categoryId in hidden } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val series = profileIdFlow
-        .flatMapLatest { seriesProgressDao.observeRecent(it) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val series = combine(
+        profileIdFlow.flatMapLatest { seriesProgressDao.observeRecent(it) },
+        hiddenCategoryIds(ContentType.SERIES)
+    ) { list, hidden ->
+        if (hidden.isEmpty()) list
+        else list.filterNot { seriesCache.categoryIdOf(it.seriesId)?.let { cat -> cat in hidden } == true }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val recentChannels = combine(
         // Busca a mais que 10 porque o filtro abaixo pode remover alguns.
         profileIdFlow.flatMapLatest { liveHistoryDao.observeRecent(it, limit = 30) },
-        adultIds(ContentType.LIVE)
-    ) { list, adult ->
-        list.filterNot { it.categoryId != null && it.categoryId in adult }.take(10)
+        hiddenCategoryIds(ContentType.LIVE)
+    ) { list, hidden ->
+        list.filterNot { it.categoryId != null && it.categoryId in hidden }.take(10)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Recomendações removidas a pedido do usuário — o Recommender fazia

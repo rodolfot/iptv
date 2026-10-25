@@ -1,0 +1,16 @@
+# Copie para wrangler.toml e preencha o database_id (wrangler d1 create tartatv-licenses).
+name = "tartatv-license"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tartatv-licenses"
+database_id = "<preencher>"
+
+[vars]
+# Configuração de anúncios servida em GET /v1/ads (ver ../ads.example.json).
+# Vazio = versão gratuita sem anúncios.
+ADS_CONFIG = ""
+
+# Segredo (não versionar):  wrangler secret put LICENSE_PRIVATE_JWK

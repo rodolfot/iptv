@@ -79,7 +79,10 @@ import com.iptv.app.domain.sort.sorted
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -130,11 +133,13 @@ class PlayerViewModel @Inject constructor(
     private val seriesProgressDao: SeriesProgressDao,
     private val liveCache: LiveCacheDao,
     private val liveHistoryDao: com.iptv.app.data.db.LiveHistoryDao,
-    private val categoryCache: com.iptv.app.data.db.CategoryCacheDao,
-    private val seriesCache: com.iptv.app.data.db.SeriesCacheDao,
     private val settingsStore: com.iptv.app.data.prefs.SettingsStore,
     private val currentProfile: CurrentProfile,
-    private val movieQueue: MovieQueue
+    private val movieQueue: MovieQueue,
+    private val liveQueue: LiveQueue,
+    /** Anúncios da versão gratuita (pre-roll/post-roll, #29). */
+    val ads: com.iptv.app.ads.AdsManager,
+    drivingMonitor: com.iptv.app.car.DrivingMonitor
 ) : ViewModel() {
 
     /** Configurações observáveis pelo player (decoder, legenda, áudio-only…). */
@@ -144,17 +149,19 @@ class PlayerViewModel @Inject constructor(
         com.iptv.app.data.prefs.AppSettings()
     )
 
-    /** True quando a categoria é marcada como adulta — conteúdo protegido não
-     *  deve entrar nos históricos (canais recentes / continuar assistindo). */
-    private suspend fun isAdultCategory(
-        type: com.iptv.app.domain.model.ContentType,
-        categoryId: String?
-    ): Boolean {
-        if (categoryId.isNullOrBlank()) return false
-        return categoryCache.isAdult(type, categoryId) == true
-    }
     private val _state = MutableStateFlow(PlayerUiState())
     val state = _state.asStateFlow()
+
+    /** Central multimídia com "só áudio em movimento" ligado e o veículo
+     *  andando (#23). Sem a opção (ou sem permissão), sempre false. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val drivingLocked = settingsStore.flow
+        .map { it.drivingAudioOnly }
+        .distinctUntilChanged()
+        .flatMapLatest { enabled ->
+            if (enabled) drivingMonitor.isMoving() else kotlinx.coroutines.flow.flowOf(false)
+        }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), false)
 
     fun load(args: PlayerArgs) {
         viewModelScope.launch {
@@ -175,11 +182,14 @@ class PlayerViewModel @Inject constructor(
                         )
                         return@launch
                     }
+                    // Aberto de Favoritos: o zapping percorre só os favoritos,
+                    // na ordem em que aparecem lá (#24).
+                    val queued = liveQueue.consume(args.streamId)
                     // Canais irmãos da mesma categoria, na mesma ordem da lista
                     // (ordenação escolhida pelo usuário), para o zapping com
                     // esquerda/direita seguir a numeração que ele vê na tela.
                     val liveSort = settingsStore.flow.first().liveSort
-                    val siblings = cached?.categoryId
+                    val siblings = queued ?: cached?.categoryId
                         ?.let { catId -> liveCache.getByCategory(catId) }
                         ?.map { it.toDomain() }
                         ?.sorted(liveSort)
@@ -284,23 +294,23 @@ class PlayerViewModel @Inject constructor(
         )
         // Histórico: marca este canal como o mais recente assistido, para
         // alimentar a seção "Canais recentes" na Início. trim() logo depois
-        // pra manter no máximo 10 — sem isso zapping pesado deixaria a tabela
-        // com centenas de linhas. Conteúdo adulto/protegido NÃO entra no
-        // histórico (a pedido do usuário).
-        if (!isAdultCategory(com.iptv.app.domain.model.ContentType.LIVE, cached?.categoryId)) {
-            runCatching {
-                val pid = currentProfile.id()
-                liveHistoryDao.upsert(
-                    com.iptv.app.data.db.LiveHistoryEntity(
-                        profileId = pid,
-                        channelId = streamId,
-                        name = title,
-                        logoUrl = cached?.logoUrl,
-                        categoryId = cached?.categoryId
-                    )
+        // pra não deixar o zapping encher a tabela com centenas de linhas.
+        // Canais adultos também são gravados: quem decide se aparecem é a
+        // opção "Mostrar conteúdo adulto em Assistidos recentemente" (filtro na
+        // leitura, desligado por padrão). Guardamos 30 para a lista não ficar
+        // vazia quando o filtro esconde parte deles.
+        runCatching {
+            val pid = currentProfile.id()
+            liveHistoryDao.upsert(
+                com.iptv.app.data.db.LiveHistoryEntity(
+                    profileId = pid,
+                    channelId = streamId,
+                    name = title,
+                    logoUrl = cached?.logoUrl,
+                    categoryId = cached?.categoryId
                 )
-                liveHistoryDao.trim(pid, keep = 10)
-            }
+            )
+            liveHistoryDao.trim(pid, keep = 30)
         }
     }
 
@@ -387,11 +397,8 @@ class PlayerViewModel @Inject constructor(
             val pid = currentProfile.id()
             when {
                 !item.episodeId.isNullOrBlank() && item.seriesId >= 0 -> {
-                    // Série em categoria adulta não entra no "Continuar assistindo".
-                    val seriesCat = seriesCache.categoryIdOf(item.seriesId)
-                    if (isAdultCategory(com.iptv.app.domain.model.ContentType.SERIES, seriesCat)) {
-                        return@launch
-                    }
+                    // Séries adultas também guardam progresso; a exibição em
+                    // "Continuar assistindo" segue a opção de conteúdo adulto.
                     progressDao.upsert(
                         EpisodeProgressEntity(
                             profileId = pid,
@@ -417,10 +424,6 @@ class PlayerViewModel @Inject constructor(
                     )
                 }
                 item.movieId >= 0 -> {
-                    // Filme em categoria adulta não entra no "Continuar assistindo".
-                    if (isAdultCategory(com.iptv.app.domain.model.ContentType.MOVIE, item.movieCategory)) {
-                        return@launch
-                    }
                     if (watched) {
                         movieProgressDao.delete(pid, item.movieId)
                     } else {
@@ -473,6 +476,17 @@ fun PlayerScreen(
     // áudio aberto pelo painel de opções (engrenagem).
     var tracks by remember { mutableStateOf(Tracks.EMPTY) }
     var showTracks by remember { mutableStateOf(false) }
+    val drivingLocked by vm.drivingLocked.collectAsState()
+    // Sessão retomada do mini-player (mesmos args, player vivo): não repete
+    // o pre-roll. Lido antes do LaunchedEffect(args) atualizar o holder.
+    val resumedSession = remember { holder?.args?.value == args && holder.player != null }
+    // Intervalo comercial em exibição (#29) e o "portão" que segura a
+    // preparação do conteúdo até o pre-roll terminar.
+    var adBreak by remember { mutableStateOf<com.iptv.app.ads.VastAd?>(null) }
+    val adGate = remember { arrayOfNulls<kotlinx.coroutines.CompletableDeferred<Unit>>(1) }
+    val adScope = androidx.compose.runtime.rememberCoroutineScope()
+    val inPip by ((context as? com.iptv.app.MainActivity)?.inPictureInPicture
+        ?: remember { mutableStateOf(false) })
 
     LaunchedEffect(args) {
         vm.load(args)
@@ -508,9 +522,10 @@ fun PlayerScreen(
     // Decoder escolhido nas Configurações — aplicado na construção do player.
     // Se o modo mudar com um player já ativo no holder, vale no próximo cold start.
     val decoderMode = settings.decoderMode
-    val exo = remember(holder, decoderMode) {
-        val factory = buildRenderersFactory(context, decoderMode)
-        holder?.ensurePlayer(context, factory, decoderMode.name)?.apply {
+    val passthrough = settings.audioPassthrough
+    val exo = remember(holder, decoderMode, passthrough) {
+        val factory = buildRenderersFactory(context, decoderMode, passthrough)
+        holder?.ensurePlayer(context, factory, "${decoderMode.name}:$passthrough")?.apply {
             repeatMode = Player.REPEAT_MODE_OFF
         } ?: newStreamingPlayer(context, factory).apply { playWhenReady = true }
     }
@@ -545,9 +560,12 @@ fun PlayerScreen(
     }
     // Modo rádio / áudio-only: desliga o renderer de vídeo (economiza banda e
     // CPU em canais de rádio). Reativo — o toggle aplica na hora.
-    LaunchedEffect(exo, settings.audioOnly) {
+    // Na central multimídia, com o veículo em movimento, o vídeo também é
+    // desligado (regra de segurança, #23) — o áudio do canal continua.
+    val videoOff = settings.audioOnly || drivingLocked
+    LaunchedEffect(exo, videoOff) {
         exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_VIDEO, settings.audioOnly)
+            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_VIDEO, videoOff)
             .build()
     }
     // Manter a CPU/Wi-Fi acordados durante streaming — sem isso, o sistema
@@ -580,6 +598,18 @@ fun PlayerScreen(
             isReconnecting = false
             playbackError = null
             isInitialBuffering = true
+        }
+        // Pre-roll (#29): só na abertura do player — não no zapping nem ao
+        // voltar do mini-player — e sujeito ao intervalo mínimo entre
+        // anúncios. Sem anúncio (premium, sem configuração, falha ou demora),
+        // segue direto para o conteúdo.
+        if (preparedFor == null && !resumedSession) {
+            vm.ads.preroll()?.let { ad ->
+                val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+                adGate[0] = gate
+                adBreak = ad
+                gate.await()
+            }
         }
         val mediaItems = state.items.map { MediaItem.fromUri(it.url) }
         exo.setMediaItems(mediaItems, state.currentIndex, state.items.getOrNull(state.currentIndex)?.startPositionMs ?: 0L)
@@ -683,7 +713,12 @@ fun PlayerScreen(
                     // reconectar. Mesmo fluxo de retry do onPlayerError.
                     val isLive = state.items.getOrNull(exo.currentMediaItemIndex)
                         ?.let { it.episodeId == null && it.movieId < 0 } ?: false
-                    if (isLive) reconnectLive(liveStreamEndedMsg)
+                    if (isLive) {
+                        reconnectLive(liveStreamEndedMsg)
+                    } else if (adBreak == null) {
+                        // Fim do filme / último episódio: post-roll (#29).
+                        adScope.launch { vm.ads.postroll()?.let { adBreak = it } }
+                    }
                 }
                 if (playbackState == Player.STATE_READY) {
                     // Conectou: zera o contador, tira overlay de reconexão e
@@ -749,6 +784,11 @@ fun PlayerScreen(
     // conectar (ou reconectar) sem ter mostrado vídeo ainda. Continua contando
     // na passagem de "conectando" para "reconectando".
     val showingLoader = (isInitialBuffering || isReconnecting) && playbackError == null
+    val audioBadge = remember(tracks, passthrough) {
+        ImmersiveAudio.selectedBadge(context, tracks, passthrough)
+    }
+    val audioUnsupported = remember(tracks) { ImmersiveAudio.hasOnlyUnsupportedAudio(tracks) }
+    var audioWarningDismissed by remember(state.items) { mutableStateOf(false) }
     var loadingElapsedSec by remember { mutableStateOf(0L) }
     LaunchedEffect(showingLoader) {
         if (!showingLoader) return@LaunchedEffect
@@ -810,7 +850,9 @@ fun PlayerScreen(
     val keepAliveOnBack = backFormFactor == com.iptv.app.ui.common.FormFactor.Phone
 
     val onMinimize = {
-        if (keepAliveOnBack && holder != null && state.items.isNotEmpty()) {
+        // Voltar durante o pre-roll fecha de vez (o conteúdo nem começou;
+        // um mini-player aqui ficaria vazio).
+        if (keepAliveOnBack && holder != null && state.items.isNotEmpty() && adBreak == null) {
             holder.minimized.value = true
         } else {
             holder?.release()
@@ -973,7 +1015,22 @@ fun PlayerScreen(
         }
     }
 
-    val seekStepMs = 10_000L
+    val seekStepMs = SEEK_STEP_MS
+    // Celular gira para paisagem no player; Android 12+ entra em PiP sozinho
+    // ao minimizar (#22).
+    LandscapeWhilePlaying(enabled = isPhone)
+    AutoEnterPip(enabled = dim.useTouchUi && state.items.isNotEmpty())
+    LaunchedEffect(inPip) {
+        playerView.useController = !inPip
+        if (inPip) playerView.hideController()
+    }
+    // Botões do volante / Bluetooth / fones (#23).
+    rememberPlayerMediaSession(
+        player = exo,
+        isLive = state.isLive,
+        onNext = { vm.zapLive(1) },
+        onPrevious = { vm.zapLive(-1) }
+    )
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -991,6 +1048,38 @@ fun PlayerScreen(
                     evt.key.nativeKeyCode == KeyEvent.KEYCODE_BACK) {
                     onMinimize()
                     return@onPreviewKeyEvent true
+                }
+                // Durante o anúncio só o botão "Pular" responde (sem zapping,
+                // seek nem pausa do conteúdo por baixo).
+                if (adBreak != null) return@onPreviewKeyEvent false
+                // Teclas de mídia do controle, do teclado e do volante:
+                // CH+/CH− e ⏭/⏮ trocam de canal no Ao Vivo e de episódio/
+                // filme no VOD.
+                when (com.iptv.app.ui.common.InputMapper.actionOf(evt.key.nativeKeyCode)) {
+                    com.iptv.app.ui.common.InputAction.CHANNEL_UP,
+                    com.iptv.app.ui.common.InputAction.NEXT -> {
+                        if (state.isLive) vm.zapLive(1)
+                        else if (exo.hasNextMediaItem()) exo.seekToNextMediaItem()
+                        else vm.stepMovie(1)
+                        return@onPreviewKeyEvent true
+                    }
+                    com.iptv.app.ui.common.InputAction.CHANNEL_DOWN,
+                    com.iptv.app.ui.common.InputAction.PREVIOUS -> {
+                        if (state.isLive) vm.zapLive(-1)
+                        else if (exo.hasPreviousMediaItem()) exo.seekToPreviousMediaItem()
+                        else vm.stepMovie(-1)
+                        return@onPreviewKeyEvent true
+                    }
+                    com.iptv.app.ui.common.InputAction.PLAY -> {
+                        exo.play()
+                        return@onPreviewKeyEvent true
+                    }
+                    com.iptv.app.ui.common.InputAction.PAUSE,
+                    com.iptv.app.ui.common.InputAction.STOP -> {
+                        exo.pause()
+                        return@onPreviewKeyEvent true
+                    }
+                    else -> Unit
                 }
                 when (evt.key) {
                     Key.DirectionLeft, Key.MediaRewind -> {
@@ -1087,45 +1176,29 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { playerView }
         )
-        if (isPhone) {
-            // Double-tap left/right thirds to seek ±10s like YouTube/Netflix mobile players.
-            androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxSize()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onDoubleTap = {
-                                    exo.seekTo((exo.currentPosition - seekStepMs).coerceAtLeast(0L))
-                                    playerView.showController()
-                                }
-                            )
-                        }
-                )
-                Box(modifier = Modifier.weight(1f).fillMaxSize())
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onDoubleTap = {
-                                    val target = exo.currentPosition + seekStepMs
-                                    val dur = exo.duration
-                                    exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
-                                    playerView.showController()
-                                }
-                            )
-                        }
-                )
-            }
+        if (dim.useTouchUi && !inPip) {
+            // Gestos de toque (#22): brilho/volume deslizando, ±10s com toque
+            // duplo, toque simples alterna os controles.
+            PlayerGestureLayer(
+                seekEnabled = !state.isLive,
+                onSeekBy = { delta ->
+                    val dur = exo.duration
+                    val target = (exo.currentPosition + delta).coerceAtLeast(0L)
+                    exo.seekTo(if (dur > 0) target.coerceAtMost(dur) else target)
+                    playerView.showController()
+                },
+                onToggleControls = {
+                    if (playerView.isControllerFullyVisible) playerView.hideController()
+                    else playerView.showController()
+                }
+            )
         }
-        if (backVisible) {
+        if (backVisible && !inPip) {
             androidx.compose.foundation.layout.Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .safeDrawingPadding()
+                    .padding(com.iptv.app.ui.common.LocalOverscanPadding.current)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .onFocusChanged { overlayHasFocus = it.hasFocus },
                 verticalAlignment = Alignment.CenterVertically,
@@ -1173,6 +1246,8 @@ fun PlayerScreen(
                 }
                 if (titleVisible) {
                     Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                    // Dolby Atmos / DTS / canais da faixa em uso (#18).
+                    audioBadge?.takeIf { it.isImmersive || it.channels != null }?.let { AudioBadgeChip(it) }
                 }
             }
         }
@@ -1262,22 +1337,16 @@ fun PlayerScreen(
                 }
             }
         }
-        // Overlay enquanto o vídeo está carregando pela primeira vez: mostra
-        // a animação "TartaTV" + spinner. Antes usávamos `SplashScreen()`
-        // que é fillMaxSize com background opaco — o overlay cobria a tela
-        // toda e o spinner ficava fora dela. Agora `WaveBrand()` é só o
-        // wordmark embutível dentro do Column do overlay.
+        // Overlay enquanto o vídeo está carregando pela primeira vez: marca
+        // no anel animado (identidade 4.0) — o próprio anel é o indicador de
+        // progresso, no lugar do antigo wordmark + spinner.
         if (isInitialBuffering && !isReconnecting && playbackError == null) {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    com.iptv.app.ui.common.WaveBrand()
-                    androidx.compose.material3.CircularProgressIndicator(
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 24.dp)
-                    )
+                    com.iptv.app.ui.common.BrandLoader(size = 112.dp, showWordmark = false)
                     // Mensagem explícita: alguns canais demoram vários segundos
                     // pra conectar e o usuário ficava encarando tela preta
                     // achando que o app travou.
@@ -1305,7 +1374,7 @@ fun PlayerScreen(
         }
         // Modo rádio / áudio-only: sem vídeo, mostra a marca + título no centro
         // pra tela não ficar preta. Só quando já conectou (não sobrepõe o splash).
-        if (settings.audioOnly && !isInitialBuffering && playbackError == null) {
+        if (videoOff && !isInitialBuffering && playbackError == null) {
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black),
                 contentAlignment = Alignment.Center
@@ -1319,7 +1388,10 @@ fun PlayerScreen(
                     )
                     Text(state.title, style = MaterialTheme.typography.titleLarge, color = Color.White)
                     Text(
-                        androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio_only),
+                        androidx.compose.ui.res.stringResource(
+                            if (drivingLocked) com.iptv.app.R.string.player_driving_video_paused
+                            else com.iptv.app.R.string.player_audio_only
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.7f),
                         modifier = Modifier.padding(top = 8.dp)
@@ -1349,6 +1421,28 @@ fun PlayerScreen(
                     )
                     LoadingStopwatch(loadingElapsedSec)
                 }
+            }
+        }
+        // Anti-mudo (#18): nenhuma faixa de áudio tocável neste aparelho.
+        if (audioUnsupported && !audioWarningDismissed && !isInitialBuffering && !inPip &&
+            playbackError == null
+        ) {
+            UnsupportedAudioBanner(
+                codec = ImmersiveAudio.firstAudioCodecLabel(tracks),
+                onOpenExternal = {
+                    audioWarningDismissed = true
+                    val url = state.items.getOrNull(exo.currentMediaItemIndex)?.url
+                    if (url != null) launchExternalPlayer(context, url, state.title, settings.externalPlayerPackage)
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .safeDrawingPadding()
+                    .padding(com.iptv.app.ui.common.LocalOverscanPadding.current)
+                    .padding(16.dp)
+            )
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(12_000)
+                audioWarningDismissed = true
             }
         }
         playbackError?.let { msg ->
@@ -1405,6 +1499,19 @@ fun PlayerScreen(
                     }
                 }
             }
+        }
+        // Intervalo comercial por cima de tudo (#29).
+        adBreak?.let { ad ->
+            com.iptv.app.ads.AdBreak(
+                ad = ad,
+                ads = vm.ads,
+                onFinished = {
+                    adBreak = null
+                    adGate[0]?.complete(Unit)
+                    adGate[0] = null
+                    runCatching { focusRequester.requestFocus() }
+                }
+            )
         }
     }
 }

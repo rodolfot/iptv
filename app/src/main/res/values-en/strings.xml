@@ -240,7 +240,7 @@
     <!-- About / Legal -->
     <string name="about_title">About TartaTV</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_intro">TartaTV is a player app that streams IPTV lists in the Xtream Codes standard provided by you. It works as a reader: it connects to the server whose credentials you enter and plays whatever the server returns.\n\nIt does not distribute, host, index or sell any content — there is no built-in catalog and no preloaded list. Playback depends entirely on the list you supply.\n\nFeatures: live channels with electronic program guide (EPG), movies and series with synopsis and cover art, continue watching, favorites, watch-later list, parental PIN control and multiple profiles. Everything is stored locally on your device — no server of our own, no analytics, no ads.</string>
+    <string name="about_intro">TartaTV is a player app that streams IPTV lists in the Xtream Codes standard provided by you. It works as a reader: it connects to the server whose credentials you enter and plays whatever the server returns.\n\nIt does not distribute, host, index or sell any content — there is no built-in catalog and no preloaded list. Playback depends entirely on the list you supply.\n\nFeatures: live channels with electronic program guide (EPG), movies and series with synopsis and cover art, continue watching, favorites, watch-later list, parental PIN control and multiple profiles. Everything is stored locally on your device, with no analytics. The free version may show ads; the Premium version is ad-free.</string>
     <string name="about_terms">Terms of Use</string>
     <string name="about_privacy">Privacy Policy</string>
     <string name="about_open_source">Open source libraries</string>
@@ -261,7 +261,7 @@
     <string name="onboarding_device_tablet">Tablet</string>
     <string name="onboarding_device_phone">Phone</string>
     <string name="onboarding_title">Welcome to TartaTV</string>
-    <string name="onboarding_message">TartaTV is a player for IPTV lists in the Xtream Codes standard — it only plays the content returned by the server whose credentials you provide. There is no built-in catalog and no content of our own.\n\nYour credentials and preferences stay on your device, in encrypted storage. We do not send data to us or to third parties, and we do not use ads or tracking.\n\nBefore continuing, please read the documents below. To use the app you need to agree to the Terms of Use and the Privacy Policy.</string>
+    <string name="onboarding_message">TartaTV is a player for IPTV lists in the Xtream Codes standard — it only plays the content returned by the server whose credentials you provide. There is no built-in catalog and no content of our own.\n\nYour credentials and preferences stay only on your device, in encrypted storage — they are never sent to us. We do not collect analytics or track what you watch. The free version may show ads; the ad-free Premium version only sends the key and the device ID to the license server.\n\nBefore continuing, please read the documents below. To use the app you need to agree to the Terms of Use and the Privacy Policy.</string>
     <string name="onboarding_read_terms">Read Terms of Use</string>
     <string name="onboarding_read_privacy">Read Privacy Policy</string>
     <string name="onboarding_accept">I agree and want to continue</string>
@@ -405,4 +405,37 @@
     <string name="locale_restart_title">Restart to apply language</string>
     <string name="locale_restart_message">Language change only takes effect after a restart. Restart now?</string>
     <string name="locale_restart_confirm">Restart</string>
+    <string name="onboarding_device_car">Car head unit</string>
+    <string name="settings_adult_in_recents">Show adult content in Recently watched</string>
+    <string name="settings_adult_in_recents_hint">Channels, movies and series from adult categories in \"Recent channels\" and \"Continue watching\". Turning on asks for the PIN.</string>
+    <string name="settings_overscan">TV safe area (overscan)</string>
+    <string name="settings_overscan_hint">Increase if the screen edges look cut off on your TV; decrease if there is a black border.</string>
+    <string name="settings_overscan_none">No margin</string>
+    <string name="settings_overscan_percent">%1$d%% of the screen</string>
+    <string name="settings_audio_passthrough">Audio passthrough (Dolby / DTS)</string>
+    <string name="settings_audio_passthrough_hint">Sends Dolby Atmos, Dolby Digital and DTS straight to the receiver/soundbar when supported. When off, audio is always decoded to PCM on the device.</string>
+    <string name="settings_driving_audio_only">Audio only while the vehicle is moving</string>
+    <string name="settings_driving_audio_only_hint">Uses GPS speed: above 10 km/h the video turns off and the channel keeps playing audio. Requires location access.</string>
+    <string name="ad_label">Ad</string>
+    <string name="ad_playing_countdown">Ad · %1$d s</string>
+    <string name="ad_skip">Skip ad</string>
+    <string name="ad_skip_in">Skip in %1$d s</string>
+    <string name="player_gesture_seek_back">−10 s</string>
+    <string name="player_gesture_seek_forward">+10 s</string>
+    <string name="player_audio_passthrough_badge">Passthrough</string>
+    <string name="player_audio_unsupported">This content\'s audio (%1$s) is not supported on this device. Turn on passthrough with a compatible receiver or open it in an external player.</string>
+    <string name="player_open_external_short">External player</string>
+    <string name="player_driving_video_paused">Video is off while the vehicle is moving — audio keeps playing.</string>
+    <string name="premium_title">Premium (ad-free)</string>
+    <string name="premium_device_id">Device ID (MAC): %1$s</string>
+    <string name="premium_status_free">Free version (may show ads). Give the ID above when buying the activation key.</string>
+    <string name="premium_status_active">Premium active · key %1$s</string>
+    <string name="premium_expires">Valid until %1$s</string>
+    <string name="premium_key_label">Activation key (16 characters)</string>
+    <string name="premium_activate">Activate</string>
+    <string name="premium_activated">Premium activated — ads turned off.</string>
+    <string name="premium_error_invalid_key">Invalid activation key.</string>
+    <string name="premium_error_bound">License already linked to another device.</string>
+    <string name="premium_error_not_configured">Premium activation is not available in this app build.</string>
+    <string name="premium_error_failed">Could not activate right now. Check your connection and try again.</string>
 </resources>

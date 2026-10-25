@@ -264,16 +264,28 @@ fun HomeScreen(
                 onBack = headerBack
             )
             when {
-                openMovie != null -> MovieDetailScreen(
-                    args = openMovie!!,
-                    // Não limpa o detalhe ao mandar pro player: assim, voltar
-                    // do player retorna pro detalhe (mesmo onde o usuário
-                    // clicou Assistir). Segundo Voltar fecha o detalhe e cai
-                    // na lista/origem. Antes limpávamos, e ao voltar caía
-                    // direto na origem — inconsistente com a UX de TV.
-                    onPlay = onPlay,
-                    onBack = { openMovie = null }
-                )
+                openMovie != null -> Column(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f)) {
+                        MovieDetailScreen(
+                            args = openMovie!!,
+                            // Não limpa o detalhe ao mandar pro player: assim, voltar
+                            // do player retorna pro detalhe (mesmo onde o usuário
+                            // clicou Assistir). Segundo Voltar fecha o detalhe e cai
+                            // na lista/origem. Antes limpávamos, e ao voltar caía
+                            // direto na origem — inconsistente com a UX de TV.
+                            onPlay = onPlay,
+                            onBack = { openMovie = null }
+                        )
+                    }
+                    // Banner da versão gratuita (#29) — some no Premium.
+                    com.iptv.app.ads.AdBanner(
+                        placement = com.iptv.app.ads.AdPlacement.DETAIL,
+                        modifier = Modifier.padding(
+                            horizontal = com.iptv.app.ui.common.rememberTvDim().ScreenPadding,
+                            vertical = 6.dp
+                        )
+                    )
+                }
                 openChannel != null -> ChannelDetailScreen(
                     channel = openChannel!!,
                     onBack = { openChannel = null },
@@ -295,16 +307,28 @@ fun HomeScreen(
                     )
                 }
                 else -> when (selectedKey) {
-                    "home" -> ContinueWatchingScreen(
-                        onPlay = onPlay,
-                        // Cards recomendados de filmes abrem a tela de
-                        // detalhe (sinopse + botão Assistir). Continue
-                        // Watching de série abre o detalhe com a temporada
-                        // do último episódio aberta — em vez de tocar direto
-                        // o usuário escolhe por onde continuar.
-                        onOpenMovie = handlePlay,
-                        onOpenSeries = { args -> openSeries = args }
-                    )
+                    "home" -> Column(Modifier.fillMaxSize()) {
+                        Box(Modifier.weight(1f)) {
+                            ContinueWatchingScreen(
+                                onPlay = onPlay,
+                                // Cards recomendados de filmes abrem a tela de
+                                // detalhe (sinopse + botão Assistir). Continue
+                                // Watching de série abre o detalhe com a temporada
+                                // do último episódio aberta — em vez de tocar direto
+                                // o usuário escolhe por onde continuar.
+                                onOpenMovie = handlePlay,
+                                onOpenSeries = { args -> openSeries = args }
+                            )
+                        }
+                        // Banner da versão gratuita (#29) — some no Premium.
+                        com.iptv.app.ads.AdBanner(
+                            placement = com.iptv.app.ads.AdPlacement.HOME,
+                            modifier = Modifier.padding(
+                                horizontal = com.iptv.app.ui.common.rememberTvDim().ScreenPadding,
+                                vertical = 6.dp
+                            )
+                        )
+                    }
                     "search" -> SearchScreen(
                         onPlay = handlePlay,
                         onOpenSeries = { id, title, cover ->
@@ -470,8 +494,10 @@ private fun TopBar(
                 )
             }
         }
+        // Marca da identidade 4.0 ao lado do nome (#30).
+        com.iptv.app.ui.common.TartaLogoMark(size = 22.dp)
         Text(
-            stringResource(com.iptv.app.R.string.app_name),
+            com.iptv.app.ui.common.Brand.WORDMARK,
             style = MaterialTheme.typography.titleMedium
         )
         // Dois indicadores distintos:

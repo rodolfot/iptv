@@ -21,3 +21,7 @@ mock/
 
 # Dumps locais do servidor Xtream (gerados pelo scripts/dump-xtream.sh)
 xtream-dump/
+
+# Dumps de crash da JVM (daemon do Gradle)
+hs_err_pid*.log
+replay_pid*.log

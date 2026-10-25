@@ -79,9 +79,16 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           UPDATE_REPO_OWNER: ${{ github.repository_owner }}
           UPDATE_REPO_NAME: ${{ github.event.repository.name }}
+          # Monetização (#29) — opcionais; vazios = sem anúncios / sem ativação Premium.
+          LICENSE_API_URL: ${{ secrets.LICENSE_API_URL }}
+          LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
+          ADS_CONFIG_URL: ${{ secrets.ADS_CONFIG_URL }}
         run: |
           ARGS="-PVERSION_NAME=${{ steps.ver.outputs.name }} -PVERSION_CODE=${{ steps.ver.outputs.code }}"
           ARGS="$ARGS -PUPDATE_REPO_OWNER=$UPDATE_REPO_OWNER -PUPDATE_REPO_NAME=$UPDATE_REPO_NAME"
+          [ -n "$LICENSE_API_URL" ] && ARGS="$ARGS -PLICENSE_API_URL=$LICENSE_API_URL"
+          [ -n "$LICENSE_PUBLIC_KEY" ] && ARGS="$ARGS -PLICENSE_PUBLIC_KEY=$LICENSE_PUBLIC_KEY"
+          [ -n "$ADS_CONFIG_URL" ] && ARGS="$ARGS -PADS_CONFIG_URL=$ADS_CONFIG_URL"
           if [ -n "$RELEASE_KEYSTORE_FILE" ]; then
             ARGS="$ARGS -PRELEASE_KEYSTORE_FILE=$RELEASE_KEYSTORE_FILE"
             ARGS="$ARGS -PRELEASE_KEYSTORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD"

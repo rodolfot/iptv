@@ -1,14 +1,15 @@
 POLÍTICA DE PRIVACIDADE — TartaTV
 
-Última atualização: 5 de maio de 2026.
+Última atualização: 25 de outubro de 2026.
 
 Esta Política descreve como o aplicativo TartaTV ("o Aplicativo") trata dados ao ser usado por você. Leia com atenção.
 
 1. RESUMO RÁPIDO
-- O TartaTV não tem servidor próprio. Não enviamos seus dados para nós nem para terceiros.
-- O Aplicativo armazena suas credenciais (URL, usuário e senha do Xtream) e seu PIN parental localmente, no próprio dispositivo, em armazenamento criptografado.
-- Suas requisições vão diretamente do seu dispositivo para o servidor de IPTV cuja URL você cadastrou. Nós não vemos esse tráfego.
-- O Aplicativo não usa anúncios, não rastreia você, não coleta analytics e não vende dados.
+- O Aplicativo armazena suas credenciais (URL, usuário e senha do Xtream) e seu PIN parental localmente, no próprio dispositivo, em armazenamento criptografado. Elas nunca são enviadas para nós.
+- Suas requisições de conteúdo vão diretamente do seu dispositivo para o servidor de IPTV cuja URL você cadastrou. Nós não vemos esse tráfego.
+- A versão gratuita pode exibir anúncios, carregados de servidores de anúncios (ver seção 4-A). A versão Premium não exibe anúncios.
+- Para ativar a versão Premium, o Aplicativo envia a chave de ativação e o identificador do dispositivo ao servidor de licenças (ver seção 4-B).
+- O Aplicativo não coleta analytics, não vende dados e não envia seu histórico, favoritos ou credenciais a ninguém.
 
 2. DADOS QUE O APLICATIVO ARMAZENA NO SEU DISPOSITIVO
 2.1 Credenciais Xtream: URL do servidor, nome de usuário e senha. Armazenadas em EncryptedSharedPreferences (criptografia AES-256), em uma área privada do Aplicativo.
@@ -19,13 +20,26 @@ Esta Política descreve como o aplicativo TartaTV ("o Aplicativo") trata dados a
 
 3. DADOS QUE O APLICATIVO NÃO COLETA
 - O Aplicativo não envia dados de uso, telemetria ou analytics para o desenvolvedor.
-- O Aplicativo não solicita acesso a contatos, agenda, localização, microfone, câmera, contas, SMS ou outras informações pessoais.
+- O Aplicativo não solicita acesso a contatos, agenda, microfone, câmera, contas, SMS ou outras informações pessoais.
+- A localização só é pedida em centrais multimídia, quando você liga a opção "Só áudio com o veículo em movimento". Ela é usada apenas no aparelho, para saber a velocidade do veículo, e nunca é enviada ou armazenada.
 - O Aplicativo não cria conta, não pede e-mail e não exige cadastro.
 
 4. COMUNICAÇÃO DE REDE
 4.1 Para reproduzir conteúdo, o Aplicativo precisa fazer requisições HTTP ao servidor cuja URL você forneceu. Essas requisições saem do seu dispositivo diretamente para esse servidor.
 4.2 As credenciais que você inseriu são enviadas a esse servidor para autenticação, conforme exige o protocolo Xtream Codes. Nós não temos visibilidade dessas requisições.
 4.3 O servidor IPTV escolhido por você possui sua própria política de privacidade, sob a qual coleta logs, IPs, e outros dados conforme entender. Avalie essa política antes de cadastrar uma lista.
+
+4-A. ANÚNCIOS (VERSÃO GRATUITA)
+4-A.1 Na versão gratuita, o Aplicativo consulta um arquivo de configuração de anúncios e, a partir dele, servidores de anúncios no padrão VAST, para exibir banners e vídeos curtos.
+4-A.2 Esses servidores recebem os dados técnicos de qualquer requisição de internet (endereço IP, modelo do aparelho no cabeçalho de navegação) e registram a exibição do anúncio, sob as políticas de privacidade dos respectivos anunciantes. O Aplicativo não envia a eles suas credenciais, seu histórico nem o conteúdo que você assiste.
+4-A.3 Com a licença Premium ativa, nenhuma dessas requisições é feita.
+
+4-B. LICENÇA PREMIUM
+4-B.1 Ao ativar uma chave, o Aplicativo envia ao servidor de licenças a chave digitada e o identificador do dispositivo (endereço MAC da rede ou um identificador derivado do aparelho). Esses dados são usados apenas para vincular a chave a um único dispositivo e emitir a licença.
+4-B.2 A licença emitida fica guardada no aparelho em armazenamento criptografado e é verificada sem acesso à internet.
+
+4-C. ATUALIZAÇÕES
+4-C.1 O Aplicativo consulta periodicamente a página de versões do repositório oficial no GitHub para saber se há atualização. A requisição não contém dados pessoais.
 
 5. BACKUP E TRANSFERÊNCIA
 5.1 O Aplicativo desabilita o backup automático em nuvem do Android. Suas credenciais não são copiadas para Google Drive nem para o sistema de transferência entre dispositivos.
@@ -35,6 +49,8 @@ Esta Política descreve como o aplicativo TartaTV ("o Aplicativo") trata dados a
 - INTERNET: para se conectar ao servidor IPTV.
 - ACCESS_NETWORK_STATE: para detectar se o dispositivo está online antes de tentar carregar conteúdo.
 - WAKE_LOCK e FOREGROUND_SERVICE: para manter a reprodução estável.
+- POST_NOTIFICATIONS e REQUEST_INSTALL_PACKAGES: avisos de catálogo/atualização e instalação da nova versão do Aplicativo, sempre com confirmação sua.
+- ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION: somente em centrais multimídia, quando você liga a regra de segurança "Só áudio com o veículo em movimento" (ver seção 3).
 - Não solicitamos nenhuma outra permissão sensível.
 
 7. CRIANÇAS
@@ -46,7 +62,7 @@ O Aplicativo não é direcionado a crianças. Caso ele seja usado por menores de
 8.3 Você pode limpar manualmente o cache do catálogo a qualquer momento em Configurações.
 
 9. SEUS DIREITOS (LGPD)
-Como o Aplicativo não envia dados para nós, não há base de dados nossa contendo informações suas. Os direitos da LGPD (acesso, retificação, exclusão, portabilidade) sobre dados que ficam no seu próprio dispositivo são exercidos por você diretamente: limpar cache, fazer logout, ou desinstalar o Aplicativo.
+Além do vínculo chave ↔ identificador do dispositivo mantido pelo servidor de licenças (quando você ativa a versão Premium), não há base de dados nossa contendo informações suas. Os direitos da LGPD (acesso, retificação, exclusão, portabilidade) sobre dados que ficam no seu próprio dispositivo são exercidos por você diretamente: limpar cache, fazer logout, ou desinstalar o Aplicativo.
 
 10. MUDANÇAS NESTA POLÍTICA
 A política vigente será sempre a versão exibida dentro do Aplicativo. Mudanças significativas serão sinalizadas com nova solicitação de aceite ao abrir o Aplicativo.

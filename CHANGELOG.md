@@ -6,6 +6,33 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.0] — 2026-10-25
+
+### Added
+
+- **Nova identidade visual** (#30): marca "T" em gradiente turquesa → violeta dentro de um anel luminoso animado, com "Tarta TV" — na splash, no carregamento do catálogo, na conexão do player e no menu superior. Novo ícone (com versão adaptativa para Android 8+), banner da Android TV e splash do sistema, gerados por `branding/generate-assets.py`.
+- **Premium por chave de ativação vinculada ao aparelho** (#29): Configurações → Premium mostra o ID do aparelho no formato MAC e aceita a chave de 16 caracteres. Uma chave vale para um único aparelho ("Licença já vinculada a outro dispositivo" nos demais); a licença é um token assinado (ECDSA) validado offline a cada abertura, guardado em armazenamento criptografado — editar os arquivos do app invalida a licença. Servidor de referência em `server/license-worker` (Cloudflare Worker + D1).
+- **Versão gratuita com anúncios** (#29): banners discretos e não focáveis na Início e no detalhe do filme, vídeo antes (pre-roll) e depois (post-roll) do conteúdo por tags VAST de qualquer ad server, com tempo limite (o conteúdo abre mesmo se o anúncio falhar), intervalo mínimo entre anúncios e botão "Pular". Ativar o Premium desliga tudo na hora. Desligado enquanto o build não tiver servidor configurado.
+- **Dolby Atmos / DTS** (#18): passthrough em bitstream para receiver/soundbar (E-AC-3 JOC, TrueHD, AC-3, E-AC-3, DTS, DTS-HD, DTS:X) com opção de forçar PCM; selo "Dolby Atmos · 7.1 · Passthrough" ao lado do título; codec no seletor de áudio; e, quando nenhuma faixa de áudio toca no aparelho, aviso com atalho para o player externo em vez de vídeo mudo.
+- **Central multimídia** (#23): tipo de aparelho "Central multimídia (carro)"; ducking com instruções do GPS e pausa em chamadas (foco de áudio); botões ⏭/⏮ do volante trocam de canal (MediaSession); knob rotativo navega como D-pad; opção "Só áudio com o veículo em movimento" (velocidade do GPS).
+- **Celular e tablet** (#22): gestos no player (brilho à esquerda, volume à direita, toque duplo ±10 s, toque alterna controles), paisagem automática no celular e Picture-in-Picture automático no Android 12+.
+- **Arquitetura multi-dispositivo** (#20): detecção de classe de aparelho (TV, celular, tablet, carro) e mapeamento unificado de entrada (D-pad, teclas de mídia, CH+/CH−, knob). Ver `docs/MULTI_DISPOSITIVO.md`.
+- **Gaveta lateral retrátil na TV** (#21): em Ao Vivo, Filmes, Séries e Favoritos a gaveta de categorias abre quando recebe o foco e recolhe num trilho com o nome da categoria quando o foco vai para a grade.
+- **Conteúdo adulto em Assistidos recentemente** (#26): nova opção no Controle parental (desligada por padrão; ligar pede o PIN). O filtro é aplicado na consulta, então alternar mostra/esconde na hora. A tela inicial da Android TV nunca mostra adulto.
+- **Auditoria de features e backlog** (#19): `docs/AUDITORIA_4.0.md`.
+
+### Fixed
+
+- **Layout cortado em TVs de 32"–100"** (#17): margem de segurança contra overscan (padrão 5%, ajustável em Configurações → Tela) e densidade normalizada — a interface ocupa a mesma proporção da tela em qualquer TV/TV box, seja qual for a resolução ou o DPI que o aparelho informa.
+- **Atualização automática não aparecia** (#28): a checagem e o download rodavam na thread principal e falhavam em silêncio; a comparação usava o número de commits contra um código derivado da tag. Agora compara as versões (SemVer), o diálogo aparece ao abrir o app com o botão focado, "Verificar atualização agora" abre o mesmo diálogo (antes só notificava — e notificação não aparece na Android TV), o download é atômico e há fallback de instalador para TV boxes.
+- **Travamento ao segurar ↑/↓ nas listas** (#25): teclas de seta que chegam rápido demais são descartadas (~11 movimentos/s), as listas deixaram de fazer buscas O(n) por item durante a rolagem e o carregamento de logos ganhou limite de paralelismo e cache.
+- **Foco perdido ao voltar das categorias para os canais** (#27): o foco volta ao último canal focado; após trocar de categoria, vai para o primeiro canal visível. Da grade, ← na primeira coluna leva à categoria selecionada.
+- **Favoritos** (#24): miniplayer de prévia como no Ao Vivo (OK abre a prévia, OK de novo a tela cheia) e zapping restrito aos favoritos quando o canal foi aberto por lá.
+
+### Changed
+
+- **Termos de Uso e Política de Privacidade** atualizados (anúncios na versão gratuita, licença Premium, localização no modo carro, checagem de atualização) — o app pede novo aceite.
+
 ## [3.1.0] — 2026-09-23
 
 ### Fixed

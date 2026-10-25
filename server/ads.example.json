@@ -1,0 +1,10 @@
+{
+  "preroll": { "enabled": true, "vastUrl": "https://ads.example.com/vast?slot=preroll" },
+  "postroll": { "enabled": true, "vastUrl": "https://ads.example.com/vast?slot=postroll" },
+  "minIntervalMinutes": 15,
+  "timeoutMs": 4000,
+  "banners": [
+    { "placement": "home", "imageUrl": "https://ads.example.com/banner-home.png", "text": "Anuncie aqui", "clickUrl": "https://example.com" },
+    { "placement": "detail", "imageUrl": "https://ads.example.com/banner-detail.png" }
+  ]
+}

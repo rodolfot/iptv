@@ -71,8 +71,25 @@ data class AppSettings(
     val epgOffsetMinutes: Int = 0,
     /** Layout de navegação do Ao Vivo em TV/Tablet (grade, lista com categorias
      *  ou lista com preview em destaque). */
-    val liveViewMode: LiveViewMode = LiveViewMode.GRID
+    val liveViewMode: LiveViewMode = LiveViewMode.GRID,
+
+    // --- v4 ---
+    /** Margem de segurança contra overscan na TV, em % da tela (0–10). */
+    val overscanPercent: Int = DEFAULT_OVERSCAN_PERCENT,
+    /** Mostra canais/filmes/séries de categorias adultas em "Assistidos
+     *  recentemente" e "Continuar assistindo". Desligado por padrão; ligar
+     *  exige o PIN parental. */
+    val showAdultInRecents: Boolean = false,
+    /** Saída de áudio: true = repassa Dolby/DTS em bitstream para o receiver
+     *  quando a saída (HDMI/óptica) suporta; false = sempre decodifica em PCM
+     *  no aparelho (útil quando o receiver anuncia um formato que não toca). */
+    val audioPassthrough: Boolean = true,
+    /** Central multimídia: com o veículo em movimento o player passa a tocar
+     *  só o áudio (vídeo desligado). Opt-in — depende da localização. */
+    val drivingAudioOnly: Boolean = false
 )
+
+const val DEFAULT_OVERSCAN_PERCENT = 5
 
 enum class StreamFormat { TS, HLS }
 
@@ -80,7 +97,9 @@ enum class DecoderMode { AUTO, HARDWARE, SOFTWARE }
 
 enum class SubtitleStyle { DEFAULT, WHITE_ON_BLACK, YELLOW, OUTLINE }
 
-enum class DeviceProfile { TV, TABLET, PHONE }
+/** Tipo de aparelho escolhido no onboarding. CAR = central multimídia
+ *  (touch + botões do volante, regras de direção). */
+enum class DeviceProfile { TV, TABLET, PHONE, CAR }
 
 /**
  * Layout de navegação do Ao Vivo em TV/Tablet:
@@ -123,7 +142,10 @@ class SettingsStore @Inject constructor(
         val LEGACY_LOGGED = booleanPreferencesKey("logged")
 
         val MIGRATED = booleanPreferencesKey("secure_migrated_v1")
-        val TERMS_ACCEPTED = booleanPreferencesKey("terms_accepted_v1")
+        // v2 (4.0.0): Termos/Política mudaram (anúncios na versão gratuita,
+        // licença Premium por dispositivo, localização no modo carro) — a
+        // própria Política promete pedir novo aceite em mudanças desse porte.
+        val TERMS_ACCEPTED = booleanPreferencesKey("terms_accepted_v2")
         val LIVE_SORT = stringPreferencesKey("live_sort")
         val MOVIES_SORT = stringPreferencesKey("movies_sort")
         val SERIES_SORT = stringPreferencesKey("series_sort")
@@ -146,6 +168,10 @@ class SettingsStore @Inject constructor(
         val EPG_URL_OVERRIDE = stringPreferencesKey("epg_url_override")
         val EPG_OFFSET_MIN = stringPreferencesKey("epg_offset_min")
         val LIVE_VIEW_MODE = stringPreferencesKey("live_view_mode")
+        val OVERSCAN_PERCENT = stringPreferencesKey("overscan_percent")
+        val SHOW_ADULT_IN_RECENTS = booleanPreferencesKey("show_adult_in_recents")
+        val AUDIO_PASSTHROUGH = booleanPreferencesKey("audio_passthrough")
+        val DRIVING_AUDIO_ONLY = booleanPreferencesKey("driving_audio_only")
     }
 
     // Reactive trigger so changes in SecureStore (synchronous) propagate to flow consumers.
@@ -188,7 +214,12 @@ class SettingsStore @Inject constructor(
             externalPlayerPackage = p[Keys.EXTERNAL_PLAYER]?.takeIf { it.isNotBlank() },
             epgUrlOverride = p[Keys.EPG_URL_OVERRIDE]?.takeIf { it.isNotBlank() },
             epgOffsetMinutes = p[Keys.EPG_OFFSET_MIN]?.toIntOrNull() ?: 0,
-            liveViewMode = enumOrDefault(p[Keys.LIVE_VIEW_MODE], LiveViewMode.GRID)
+            liveViewMode = enumOrDefault(p[Keys.LIVE_VIEW_MODE], LiveViewMode.GRID),
+            overscanPercent = p[Keys.OVERSCAN_PERCENT]?.toIntOrNull()?.coerceIn(0, 10)
+                ?: DEFAULT_OVERSCAN_PERCENT,
+            showAdultInRecents = p[Keys.SHOW_ADULT_IN_RECENTS] == true,
+            audioPassthrough = p[Keys.AUDIO_PASSTHROUGH] != false,
+            drivingAudioOnly = p[Keys.DRIVING_AUDIO_ONLY] == true
         )
     }
 
@@ -260,6 +291,22 @@ class SettingsStore @Inject constructor(
 
     suspend fun setLiveViewMode(mode: LiveViewMode) {
         context.dataStore.edit { it[Keys.LIVE_VIEW_MODE] = mode.name }
+    }
+
+    suspend fun setOverscanPercent(percent: Int) {
+        context.dataStore.edit { it[Keys.OVERSCAN_PERCENT] = percent.coerceIn(0, 10).toString() }
+    }
+
+    suspend fun setShowAdultInRecents(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.SHOW_ADULT_IN_RECENTS] = enabled }
+    }
+
+    suspend fun setAudioPassthrough(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUDIO_PASSTHROUGH] = enabled }
+    }
+
+    suspend fun setDrivingAudioOnly(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.DRIVING_AUDIO_ONLY] = enabled }
     }
 
     suspend fun setDeviceProfile(profile: DeviceProfile?) {

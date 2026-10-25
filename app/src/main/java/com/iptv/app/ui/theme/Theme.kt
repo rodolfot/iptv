@@ -17,7 +17,7 @@ import androidx.tv.material3.Shapes
 import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 
-private val Background = Color(0xFF0B0F14)
+private val Background = Color(0xFF0B121C) // azul-marinho da identidade 4.0 (#30)
 private val Surface = Color(0xFF141A22)
 private val SurfaceVariant = Color(0xFF1C2430)
 private val Primary = Color(0xFF00B7FF)

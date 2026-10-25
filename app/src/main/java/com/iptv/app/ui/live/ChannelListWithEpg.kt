@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,6 +48,8 @@ import coil.compose.AsyncImage
 import com.iptv.app.R
 import com.iptv.app.data.db.EpgProgrammeEntity
 import com.iptv.app.domain.model.LiveChannel
+import com.iptv.app.ui.common.focusMemoryItem
+import com.iptv.app.ui.common.restoreFocusFrom
 import com.iptv.app.ui.home.HomeViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -72,6 +75,11 @@ fun ChannelListWithEpg(
     isParentalUnlocked: Boolean,
     onPlay: (LiveChannel) -> Unit,
     header: @Composable () -> Unit = {},
+    /** Destino do foco ao sair da lista pela esquerda (gaveta de categorias). */
+    onExitLeft: (() -> FocusRequester)? = null,
+    /** Memória de foco da lista (#27) — passada de fora quando a gaveta
+     *  precisa devolver o foco para cá. */
+    focusMemory: com.iptv.app.ui.common.FocusMemory = com.iptv.app.ui.common.rememberFocusMemory(),
     modifier: Modifier = Modifier
 ) {
     // Reset sempre que a lista muda de identidade (troca de categoria) — não
@@ -80,6 +88,13 @@ fun ChannelListWithEpg(
     val listState = rememberLazyListState()
     val firstFocus = remember { FocusRequester() }
     val favorites by vm.favorites.collectAsState()
+    // Ids favoritos num Set — antes cada linha fazia favorites.any { } (O(n·f)
+    // por rolagem).
+    val favoriteIds = remember(favorites) {
+        favorites.filter { it.type == com.iptv.app.domain.model.ContentType.LIVE }
+            .map { it.itemId }
+            .toSet()
+    }
     val snackbar = com.iptv.app.ui.common.LocalSnackbar.current
     val favoriteAddedMsg = stringResource(R.string.snack_favorite_added)
     val favoriteRemovedMsg = stringResource(R.string.snack_favorite_removed)
@@ -107,15 +122,23 @@ fun ChannelListWithEpg(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(end = 8.dp, bottom = 12.dp),
-                modifier = Modifier.width(340.dp).fillMaxHeight()
+                modifier = Modifier
+                    .width(340.dp)
+                    .fillMaxHeight()
+                    // Volta da gaveta cai no último canal focado (#27), ou no
+                    // primeiro visível no topo da lista.
+                    .restoreFocusFrom(
+                        memory = focusMemory,
+                        fallbackKey = {
+                            listState.layoutInfo.visibleItemsInfo.firstOrNull { it.offset >= 0 }?.key
+                        },
+                        onExitLeft = onExitLeft
+                    )
             ) {
-                items(items = channels, key = { it.id }) { channel ->
-                    val index = channels.indexOf(channel)
+                itemsIndexed(items = channels, key = { _, ch -> ch.id }) { index, channel ->
                     val locked = isCategoryAdult && !isParentalUnlocked
                     val now = channel.epgChannelId?.let { epgNow[it] }
-                    val isFavorite = favorites.any {
-                        it.type == com.iptv.app.domain.model.ContentType.LIVE && it.itemId == channel.id
-                    }
+                    val isFavorite = channel.id in favoriteIds
                     val isPreviewing = previewChannel?.id == channel.id
                     ChannelRow(
                         channel = channel,
@@ -129,6 +152,7 @@ fun ChannelListWithEpg(
                         isFavorite = isFavorite,
                         isPreviewing = isPreviewing,
                         modifier = Modifier
+                            .focusMemoryItem(focusMemory, channel.id)
                             .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
                         onClick = {
                             when {

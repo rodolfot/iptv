@@ -240,7 +240,7 @@
     <!-- About / Legal -->
     <string name="about_title">Acerca de TartaTV</string>
     <string name="about_version">Versión %1$s</string>
-    <string name="about_intro">TartaTV es una aplicación reproductor que reproduce listas IPTV en formato Xtream Codes proporcionadas por el propio usuario. Funciona como un lector: se conecta al servidor cuyas credenciales introduces y muestra el contenido devuelto.\n\nNo distribuye, aloja, indexa ni comercializa ningún contenido — no hay catálogo integrado ni listas precargadas. Toda la reproducción depende exclusivamente de la lista que introduzcas.\n\nFunciones: canales en directo con guía de programación (EPG), películas y series con sinopsis y carátula, continuar viendo, favoritos, lista para ver después, control parental con PIN y múltiples perfiles. Todo se guarda localmente en tu dispositivo — sin servidor propio, sin analítica y sin anuncios.</string>
+    <string name="about_intro">TartaTV es una aplicación reproductor que reproduce listas IPTV en formato Xtream Codes proporcionadas por el propio usuario. Funciona como un lector: se conecta al servidor cuyas credenciales introduces y muestra el contenido devuelto.\n\nNo distribuye, aloja, indexa ni comercializa ningún contenido — no hay catálogo integrado ni listas precargadas. Toda la reproducción depende exclusivamente de la lista que introduzcas.\n\nFunciones: canales en directo con guía de programación (EPG), películas y series con sinopsis y carátula, continuar viendo, favoritos, lista para ver después, control parental con PIN y múltiples perfiles. Todo se guarda localmente en tu dispositivo, sin analítica. La versión gratuita puede mostrar anuncios; la versión Premium no tiene anuncios.</string>
     <string name="about_terms">Términos de Uso</string>
     <string name="about_privacy">Política de Privacidad</string>
     <string name="about_open_source">Bibliotecas de código abierto</string>
@@ -261,7 +261,7 @@
     <string name="onboarding_device_tablet">Tablet</string>
     <string name="onboarding_device_phone">Móvil</string>
     <string name="onboarding_title">Bienvenido a TartaTV</string>
-    <string name="onboarding_message">TartaTV es un reproductor de listas IPTV en formato Xtream Codes — solo reproduce el contenido del servidor cuyas credenciales facilites. No hay catálogo integrado ni contenido propio.\n\nTus credenciales y preferencias permanecen únicamente en tu dispositivo, en almacenamiento cifrado. No enviamos datos a nosotros ni a terceros, y no usamos anuncios ni rastreo.\n\nAntes de continuar, lee los documentos a continuación. Para usar la aplicación debes aceptar los Términos de Uso y la Política de Privacidad.</string>
+    <string name="onboarding_message">TartaTV es un reproductor de listas IPTV en formato Xtream Codes — solo reproduce el contenido del servidor cuyas credenciales facilites. No hay catálogo integrado ni contenido propio.\n\nTus credenciales y preferencias permanecen únicamente en tu dispositivo, en almacenamiento cifrado; nunca se nos envían. No recopilamos analítica ni rastreamos lo que ves. La versión gratuita puede mostrar anuncios; la versión Premium, sin anuncios, solo envía la clave y el ID del dispositivo al servidor de licencias.\n\nAntes de continuar, lee los documentos a continuación. Para usar la aplicación debes aceptar los Términos de Uso y la Política de Privacidad.</string>
     <string name="onboarding_read_terms">Leer Términos de Uso</string>
     <string name="onboarding_read_privacy">Leer Política de Privacidad</string>
     <string name="onboarding_accept">Acepto y quiero continuar</string>
@@ -405,4 +405,37 @@
     <string name="locale_restart_title">Reiniciar para aplicar idioma</string>
     <string name="locale_restart_message">El cambio de idioma solo se aplica después de reiniciar. ¿Reiniciar ahora?</string>
     <string name="locale_restart_confirm">Reiniciar</string>
+    <string name="onboarding_device_car">Central multimedia (auto)</string>
+    <string name="settings_adult_in_recents">Mostrar contenido adulto en Vistos recientemente</string>
+    <string name="settings_adult_in_recents_hint">Canales, películas y series de categorías adultas en \"Canales recientes\" y \"Seguir viendo\". Activar pide el PIN.</string>
+    <string name="settings_overscan">Área segura de la TV (overscan)</string>
+    <string name="settings_overscan_hint">Auméntala si los bordes se ven cortados en tu TV; redúcela si sobra borde negro.</string>
+    <string name="settings_overscan_none">Sin margen</string>
+    <string name="settings_overscan_percent">%1$d%% de la pantalla</string>
+    <string name="settings_audio_passthrough">Passthrough de audio (Dolby / DTS)</string>
+    <string name="settings_audio_passthrough_hint">Envía Dolby Atmos, Dolby Digital y DTS directo al receptor/barra de sonido cuando lo soporta. Desactivado, el audio siempre se decodifica a PCM en el dispositivo.</string>
+    <string name="settings_driving_audio_only">Solo audio con el vehículo en movimiento</string>
+    <string name="settings_driving_audio_only_hint">Usa la velocidad del GPS: por encima de 10 km/h el video se apaga y el canal sigue con el audio. Requiere acceso a la ubicación.</string>
+    <string name="ad_label">Anuncio</string>
+    <string name="ad_playing_countdown">Anuncio · %1$d s</string>
+    <string name="ad_skip">Saltar anuncio</string>
+    <string name="ad_skip_in">Saltar en %1$d s</string>
+    <string name="player_gesture_seek_back">−10 s</string>
+    <string name="player_gesture_seek_forward">+10 s</string>
+    <string name="player_audio_passthrough_badge">Passthrough</string>
+    <string name="player_audio_unsupported">El audio de este contenido (%1$s) no es compatible con este dispositivo. Activa el passthrough con un receptor compatible o ábrelo en un reproductor externo.</string>
+    <string name="player_open_external_short">Reproductor externo</string>
+    <string name="player_driving_video_paused">Video apagado con el vehículo en movimiento: el audio continúa.</string>
+    <string name="premium_title">Premium (sin anuncios)</string>
+    <string name="premium_device_id">ID del dispositivo (MAC): %1$s</string>
+    <string name="premium_status_free">Versión gratuita (puede mostrar anuncios). Indica el ID de arriba al comprar la clave de activación.</string>
+    <string name="premium_status_active">Premium activo · clave %1$s</string>
+    <string name="premium_expires">Válido hasta %1$s</string>
+    <string name="premium_key_label">Clave de activación (16 caracteres)</string>
+    <string name="premium_activate">Activar</string>
+    <string name="premium_activated">Premium activado: anuncios desactivados.</string>
+    <string name="premium_error_invalid_key">Clave de activación no válida.</string>
+    <string name="premium_error_bound">Licencia ya vinculada a otro dispositivo.</string>
+    <string name="premium_error_not_configured">La activación Premium no está disponible en esta versión de la app.</string>
+    <string name="premium_error_failed">No se pudo activar ahora. Revisa la conexión e inténtalo de nuevo.</string>
 </resources>

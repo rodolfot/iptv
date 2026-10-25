@@ -81,13 +81,19 @@ class HomeViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val currentProfile: CurrentProfile,
     private val xtream: com.iptv.app.data.api.XtreamRepository,
-    private val movieQueue: com.iptv.app.ui.player.MovieQueue
+    private val movieQueue: com.iptv.app.ui.player.MovieQueue,
+    private val liveQueue: com.iptv.app.ui.player.LiveQueue
 ) : ViewModel() {
 
     /** Publica a fila de filmes (na ordem exata que o usuário vê) para o player
      *  habilitar o botão "Próximo". Chamado pela listagem ao tocar um filme. */
     fun setMovieQueue(items: List<com.iptv.app.ui.player.PlayerArgs>) {
         movieQueue.items = items
+    }
+
+    /** Zapping restrito a esta lista no próximo canal aberto (ex.: Favoritos). */
+    fun setLiveQueue(items: List<com.iptv.app.ui.player.LiveNav>) {
+        liveQueue.publish(items)
     }
 
     /** URL HLS para preview do canal ao vivo no painel lateral. */

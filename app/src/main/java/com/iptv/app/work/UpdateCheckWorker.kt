@@ -6,11 +6,8 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.iptv.app.R
@@ -21,8 +18,6 @@ import com.iptv.app.update.UpdateChecker
 import com.iptv.app.update.UpdateInstaller
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import java.util.concurrent.TimeUnit
 
 /**
@@ -46,10 +41,10 @@ class UpdateCheckWorker @AssistedInject constructor(
         val update = checker.check()
             ?: return Result.success(Data.Builder().putBoolean(OUTPUT_FOUND, false).build())
 
-        // "Verificar agora" ignora essa checagem pra sempre dar feedback ao usuário;
-        // o ciclo periódico em segundo plano não repete a notificação pra mesma versão.
-        val force = inputData.getBoolean(KEY_FORCE, false)
-        if (!force && settings.lastNotifiedUpdateVersion() == update.versionName) {
+        // O ciclo periódico não repete a notificação pra mesma versão. (O
+        // "Verificar agora" das Configurações não passa mais por aqui — abre o
+        // diálogo de instalação dentro do app.)
+        if (settings.lastNotifiedUpdateVersion() == update.versionName) {
             return Result.success(
                 Data.Builder().putBoolean(OUTPUT_FOUND, true).putString(OUTPUT_VERSION, update.versionName).build()
             )
@@ -75,9 +70,7 @@ class UpdateCheckWorker @AssistedInject constructor(
 
     companion object {
         private const val UNIQUE_NAME = "update_check"
-        private const val ONESHOT_NAME = "update_check_oneshot"
         private const val NOTIF_ID = 3001
-        private const val KEY_FORCE = "force"
 
         const val OUTPUT_FOUND = "found"
         const val OUTPUT_VERSION = "version"
@@ -98,27 +91,5 @@ class UpdateCheckWorker @AssistedInject constructor(
                 request
             )
         }
-
-        /** Dispara uma checagem imediata (botão "Verificar atualização agora" nas Configurações). */
-        fun checkNow(context: Context) {
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-            val request = OneTimeWorkRequestBuilder<UpdateCheckWorker>()
-                .setConstraints(constraints)
-                .setInputData(Data.Builder().putBoolean(KEY_FORCE, true).build())
-                .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                ONESHOT_NAME,
-                ExistingWorkPolicy.REPLACE,
-                request
-            )
-        }
-
-        /** Observa o resultado do "Verificar agora" pra dar feedback (snackbar) na UI. */
-        fun observeOneShot(context: Context): Flow<WorkInfo?> =
-            WorkManager.getInstance(context)
-                .getWorkInfosForUniqueWorkFlow(ONESHOT_NAME)
-                .map { it.firstOrNull() }
     }
 }

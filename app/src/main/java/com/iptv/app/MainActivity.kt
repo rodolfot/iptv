@@ -66,6 +66,9 @@ class MainActivity : ComponentActivity() {
     /** When true, leaving the app while playing puts the player into PiP. */
     var pipEnabled: Boolean = false
 
+    /** Em Picture-in-Picture agora — o player esconde a própria interface. */
+    val inPictureInPicture = mutableStateOf(false)
+
     val playbackHolder = ActivePlaybackHolder()
 
     @Inject lateinit var homeChannelPublisher: com.iptv.app.tv.HomeChannelPublisher
@@ -98,6 +101,28 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         playbackHolder.release()
         super.onDestroy()
+    }
+
+    private val dpadThrottle = com.iptv.app.ui.common.DpadRepeatThrottle()
+
+    /**
+     * Ponto único de entrada de teclas antes do Compose:
+     *  - segurar ↑/↓ no controle gera ~20–30 eventos de repetição por segundo;
+     *    cada um movia o foco, rolava a lista e recompunha os cards. Em TVs
+     *    lentas a fila de rolagens travava a UI até o app ser encerrado
+     *    (#25). [DpadRepeatThrottle] descarta repetições que chegam rápido
+     *    demais — o primeiro toque e os toques isolados passam intactos;
+     *  - knob rotativo de central multimídia (NAVIGATE_NEXT/PREVIOUS) vira
+     *    ↓/↑ do D-pad, que a UI inteira já entende.
+     */
+    // O lint marca o override como API restrita porque ComponentActivity herda
+    // a anotação de androidx.core.app.ComponentActivity; dispatchKeyEvent é a
+    // API pública de Activity.
+    @android.annotation.SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (dpadThrottle.shouldDrop(event)) return true
+        val mapped = com.iptv.app.ui.common.InputMapper.normalize(event)
+        return super.dispatchKeyEvent(mapped)
     }
 
     override fun onStop() {
@@ -134,7 +159,7 @@ class MainActivity : ComponentActivity() {
         newConfig: Configuration
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        // Listeners on the Compose side react via DisposableEffect, no extra code needed here.
+        inPictureInPicture.value = isInPictureInPictureMode
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,6 +178,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             IptvTheme {
                 Surface(
+                    // Mesma cor das telas: a margem de overscan da TV fica
+                    // invisível em vez de virar uma moldura.
+                    color = MaterialTheme.colorScheme.background,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(MaterialTheme.colorScheme.background)
@@ -189,6 +217,8 @@ data class RootState(
     val deviceProfile: com.iptv.app.data.prefs.DeviceProfile? = null,
     /** Chip de horário a cada hora cheia (Configurações). */
     val showHourlyClock: Boolean = false,
+    /** Margem contra overscan na TV (Configurações → Tela). */
+    val overscanPercent: Int = com.iptv.app.data.prefs.DEFAULT_OVERSCAN_PERCENT,
     /** Falso até o primeiro emit do DataStore. Sem isso, o NavHost arranca em
      *  "onboarding" com base no estado default e dá um flash da tela de
      *  boas-vindas antes do estado real chegar (termos já aceitos). */
@@ -206,6 +236,7 @@ class RootViewModel @Inject constructor(
                 loggedIn = it.isLoggedIn && it.host.isNotBlank(),
                 deviceProfile = it.deviceProfile,
                 showHourlyClock = it.showHourlyClock,
+                overscanPercent = it.overscanPercent,
                 loaded = true
             )
         }
@@ -223,6 +254,8 @@ fun AppNav(
     CompositionLocalProvider(
         com.iptv.app.ui.common.LocalDeviceProfile provides state.deviceProfile
     ) {
+    // Densidade normalizada + margem de overscan na TV (32" a 100").
+    com.iptv.app.ui.common.TvScreenAdapter(overscanPercent = state.overscanPercent) {
         // Espera o primeiro emit do DataStore + mínimo de 2 segundos antes
         // de montar o NavHost. Sem o mínimo, em TVs rápidas o splash piscava
         // (200ms); com 2s o usuário tem tempo de ver a animação e os
@@ -234,7 +267,7 @@ fun AppNav(
         }
         if (!state.loaded || !minSplashElapsed) {
             com.iptv.app.ui.common.SplashScreen()
-            return@CompositionLocalProvider
+            return@TvScreenAdapter
         }
         val nav = rememberNavController()
         // Deep link dos cards da Android TV: navega pro player assim que o
@@ -259,10 +292,12 @@ fun AppNav(
                                 WindowInsetsSides.Top + WindowInsetsSides.Horizontal
                             )
                         )
+                        .padding(com.iptv.app.ui.common.LocalOverscanPadding.current)
                         .padding(top = 64.dp, end = 16.dp)
                 )
             }
         }
+    }
     }
 }
 
@@ -273,30 +308,33 @@ private fun AppNavRoutes(state: RootState, nav: androidx.navigation.NavHostContr
         state.loggedIn -> "home"
         else -> "login"
     }
+    // Telas de navegação respeitam a margem de overscan da TV; o player não
+    // (vídeo de borda a borda — ele aplica a margem só nos controles).
+    val safe = Modifier.fillMaxSize().padding(com.iptv.app.ui.common.LocalOverscanPadding.current)
     NavHost(navController = nav, startDestination = start) {
         composable("onboarding") {
-            OnboardingScreen(onAccepted = {
+            Box(safe) { OnboardingScreen(onAccepted = {
                 nav.navigate(if (state.loggedIn) "home" else "login") {
                     popUpTo("onboarding") { inclusive = true }
                 }
-            })
+            }) }
         }
         composable("login") {
-            LoginScreen(onLogged = {
+            Box(safe) { LoginScreen(onLogged = {
                 nav.navigate("home") {
                     popUpTo("login") { inclusive = true }
                 }
-            })
+            }) }
         }
         composable("home") {
-            HomeScreen(
+            Box(safe) { HomeScreen(
                 onPlay = { args -> nav.navigate(PlayerArgs.toRoute(args)) },
                 onLogout = {
                     nav.navigate("login") {
                         popUpTo("home") { inclusive = true }
                     }
                 }
-            )
+            ) }
         }
         composable(PlayerArgs.ROUTE) { backStack ->
             val args = PlayerArgs.fromBackStack(backStack)

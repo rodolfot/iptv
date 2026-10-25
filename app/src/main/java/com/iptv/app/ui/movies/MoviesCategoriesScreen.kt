@@ -41,6 +41,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
+import com.iptv.app.ui.common.focusMemoryItem
+import com.iptv.app.ui.common.restoreFocusFrom
 import com.iptv.app.domain.model.Category
 import com.iptv.app.domain.model.Movie
 import com.iptv.app.domain.sort.SortOption
@@ -100,20 +102,30 @@ fun MoviesCategoriesScreen(
         runCatching { drawerSelectedRequester.requestFocus() }
     }
 
-    Row(modifier = modifier.fillMaxSize()) {
-        MoviesCategoriesDrawer(
-            categories = categories,
-            selectedId = selectedCategoryId,
-            onSelect = onCategorySelected,
-            selectedRequester = drawerSelectedRequester,
-            countByCategory = countByCategory,
-            modifier = Modifier.width(280.dp).fillMaxHeight()
-        )
-
+    val drawerMemory = com.iptv.app.ui.common.rememberFocusMemory()
+    // Memória da grade (#27), compartilhada com a gaveta (→ volta ao último card).
+    val gridMemory = com.iptv.app.ui.common.rememberFocusMemory(selectedCategoryId)
+    val collapsible = !com.iptv.app.ui.common.rememberTvDim().useTouchUi
+    com.iptv.app.ui.common.CollapsibleDrawerLayout(
+        collapsible = collapsible,
+        collapsedLabel = categories.firstOrNull { it.id == selectedCategoryId }?.name.orEmpty(),
+        modifier = modifier,
+        drawer = {
+            MoviesCategoriesDrawer(
+                categories = categories,
+                selectedId = selectedCategoryId,
+                onSelect = onCategorySelected,
+                selectedRequester = drawerSelectedRequester,
+                countByCategory = countByCategory,
+                memory = drawerMemory,
+                onExitRight = { gridMemory.enterTarget() },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    ) {
         Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
+                .fillMaxSize()
                 .padding(16.dp)
         ) {
             // Busca ocupa toda a largura do header. Botão Filtros foi removido
@@ -180,15 +192,24 @@ fun MoviesCategoriesScreen(
             // primeira dobra. Em 1080p ainda restam ~1576dp úteis depois do
             // drawer; com 95dp + 8dp de gap cabem ~15-16 colunas e duas
             // linhas inteiras já mostram >8 filmes sem rolar.
+            // Volta da gaveta cai no último card focado ou no primeiro visível
+            // (#27); sair pela esquerda vai para a categoria atual da gaveta.
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Adaptive(95.dp),
                 contentPadding = PaddingValues(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .restoreFocusFrom(
+                        memory = gridMemory,
+                        fallbackKey = { com.iptv.app.ui.live.firstFullyVisibleKey(gridState) },
+                        onExitLeft = { drawerMemory.enterTarget(selectedCategoryId) }
+                    )
             ) {
                 items(filtered, key = { it.id }) { m ->
+                    Box(Modifier.focusMemoryItem(gridMemory, m.id)) {
                     val mp = movieProgress[m.id]
                     PosterCard(
                         title = m.name,
@@ -211,6 +232,7 @@ fun MoviesCategoriesScreen(
                         onSetMovieQueue(filtered)
                         onMovieClick(m)
                     }
+                    }
                 }
             }
         }
@@ -223,6 +245,8 @@ private fun MoviesCategoriesDrawer(
     selectedId: String,
     onSelect: (String) -> Unit,
     selectedRequester: FocusRequester,
+    memory: com.iptv.app.ui.common.FocusMemory,
+    onExitRight: (() -> androidx.compose.ui.focus.FocusRequester)? = null,
     countByCategory: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
@@ -252,8 +276,13 @@ private fun MoviesCategoriesDrawer(
                 style = MaterialTheme.typography.titleSmall
             )
         }
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            lazyListItems(categories) { cat ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .restoreFocusFrom(memory, fallbackKey = { selectedId }, onExitRight = onExitRight)
+        ) {
+            lazyListItems(categories, key = { it.id }) { cat ->
                 val isSelected = cat.id == selectedId
                 com.iptv.app.ui.common.DrawerCategoryItem(
                     name = cat.name,
@@ -261,7 +290,9 @@ private fun MoviesCategoriesDrawer(
                     isAdult = cat.isAdult,
                     count = countByCategory[cat.id],
                     onClick = { onSelect(cat.id) },
-                    modifier = if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier
+                    modifier = Modifier
+                        .focusMemoryItem(memory, cat.id)
+                        .then(if (isSelected) Modifier.focusRequester(selectedRequester) else Modifier)
                 )
             }
         }

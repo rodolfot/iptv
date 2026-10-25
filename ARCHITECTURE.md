@@ -52,7 +52,10 @@ app/src/main/java/com/iptv/app/
 ├─ ui/             # Compose: home, login, live, movies, series, search,
 │                  #          favorites, settings, legal, player, parental,
 │                  #          continueWatching, update
-├─ update/         # UpdateChecker (GitHub Releases)
+├─ update/         # UpdateChecker (GitHub Releases) + UpdateInstaller
+├─ premium/        # LicenseManager, LicenseToken (ECDSA), DeviceIdentity (4.0)
+├─ ads/            # AdsManager, VastParser, AdBanner/AdBreak (4.0)
+├─ car/            # DrivingMonitor — regra "só áudio em movimento" (4.0)
 ├─ work/           # CatalogRefreshWorker, ResumeReminderWorker
 └─ diag/           # CrashLog (local-only, opt-in)
 ```
@@ -150,3 +153,9 @@ Atualizar com cuidado: ExoPlayer e Compose costumam ter breaking changes; OkHttp
 - **Cast / Chromecast**: integrar `androidx.mediarouter` + `cast-framework`; PlayerScreen escolhe entre ExoPlayer local e RemotePlayer.
 - **Download offline**: ExoPlayer Media3 tem `DownloadManager`; precisa UI de fila + tabela `downloads` no Room.
 - **Per-profile data isolation (multi-perfil v2)**: adicionar `profileId` em `favorites`/`*_progress`/etc., migração que põe profileId do perfil atual em todos os rows.
+
+## Multi-dispositivo, TV e monetização (4.0)
+
+- Detecção de aparelho, UI adaptativa e abstração de entrada: [docs/MULTI_DISPOSITIVO.md](docs/MULTI_DISPOSITIVO.md).
+- Servidor de licenças/anúncios e configuração do build: [server/README.md](server/README.md).
+- Status das features e backlog: [docs/AUDITORIA_4.0.md](docs/AUDITORIA_4.0.md).

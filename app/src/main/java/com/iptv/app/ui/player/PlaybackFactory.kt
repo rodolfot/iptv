@@ -6,7 +6,12 @@ import android.content.Context
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioCapabilities
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.RenderersFactory
@@ -32,8 +37,35 @@ import java.util.concurrent.TimeUnit
  * decoder de software), cai de volta para a lista completa para não falhar a
  * reprodução à toa.
  */
-fun buildRenderersFactory(context: Context, mode: DecoderMode): RenderersFactory =
-    DefaultRenderersFactory(context).apply {
+fun buildRenderersFactory(
+    context: Context,
+    mode: DecoderMode,
+    /**
+     * Dolby/DTS em bitstream (#18). Com true o ExoPlayer repassa E-AC-3 JOC
+     * (Atmos), TrueHD, AC-3, E-AC-3 e DTS/DTS-HD/DTS:X direto para o receiver
+     * quando a saída (HDMI/óptica) anuncia suporte — e decodifica em PCM
+     * quando não anuncia. Com false a saída é tratada como só-PCM: tudo é
+     * decodificado no aparelho (downmix para estéreo/5.1), para receivers que
+     * anunciam um formato mas ficam mudos com ele.
+     */
+    passthrough: Boolean = true
+): RenderersFactory =
+    object : DefaultRenderersFactory(context) {
+        override fun buildAudioSink(
+            context: Context,
+            enableFloatOutput: Boolean,
+            enableAudioTrackPlaybackParams: Boolean
+        ): AudioSink {
+            val builder = DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+            if (!passthrough) {
+                @Suppress("DEPRECATION")
+                builder.setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
+            }
+            return builder.build()
+        }
+    }.apply {
         setEnableDecoderFallback(true)
         if (mode != DecoderMode.AUTO) {
             setMediaCodecSelector(decoderModeSelector(mode))
@@ -126,6 +158,19 @@ fun newStreamingPlayer(
     val builder = ExoPlayer.Builder(appContext)
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
         .setLoadControl(if (preview) previewLoadControl() else mainLoadControl())
+        // Foco de áudio gerenciado pelo ExoPlayer (#23): instrução do GPS
+        // (Waze/Maps) abaixa o volume e ele volta sozinho; chamada (inclusive
+        // via Bluetooth no carro) pausa e retoma no fim; outro app de mídia
+        // tomando o foco pausa o canal.
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build(),
+            /* handleAudioFocus = */ true
+        )
+        // Fone/Bluetooth desconectado: pausa em vez de sair som no alto-falante.
+        .setHandleAudioBecomingNoisy(true)
     if (renderersFactory != null) builder.setRenderersFactory(renderersFactory)
     return builder.build().apply {
         if (preview) {

@@ -2,6 +2,7 @@ package com.iptv.app.ui.favorites
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,9 @@ import com.iptv.app.ui.common.LocalFilterField
 import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.PosterCard
 import com.iptv.app.ui.common.TouchableButton
+import com.iptv.app.ui.common.focusMemoryItem
 import com.iptv.app.ui.common.rememberTvDim
+import com.iptv.app.ui.common.restoreFocusFrom
 import com.iptv.app.ui.home.HomeViewModel
 import com.iptv.app.ui.live.ChannelTile
 import com.iptv.app.ui.player.PlayerArgs
@@ -113,9 +116,29 @@ fun FavoritesScreen(
     val visible = byType[activeType].orEmpty()
         .filter { needle.isBlank() || it.name.lowercase().contains(needle) }
 
+    // Canal confirmado com OK na TV — toca no miniplayer de prévia, como na
+    // grade do Ao Vivo (#24). OK de novo no mesmo canal abre em tela cheia.
+    var previewChannel by remember { mutableStateOf<FavoriteEntity?>(null) }
+    val isPhone = dim.formFactor == FormFactor.Phone
+    val playLive: (FavoriteEntity) -> Unit = { f ->
+        // Zapping no player percorre só os favoritos, na ordem da tela.
+        vm.setLiveQueue(
+            byType[ContentType.LIVE].orEmpty().map { com.iptv.app.ui.player.LiveNav(it.itemId, it.name) }
+        )
+        onPlay(PlayerArgs(PlayerKind.LIVE, f.itemId, f.name, null, categoryId = f.categoryId))
+    }
     val openItem: (FavoriteEntity) -> Unit = { f ->
         when (f.type) {
-            ContentType.LIVE -> onPlay(PlayerArgs(PlayerKind.LIVE, f.itemId, f.name, null))
+            ContentType.LIVE -> when {
+                isPhone -> playLive(f)
+                previewChannel?.itemId == f.itemId -> {
+                    // Solta a conexão da prévia antes do player (contas
+                    // Xtream com limite de 1 conexão).
+                    previewChannel = null
+                    playLive(f)
+                }
+                else -> previewChannel = f
+            }
             ContentType.MOVIE -> onPlay(
                 PlayerArgs(
                     kind = PlayerKind.MOVIE,
@@ -134,7 +157,7 @@ fun FavoritesScreen(
         snackbar?.show(removedMsg)
     }
 
-    if (dim.formFactor == FormFactor.Phone) {
+    if (isPhone) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -172,74 +195,114 @@ fun FavoritesScreen(
     }
 
     val drawerSelectedRequester = remember { FocusRequester() }
+    val drawerMemory = com.iptv.app.ui.common.rememberFocusMemory()
+    val gridMemory = com.iptv.app.ui.common.rememberFocusMemory(activeType)
     // Foco inicial na seção selecionada da gaveta, como em Filmes/Séries.
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(50)
         runCatching { drawerSelectedRequester.requestFocus() }
     }
-    Row(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .width(280.dp)
-                .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(vertical = 8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    stringResource(R.string.tab_favorites),
-                    style = MaterialTheme.typography.titleSmall
-                )
-            }
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                lazyListItems(SECTIONS) { type ->
-                    val isSelected = type == activeType
-                    DrawerCategoryItem(
-                        name = sectionLabel(type),
-                        isSelected = isSelected,
-                        isAdult = false,
-                        count = byType[type].orEmpty().size,
-                        onClick = { selectedType = type },
-                        modifier = if (isSelected) {
-                            Modifier.focusRequester(drawerSelectedRequester)
-                        } else Modifier
-                    )
+    // Trocar de seção (Canais → Filmes) encerra a prévia.
+    LaunchedEffect(activeType) { if (activeType != ContentType.LIVE) previewChannel = null }
+    Box(modifier = Modifier.fillMaxSize()) {
+        com.iptv.app.ui.common.CollapsibleDrawerLayout(
+            collapsible = !dim.useTouchUi,
+            collapsedLabel = sectionLabel(activeType),
+            drawer = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Favorite,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            stringResource(R.string.tab_favorites),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .restoreFocusFrom(
+                                drawerMemory,
+                                fallbackKey = { activeType },
+                                onExitRight = { gridMemory.enterTarget() }
+                            )
+                    ) {
+                        lazyListItems(SECTIONS, key = { it }) { type ->
+                            val isSelected = type == activeType
+                            DrawerCategoryItem(
+                                name = sectionLabel(type),
+                                isSelected = isSelected,
+                                isAdult = false,
+                                count = byType[type].orEmpty().size,
+                                onClick = { selectedType = type },
+                                modifier = Modifier
+                                    .focusMemoryItem(drawerMemory, type)
+                                    .then(
+                                        if (isSelected) Modifier.focusRequester(drawerSelectedRequester)
+                                        else Modifier
+                                    )
+                            )
+                        }
+                    }
                 }
             }
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .padding(16.dp)
         ) {
-            LocalFilterField(
-                value = localFilter,
-                onValueChange = { localFilter = it },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-            )
-            // Mesmo grid de Filmes/Séries/Ao Vivo: 95dp Adaptive + gap 6.
-            FavoritesGrid(
-                items = visible,
-                columns = GridCells.Adaptive(95.dp),
-                spacing = 6.dp,
-                onOpen = openItem,
-                onRemove = removeItem,
-                modifier = Modifier.weight(1f).fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                LocalFilterField(
+                    value = localFilter,
+                    onValueChange = { localFilter = it },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                )
+                // Mesmo grid de Filmes/Séries/Ao Vivo: 95dp Adaptive + gap 6.
+                FavoritesGrid(
+                    items = visible,
+                    columns = GridCells.Adaptive(95.dp),
+                    spacing = 6.dp,
+                    previewItemId = previewChannel?.itemId,
+                    focusMemory = gridMemory,
+                    onExitLeft = { drawerMemory.enterTarget(activeType) },
+                    onOpen = openItem,
+                    onRemove = removeItem,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            }
+        }
+        // Miniplayer de prévia, igual ao da grade do Ao Vivo.
+        previewChannel?.let { f ->
+            com.iptv.app.ui.live.LivePreviewPip(
+                channel = f.toLiveChannel(),
+                vm = vm,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
             )
         }
     }
 }
+
+private fun FavoriteEntity.toLiveChannel() = LiveChannel(
+    id = itemId,
+    num = null,
+    name = name,
+    logoUrl = logoUrl,
+    categoryId = categoryId,
+    epgChannelId = null,
+    addedTimestamp = 0L
+)
 
 @Composable
 private fun FavoritesGrid(
@@ -248,42 +311,47 @@ private fun FavoritesGrid(
     spacing: androidx.compose.ui.unit.Dp,
     onOpen: (FavoriteEntity) -> Unit,
     onRemove: (FavoriteEntity) -> Unit,
+    previewItemId: Int? = null,
+    focusMemory: com.iptv.app.ui.common.FocusMemory = com.iptv.app.ui.common.rememberFocusMemory(),
+    onExitLeft: (() -> FocusRequester)? = null,
     modifier: Modifier = Modifier
 ) {
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
     LazyVerticalGrid(
+        state = gridState,
         columns = columns,
         contentPadding = PaddingValues(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalArrangement = Arrangement.spacedBy(spacing),
-        modifier = modifier
+        modifier = modifier.restoreFocusFrom(
+            memory = focusMemory,
+            fallbackKey = { com.iptv.app.ui.live.firstFullyVisibleKey(gridState) },
+            onExitLeft = onExitLeft
+        )
     ) {
         items(items, key = { "${it.type}-${it.itemId}" }) { f ->
+            val itemModifier = Modifier.focusMemoryItem(focusMemory, "${f.type}-${f.itemId}")
             when (f.type) {
                 // Canal usa o mesmo tile da grade do Ao Vivo (logo inteira,
                 // sem corte, nome na barra inferior).
                 ContentType.LIVE -> ChannelTile(
-                    channel = LiveChannel(
-                        id = f.itemId,
-                        num = null,
-                        name = f.name,
-                        logoUrl = f.logoUrl,
-                        categoryId = f.categoryId,
-                        epgChannelId = null,
-                        addedTimestamp = 0L
-                    ),
+                    channel = f.toLiveChannel(),
                     locked = false,
                     isFavorite = false,
-                    isPreviewing = false,
+                    isPreviewing = previewItemId == f.itemId,
+                    modifier = itemModifier,
                     onClick = { onOpen(f) },
                     onLongClick = { onRemove(f) }
                 )
-                ContentType.MOVIE, ContentType.SERIES -> PosterCard(
-                    title = f.name,
-                    imageUrl = f.logoUrl,
-                    fallbackIcon = if (f.type == ContentType.MOVIE) Icons.Filled.Movie else Icons.Filled.Tv,
-                    fillWidth = true,
-                    onLongClick = { onRemove(f) }
-                ) { onOpen(f) }
+                ContentType.MOVIE, ContentType.SERIES -> Box(itemModifier) {
+                    PosterCard(
+                        title = f.name,
+                        imageUrl = f.logoUrl,
+                        fallbackIcon = if (f.type == ContentType.MOVIE) Icons.Filled.Movie else Icons.Filled.Tv,
+                        fillWidth = true,
+                        onLongClick = { onRemove(f) }
+                    ) { onOpen(f) }
+                }
             }
         }
     }
