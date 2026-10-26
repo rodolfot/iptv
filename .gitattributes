@@ -1,0 +1,3 @@
+*.aar binary
+*.sh text eol=lf
+scripts/ffmpeg-lgpl/Dockerfile text eol=lf

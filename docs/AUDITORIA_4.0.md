@@ -32,7 +32,7 @@ Novos na 4.0: `premium/` (licença), `ads/` (VAST), `car/` (regras de direção)
 | Status | Feature | Onde / observação |
 |---|---|---|
 | [X] | Passthrough / bitstream | 4.0: `buildRenderersFactory(passthrough)` + opção em Configurações. |
-| [~] | Codecs HD e fallback seguro | 4.0: identificação Atmos/TrueHD/DD+/DTS/DTS-HD/DTS:X com selo (`ImmersiveAudio.kt`), seleção automática de faixa suportada e aviso anti-mudo com player externo. **Falta**: decodificação de DTS/TrueHD por software (ver plano). |
+| [X] | Codecs HD e fallback seguro | Identificação Atmos/TrueHD/DD+/DTS/DTS-HD/DTS:X com selo (`ImmersiveAudio.kt`), passthrough e, na 4.0.1, decoder FFmpeg LGPL (DTS, TrueHD, AC-3/E-AC-3) como fallback em PCM. DTS:X sai como DTS-HD (objetos não são decodificados por software). |
 | [ ] | AFR (troca de taxa de quadros) | Ausente. |
 | [ ] | Multi-View | Ausente. |
 | [X] | Picture-in-Picture | `MainActivity.onUserLeaveHint` + auto-enter no Android 12+ (4.0). |
@@ -53,7 +53,6 @@ Novos na 4.0: `premium/` (licença), `ads/` (VAST), `car/` (regras de direção)
 | Média | Stalker Portal | Completar `StalkerClient` (get_genres, get_ordered_list, create_link) e um `StalkerRepository` implementando a mesma interface do Xtream; login com MAC virtual. |
 | Média | AFR | Android 11+: `Surface.setFrameRate`/`setFrameRateCompat` a partir do `Format.frameRate` do vídeo; Android 6–10: trocar `Display.Mode` via `WindowManager.LayoutParams.preferredDisplayModeId`. Opção liga/desliga (padrão desligado). |
 | Média | Isolamento por perfil + sync | Coluna `profileId` já existe nas tabelas de progresso; completar favoritos/watchlist e implementar `SyncBackend` (ex.: Supabase/Firestore REST) com resolução por `updatedAt`. |
-| Baixa | Decodificação DTS/TrueHD por software | Extensão FFmpeg do Media3 compilada com licença LGPL (só decoders de áudio) — evitar o build do Jellyfin, que é GPL-3.0 e incompatível com a licença Premium. |
 | Baixa | Multi-View | Tela 2×2 com até 4 `ExoPlayer` em prévia (buffer 8 MB, SD), áudio só do quadro focado; limitar pelo `max_connections` da conta. |
 | Baixa | PVR / gravação local | `ForegroundService` gravando o TS (OkHttp → arquivo) com agendamento WorkManager; exige permissão de armazenamento e checar `max_connections`. |
 
@@ -67,7 +66,6 @@ gh issue create --title "[Feature] Edição manual de EPG e categorias" --label 
 gh issue create --title "[Feature] Stalker Portal" --label enhancement --body $'Completar o suporte a portais Stalker/Ministra.\n\n## Critérios de aceite\n- [ ] Login com URL do portal + MAC\n- [ ] Ao Vivo, Filmes e Séries carregados do portal\n- [ ] create_link para reprodução\n\n## Arquivos\n- data/stalker/StalkerClient.kt (+ StalkerRepository)\n- ui/login/LoginScreen.kt, data/cache/CatalogCacheRepository.kt'
 gh issue create --title "[Feature] AFR — troca automática da taxa de quadros" --label enhancement --body $'Casar a taxa do display com o FPS do vídeo (24/25/30/50/60 Hz).\n\n## Critérios de aceite\n- [ ] Opção em Configurações (padrão desligado)\n- [ ] Filme 23.976 fps troca a TV para 24 Hz e volta ao sair\n- [ ] Sem efeito em aparelhos sem modos compatíveis\n\n## Arquivos\n- ui/player/PlayerScreen.kt (Format.frameRate), MainActivity.kt (preferredDisplayModeId / Surface.setFrameRate)'
 gh issue create --title "[Feature] Perfis isolados e sincronização na nuvem" --label enhancement --body $'Favoritos/progresso por perfil e sync entre aparelhos.\n\n## Critérios de aceite\n- [ ] Cada perfil tem favoritos, watchlist e progresso próprios\n- [ ] Login opcional de sync; mudanças aparecem no outro aparelho em até 1 min\n\n## Arquivos\n- data/db (profileId em favorites/watchlist + migração), data/sync/SyncBackend.kt'
-gh issue create --title "[Feature] Decodificação de DTS/TrueHD por software (FFmpeg LGPL)" --label enhancement --body $'Tocar DTS/TrueHD em aparelhos sem decoder nem receiver.\n\n## Critérios de aceite\n- [ ] Extensão FFmpeg do Media3 compilada só com decoders de áudio, licença LGPL\n- [ ] Conteúdo só-DTS toca com som em celular/TV sem DTS\n- [ ] Passthrough continua tendo prioridade quando disponível\n\n## Arquivos\n- app/build.gradle.kts, ui/player/PlaybackFactory.kt (EXTENSION_RENDERER_MODE_ON)'
 gh issue create --title "[Feature] Multi-View (2 a 4 canais)" --label enhancement --body $'Assistir vários canais ao mesmo tempo.\n\n## Critérios de aceite\n- [ ] Layout 2 e 2x2, áudio do quadro focado\n- [ ] Respeita max_connections da conta e avisa quando excede\n\n## Arquivos\n- ui/player (MultiViewScreen.kt), ui/player/PlaybackFactory.kt'
 gh issue create --title "[Feature] Gravação local (PVR)" --label enhancement --body $'Gravar canais ao vivo no armazenamento local/externo.\n\n## Critérios de aceite\n- [ ] Gravar agora / agendar pela EPG\n- [ ] Lista de gravações reproduzível offline\n- [ ] Avisa quando a conta não permite conexão extra\n\n## Arquivos\n- novo pacote record/ (ForegroundService + WorkManager), ui/live, AndroidManifest.xml'
 ```

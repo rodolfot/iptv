@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.1] — 2026-10-26
+
+### Added
+
+- **DTS e Dolby TrueHD sem receiver** (#18): decoder FFmpeg só de áudio, compilado sem GPL (licença LGPL 2.1+), entra quando o aparelho não tem decoder nem receiver para o formato — DTS/DTS-HD, TrueHD/MLP e AC-3/E-AC-3 tocam em PCM em vez de ficar mudos. O passthrough para o receiver continua tendo prioridade. Reproduzível por `scripts/ffmpeg-lgpl` (Docker); fontes e licença em `app/libs/media3-decoder-ffmpeg-NOTICE.txt`.
+- **Premium e anúncios ligados**: o app passa a usar o portal tv.muchila.com.br como servidor de licenças e de configuração de anúncios.
+
 ## [4.0.0] — 2026-10-25
 
 ### Added

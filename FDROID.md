@@ -18,6 +18,11 @@ Everything F-Droid needs to build TartaTV from source is committed:
   graphic candidate.
 * No proprietary dependencies, no Google Play Services, no Firebase, no
   analytics SDK — required by F-Droid's inclusion policy.
+* `app/libs/media3-decoder-ffmpeg-*-lgpl.aar` is a prebuilt (LGPL FFmpeg +
+  Apache-2.0 Media3 module). F-Droid does not accept prebuilt binaries: the
+  fdroiddata recipe must rebuild it from source with
+  `scripts/ffmpeg-lgpl/build.sh` (as a `srclibs`/`prebuild` step) before
+  `assembleRelease`.
 
 ## fdroiddata manifest
 

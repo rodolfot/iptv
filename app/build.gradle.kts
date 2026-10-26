@@ -164,6 +164,11 @@ dependencies {
     implementation("androidx.media3:media3-ui:$media3")
     implementation("androidx.media3:media3-session:$media3")
     implementation("androidx.media3:media3-datasource-okhttp:$media3")
+    // Decoder FFmpeg (LGPL) só de áudio — DTS/DTS-HD, TrueHD/MLP, AC-3/E-AC-3 —
+    // para aparelhos sem decoder nem receiver (#18). Não existe no Maven do
+    // Google; o AAR é gerado por scripts/ffmpeg-lgpl/build.sh (ver NOTICE em libs/).
+    implementation(files("libs/media3-decoder-ffmpeg-$media3-lgpl.aar"))
+    implementation("androidx.media3:media3-decoder:$media3")
 
     // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

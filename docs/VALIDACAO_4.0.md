@@ -27,8 +27,12 @@ Roteiro por issue. Os itens marcados ✅ foram verificados no emulador Android T
   selo **Dolby Atmos · 7.1 · Passthrough** ao lado do título; o receiver indica Atmos/DTS.
 - Configurações → Player → **Passthrough de áudio** desligado: o mesmo arquivo toca em
   PCM (selo sem "Passthrough").
-- Arquivo só com DTS num celular sem decoder: aviso "O áudio deste conteúdo (DTS) não
-  é suportado…" com botão **Player externo** (antes: vídeo mudo).
+- ✅ 4.0.1: arquivo só com DTS 5.1 num aparelho sem decoder DTS nem receiver (emulador
+  Android TV) toca com som — o FfmpegAudioRenderer decodifica em PCM 5.1 (`dumpsys
+  media.audio_flinger`: 48 kHz, máscara 0x3F). Amostra de teste:
+  `ffmpeg -f lavfi -i testsrc2 -f lavfi -i sine -filter_complex "[1:a]pan=5.1|c0=c0|c1=c0|c2=c0|c3=c0|c4=c0|c5=c0[a]" -map 0:v -map "[a]" -t 30 -c:v libx264 -c:a dca -strict -2 dts.mkv`.
+- Formato sem nenhum decoder possível: aviso "O áudio deste conteúdo não é suportado…"
+  com botão **Player externo** (antes: vídeo mudo).
 - Painel de opções → Áudio: faixas listadas com codec ("Inglês · Dolby Atmos · 7.1").
 
 ## #22 — Celular e tablet

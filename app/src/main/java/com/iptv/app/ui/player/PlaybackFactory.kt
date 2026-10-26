@@ -66,6 +66,11 @@ fun buildRenderersFactory(
             return builder.build()
         }
     }.apply {
+        // Ordem dos renderers de áudio: decoder do aparelho/passthrough primeiro
+        // e, só quando nenhum dá conta do formato (DTS num celular, TrueHD numa
+        // TV sem licença), o FfmpegAudioRenderer decodifica em PCM — fim do
+        // vídeo mudo (#18).
+        setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         setEnableDecoderFallback(true)
         if (mode != DecoderMode.AUTO) {
             setMediaCodecSelector(decoderModeSelector(mode))

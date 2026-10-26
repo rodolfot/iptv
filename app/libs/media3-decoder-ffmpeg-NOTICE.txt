@@ -1,0 +1,8 @@
+media3-decoder-ffmpeg-1.4.0-lgpl.aar
+
+- Código do módulo: androidx/media 1.4.0 (Apache License 2.0)
+  https://github.com/androidx/media/tree/1.4.0/libraries/decoder_ffmpeg
+- FFmpeg release/6.0 @ 573f2b81ebd97da81def2ba762e81b0328547004 (GNU LGPL 2.1 ou posterior)
+  https://git.ffmpeg.org/gitweb/ffmpeg.git/commit/573f2b81ebd97da81def2ba762e81b0328547004
+  Configurado sem --enable-gpl e sem --enable-nonfree; decoders: dca truehd mlp ac3 eac3
+- Para recompilar/substituir a biblioteca: scripts/ffmpeg-lgpl/build.sh
