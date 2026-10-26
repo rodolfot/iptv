@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -120,13 +121,11 @@ fun LoginScreen(
     LaunchedEffect(Unit) { runCatching { hostFocus.requestFocus() } }
 
     if (state.success) {
-        val ctx = androidx.compose.ui.platform.LocalContext.current
         LaunchedEffect(Unit) {
-            // Dispara o bootstrap por categoria em background — popula o
-            // cache enquanto o usuário começa a navegar. Cada categoria
-            // visitada antes do worker chegar nela cai no fetch on-demand
-            // do load*() (~2s).
-            com.iptv.app.work.CatalogRefreshWorker.enqueueOneShot(ctx)
+            // O primeiro carregamento fica com a Início (bootstrapEssentials +
+            // filmes/séries em segundo plano). Antes daqui saía também um
+            // Worker com o catálogo inteiro por categoria, e a tela de
+            // carregamento esperava ele terminar — ~3 min na TV (#32).
             onLogged()
         }
     }
@@ -146,7 +145,17 @@ fun LoginScreen(
                 .padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(stringResource(R.string.login_brand), style = MaterialTheme.typography.displayMedium)
+            // Logo animado + nome, no lugar do "TartaTV" só em texto grande.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                com.iptv.app.ui.common.AnimatedTartaLogo(size = 64.dp)
+                Text(
+                    com.iptv.app.ui.common.Brand.WORDMARK,
+                    style = MaterialTheme.typography.headlineMedium
+                )
+            }
             Text(
                 stringResource(R.string.login_title),
                 style = MaterialTheme.typography.titleMedium,

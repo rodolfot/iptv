@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.iptv.app.BuildConfig
 import com.iptv.app.premium.LicenseManager
+import com.iptv.app.premium.PremiumFeature
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,8 +30,19 @@ data class AdBannerSpec(
     val placement: AdPlacement,
     val imageUrl: String,
     val text: String?,
-    val clickUrl: String?
+    val clickUrl: String?,
+    /** Anúncio da casa (#34): promove o Premium quando não há anunciante. */
+    val house: Boolean = false
 )
+
+/** O que toca antes/depois do conteúdo. */
+sealed interface AdBreakItem {
+    /** Anúncio em vídeo de um anunciante (tag VAST). */
+    data class Video(val ad: VastAd) : AdBreakItem
+
+    /** Cartão "Assista sem anúncios" com o QR da loja — anúncio da casa (#34). */
+    data object HousePremium : AdBreakItem
+}
 
 /**
  * Configuração de anúncios servida em `ADS_CONFIG_URL` (JSON). Exemplo em
@@ -44,10 +56,13 @@ data class AdsConfig(
     val minIntervalMs: Long,
     /** Tempo máximo para o anúncio responder e começar a tocar. */
     val timeoutMs: Long,
-    val banners: List<AdBannerSpec>
+    val banners: List<AdBannerSpec>,
+    /** Anúncios da casa quando falta anunciante (padrão ligado). */
+    val houseAds: Boolean = true
 ) {
     companion object {
-        val NONE = AdsConfig(null, null, 0, 0, emptyList())
+        private const val DEFAULT_INTERVAL_MS = 15 * 60_000L
+        val NONE = AdsConfig(null, null, DEFAULT_INTERVAL_MS, 4_000L, emptyList())
 
         fun fromJson(raw: String): AdsConfig {
             val json = JSONObject(raw)
@@ -76,7 +91,8 @@ data class AdsConfig(
                 postrollVastUrl = vast("postroll"),
                 minIntervalMs = json.optLong("minIntervalMinutes", 15) * 60_000L,
                 timeoutMs = json.optLong("timeoutMs", 4_000L).coerceIn(1_000L, 10_000L),
-                banners = banners
+                banners = banners,
+                houseAds = json.optJSONObject("house")?.optBoolean("enabled", true) ?: true
             )
         }
     }
@@ -94,7 +110,10 @@ data class AdsConfig(
  *  - falha, VAST vazio ou demora acima de `timeoutMs` = sem anúncio; o
  *    conteúdo abre normalmente;
  *  - no máximo um anúncio em vídeo a cada `minIntervalMinutes` (o zapping
- *    entre canais não dispara pre-roll a cada troca).
+ *    entre canais não dispara pre-roll a cada troca);
+ *  - sem anunciante (nenhuma tag/banner, ou a tag falhou), a versão gratuita
+ *    mostra os anúncios da casa promovendo o Premium (#34) — desligável pelo
+ *    servidor (`house.enabled`) e só em builds com loja (licença configurada).
  */
 @Singleton
 class AdsManager @Inject constructor(
@@ -113,13 +132,21 @@ class AdsManager @Inject constructor(
     fun banner(placement: AdPlacement): Flow<AdBannerSpec?> {
         scope.launch { ensureConfig() }
         return combine(config, license.state) { cfg, lic ->
-            if (lic.premium) null else cfg.banners.firstOrNull { it.placement == placement }
+            when {
+                lic.has(PremiumFeature.NO_ADS) -> null
+                else -> cfg.banners.firstOrNull { it.placement == placement }
+                    ?: if (houseAdsEnabled(cfg)) AdBannerSpec(placement, "", null, null, house = true) else null
+            }
         }
     }
 
-    suspend fun preroll(): VastAd? = videoAd { it.prerollVastUrl }
+    /** Pre-roll: anúncio do anunciante ou, sem ele, o cartão do Premium. */
+    suspend fun preroll(): AdBreakItem? = videoBreak(houseFallback = true) { it.prerollVastUrl }
 
-    suspend fun postroll(): VastAd? = videoAd { it.postrollVastUrl }
+    /** Post-roll: só anunciante (o cartão da casa no fim do filme cansaria). */
+    suspend fun postroll(): AdBreakItem? = videoBreak(houseFallback = false) { it.postrollVastUrl }
+
+    private fun houseAdsEnabled(cfg: AdsConfig) = cfg.houseAds && license.isConfigured
 
     /** Registra o anúncio exibido (frequency cap). */
     fun markShown() {
@@ -136,14 +163,16 @@ class AdsManager @Inject constructor(
         }
     }
 
-    private suspend fun videoAd(pick: (AdsConfig) -> String?): VastAd? {
+    private suspend fun videoBreak(houseFallback: Boolean, pick: (AdsConfig) -> String?): AdBreakItem? {
         license.load()
-        if (license.isPremium()) return null
+        if (license.has(PremiumFeature.NO_ADS)) return null
         val cfg = ensureConfig()
-        val tag = pick(cfg) ?: return null
         val since = SystemClock.elapsedRealtime() - lastVideoAdAt
         if (lastVideoAdAt > 0 && since < cfg.minIntervalMs) return null
-        return withTimeoutOrNull(cfg.timeoutMs) { resolveVast(tag) }
+        pick(cfg)?.let { tag ->
+            withTimeoutOrNull(cfg.timeoutMs) { resolveVast(tag) }?.let { return AdBreakItem.Video(it) }
+        }
+        return if (houseFallback && houseAdsEnabled(cfg)) AdBreakItem.HousePremium else null
     }
 
     /** Segue Wrappers (até 4 níveis) acumulando impressões/rastreamento. */

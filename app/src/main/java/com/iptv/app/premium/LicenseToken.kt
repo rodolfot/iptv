@@ -14,12 +14,15 @@ import java.security.spec.X509EncodedKeySpec
  * @property key chave de ativação (16 caracteres, sem hífens).
  * @property deviceId identificador do aparelho ao qual a chave foi vinculada.
  * @property expiresAt epoch em segundos; 0 = vitalícia.
+ * @property features benefícios do plano ([PremiumFeature.key]); null =
+ *  token sem a lista (anterior à 4.0.2), que vale como Premium completo.
  */
 data class LicensePayload(
     val key: String,
     val deviceId: String,
     val issuedAt: Long,
-    val expiresAt: Long
+    val expiresAt: Long,
+    val features: Set<String>? = null
 )
 
 /**
@@ -59,7 +62,10 @@ object LicenseToken {
             key = json.getString("k"),
             deviceId = json.getString("d"),
             issuedAt = json.optLong("iat", 0L),
-            expiresAt = json.optLong("exp", 0L)
+            expiresAt = json.optLong("exp", 0L),
+            features = json.optJSONArray("f")?.let { arr ->
+                (0 until arr.length()).mapNotNull { arr.optString(it).takeIf(String::isNotBlank) }.toSet()
+            }
         )
     }.getOrNull()
 

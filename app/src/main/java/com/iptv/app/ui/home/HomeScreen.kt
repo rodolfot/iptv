@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
@@ -47,8 +49,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.Image
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -158,6 +158,8 @@ fun HomeScreen(
     // interno se perdia. Mantida até o usuário trocar de categoria ou sair do menu.
     var moviesLocalFilter by rememberSaveable { mutableStateOf("") }
     val initialLoading by vm.initialLoading.collectAsState()
+    val bootstrapProgress by vm.bootstrapProgress.collectAsState()
+    val backgroundProgress by vm.backgroundProgress.collectAsState()
     val playbackHolder = LocalPlaybackHolder.current
     val miniPlayerFormFactor = com.iptv.app.ui.common.rememberTvDim().formFactor
     // TV/Tablet have no D-pad-reachable dock for the mini-player, and audio
@@ -203,7 +205,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) { vm.bootstrapCatalog() }
 
     if (initialLoading) {
-        CatalogLoadingScreen()
+        CatalogLoadingScreen(bootstrapProgress)
         return
     }
 
@@ -221,6 +223,15 @@ fun HomeScreen(
     ) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         UpdatePromptHost()
+        // Filmes e séries chegando em segundo plano (#32): por cima do
+        // conteúdo, no canto, sem ocupar espaço do menu.
+        BackgroundCatalogChip(
+            backgroundProgress,
+            Modifier
+                .align(Alignment.BottomEnd)
+                .zIndex(1f)
+                .padding(16.dp)
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -317,7 +328,8 @@ fun HomeScreen(
                                 // do último episódio aberta — em vez de tocar direto
                                 // o usuário escolhe por onde continuar.
                                 onOpenMovie = handlePlay,
-                                onOpenSeries = { args -> openSeries = args }
+                                onOpenSeries = { args -> openSeries = args },
+                                onNavigate = { key -> selectedKey = key }
                             )
                         }
                         // Banner da versão gratuita (#29) — some no Premium.
@@ -455,11 +467,7 @@ private fun TopBar(
                         )
                     }
                 }
-                Image(
-                    painter = painterResource(com.iptv.app.R.drawable.app_banner),
-                    contentDescription = stringResource(com.iptv.app.R.string.app_name),
-                    modifier = Modifier.height(bannerHeight)
-                )
+                com.iptv.app.ui.common.AnimatedTartaLogo(size = bannerHeight + 8.dp)
             }
             LazyRow(
                 modifier = Modifier
@@ -494,12 +502,8 @@ private fun TopBar(
                 )
             }
         }
-        // Marca da identidade 4.0 ao lado do nome (#30).
-        com.iptv.app.ui.common.TartaLogoMark(size = 22.dp)
-        Text(
-            com.iptv.app.ui.common.Brand.WORDMARK,
-            style = MaterialTheme.typography.titleMedium
-        )
+        // Logo animado da identidade 4.0 no lugar do nome por extenso (#37).
+        com.iptv.app.ui.common.AnimatedTartaLogo(size = 40.dp)
         // Dois indicadores distintos:
         //  - Selecionado (após OK): pílula azul preenchida (mostra qual menu
         //    está realmente ativo, mesmo quando o foco está em outro lugar).
@@ -597,6 +601,41 @@ private fun TopBar(
                 }
             }
         }
+    }
+}
+
+/**
+ * Aviso flutuante no canto inferior direito enquanto filmes e séries carregam
+ * em segundo plano depois do primeiro acesso (#32) — o app já está liberado,
+ * mas o usuário sabe que o catálogo ainda está chegando. Não focável e fora
+ * do menu superior (ao lado das abas ele empurrava "Config" para fora).
+ */
+@Composable
+private fun BackgroundCatalogChip(
+    progress: com.iptv.app.data.cache.CatalogCacheRepository.BootstrapProgress?,
+    modifier: Modifier = Modifier
+) {
+    if (progress == null || progress.total <= 0) return
+    val pct = (progress.current * 100 / progress.total).coerceIn(0, 99)
+    Row(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        androidx.compose.material3.CircularProgressIndicator(
+            progress = { pct / 100f },
+            modifier = Modifier.size(14.dp),
+            strokeWidth = 2.dp
+        )
+        Text(
+            stringResource(com.iptv.app.R.string.catalog_background_progress, pct),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 

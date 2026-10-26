@@ -272,22 +272,6 @@ class CatalogCacheRepository @Inject constructor(
         touch(Scope.SERIES_LIST)
     }
 
-    /** Refresh everything sequentially — chamada antiga, mantida pra
-     *  compatibilidade mas evite usar em catálogos grandes (50k+ filmes
-     *  numa única request dão timeout). Prefira `refreshAllByCategory`. */
-    suspend fun refreshAll(): List<Throwable> = exclusiveFullRefresh {
-        val errors = mutableListOf<Throwable>()
-        listOf(
-            refreshLiveCategories(),
-            refreshMovieCategories(),
-            refreshSeriesCategories(),
-            refreshLiveStreams(),
-            refreshMovieStreams(),
-            refreshSeriesList()
-        ).forEach { r -> r.exceptionOrNull()?.let(errors::add) }
-        errors
-    }
-
     data class BootstrapProgress(
         val phase: String,
         val current: Int,
@@ -300,7 +284,7 @@ class CatalogCacheRepository @Inject constructor(
      *  2) Streams por categoria, uma a uma — cada chamada é rápida (1-3s)
      *     mesmo para categorias grandes (Marvel/DC: 182 filmes / 62 KB).
      *
-     * Vantagem sobre `refreshAll`: nunca dá timeout, mesmo em catálogos
+     * Vantagem sobre baixar o catálogo numa chamada só: nunca dá timeout, mesmo em catálogos
      * com 50k+ filmes (que estouravam o read-timeout do OkHttp). E o
      * usuário pode navegar em categorias já carregadas antes do fim.
      *
@@ -328,31 +312,75 @@ class CatalogCacheRepository @Inject constructor(
         }
         touch(Scope.LIVE_STREAMS)
 
-        // Movies
+        refreshVodCatalogByCategory(errors, onProgress)
+
+        errors
+    }
+
+    /**
+     * Primeiro acesso (#32): só o necessário para abrir o app — as três
+     * listas de categorias e os canais ao vivo (uma chamada). Antes o app
+     * esperava o catálogo inteiro (filmes e séries em JSONs gigantes) e
+     * ficava ~3 min na tela de carregamento em listas grandes. Filmes e
+     * séries vêm depois por [refreshVodByCategory], em segundo plano; uma
+     * categoria aberta antes disso é buscada sozinha pelas telas.
+     */
+    // Sem o lock de refresh completo de propósito: se um Worker estiver
+    // baixando o catálogo inteiro, a tela de carregamento não pode esperar
+    // por ele — categorias e canais são leves e repetir não faz mal.
+    suspend fun bootstrapEssentials(
+        onProgress: suspend (BootstrapProgress) -> Unit = {}
+    ): List<Throwable> {
+        val errors = mutableListOf<Throwable>()
+        onProgress(BootstrapProgress("categories", 0, 3))
+        refreshLiveCategories().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("categories", 1, 3))
+        refreshMovieCategories().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("categories", 2, 3))
+        refreshSeriesCategories().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("live", 0, 1))
+        refreshLiveStreams().exceptionOrNull()?.let(errors::add)
+        onProgress(BootstrapProgress("live", 1, 1))
+        return errors
+    }
+
+    /** Filmes e séries por categoria — a segunda fase do primeiro acesso. */
+    suspend fun refreshVodByCategory(
+        onProgress: suspend (BootstrapProgress) -> Unit = {}
+    ): List<Throwable> = exclusiveFullRefresh {
+        val errors = mutableListOf<Throwable>()
+        refreshVodCatalogByCategory(errors, onProgress)
+        errors
+    }
+
+    /**
+     * Filmes e depois séries, uma categoria por vez. O progresso é contado
+     * sobre as duas juntas ("vod": x de filmes+séries) para a barra não
+     * voltar a zero no meio.
+     */
+    private suspend fun refreshVodCatalogByCategory(
+        errors: MutableList<Throwable>,
+        onProgress: suspend (BootstrapProgress) -> Unit
+    ) {
         val movieCats = categories.get(ContentType.MOVIE).map { it.id }
+        val seriesCats = categories.get(ContentType.SERIES).map { it.id }
+        val total = movieCats.size + seriesCats.size
         movieCats.forEachIndexed { idx, catId ->
             runCatching { refreshMovieStreamsForCategory(catId) }
                 .exceptionOrNull()?.let(errors::add)
-            onProgress(BootstrapProgress("movies", idx + 1, movieCats.size))
+            onProgress(BootstrapProgress("vod", idx + 1, total))
         }
         touch(Scope.MOVIE_STREAMS)
-
-        // Series
-        val seriesCats = categories.get(ContentType.SERIES).map { it.id }
         seriesCats.forEachIndexed { idx, catId ->
             runCatching { refreshSeriesListForCategory(catId) }
                 .exceptionOrNull()?.let(errors::add)
-            onProgress(BootstrapProgress("series", idx + 1, seriesCats.size))
+            onProgress(BootstrapProgress("vod", movieCats.size + idx + 1, total))
         }
         touch(Scope.SERIES_LIST)
-
         // Invalida o cache de detalhes (series_info, vod_info) — ele tem TTL
         // próprio de 24h e fica "pegado" mesmo quando o provedor publica
-        // novas temporadas/episódios. Limpar aqui garante que a próxima
-        // entrada em qualquer série/filme busque dados frescos do servidor.
+        // novas temporadas/episódios.
         runCatching { detail.clearAll() }.exceptionOrNull()?.let(errors::add)
-
-        errors
     }
 
     /* ----------------- Search (FTS) ----------------- */

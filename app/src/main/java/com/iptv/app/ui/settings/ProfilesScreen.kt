@@ -33,6 +33,10 @@ import androidx.compose.material3.Text
 import com.iptv.app.R
 import com.iptv.app.data.prefs.Profile
 import com.iptv.app.data.prefs.ProviderType
+import androidx.compose.material.icons.filled.Lock
+import com.iptv.app.premium.PremiumFeature
+import com.iptv.app.ui.premium.PremiumPaywallDialog
+import com.iptv.app.ui.premium.rememberHasPremium
 import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.TouchableButton
 import com.iptv.app.ui.common.rememberTvDim
@@ -53,6 +57,11 @@ fun ProfilesScreen(
     val switchedMsg = stringResource(R.string.snack_profile_switched)
     var editing by remember { mutableStateOf<Profile?>(null) }
     var creating by remember { mutableStateOf(false) }
+    val unlimitedProfiles = rememberHasPremium(PremiumFeature.UNLIMITED_PROFILES)
+    var showPaywall by remember { mutableStateOf(false) }
+    if (showPaywall) {
+        PremiumPaywallDialog(PremiumFeature.UNLIMITED_PROFILES, onDismiss = { showPaywall = false })
+    }
 
     if (creating || editing != null) {
         ProfileEditor(
@@ -144,8 +153,25 @@ fun ProfilesScreen(
             }
         }
 
-        TouchableButton(onClick = { creating = true }) {
+        // Gratuito: até FREE_PROFILE_LIMIT perfis; acima disso, "Seja Premium"
+        // (#35). Quem já tem mais mantém os seus — só não cria novos.
+        val canAdd = unlimitedProfiles || s.profiles.size < PremiumFeature.FREE_PROFILE_LIMIT
+        TouchableButton(onClick = { if (canAdd) creating = true else showPaywall = true }) {
+            if (!canAdd) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Filled.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 6.dp)
+                )
+            }
             Text(stringResource(R.string.profiles_add))
+        }
+        if (!canAdd) {
+            Text(
+                stringResource(R.string.profiles_free_limit, PremiumFeature.FREE_PROFILE_LIMIT),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         TouchableButton(onClick = onClose) {
             Text(stringResource(R.string.back))

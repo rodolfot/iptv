@@ -90,6 +90,11 @@ object ImmersiveAudio {
         }.getOrDefault(false)
     }
 
+    /** Família do codec da faixa de áudio selecionada. */
+    fun selectedFamily(tracks: Tracks): AudioCodecFamily? = tracks.groups
+        .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+        ?.let { g -> (0 until g.length).firstOrNull { g.isTrackSelected(it) }?.let { familyOf(g.getTrackFormat(it)) } }
+
     /** Badge da faixa de áudio selecionada, ou null se não houver áudio. */
     fun selectedBadge(context: Context, tracks: Tracks, passthroughEnabled: Boolean): AudioBadge? {
         val format = tracks.groups

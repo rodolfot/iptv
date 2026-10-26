@@ -6,6 +6,27 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.2] — 2026-10-26
+
+### Added
+
+- **Benefícios do Premium** (#35): além de tirar os anúncios, o Premium libera perfis/listas ilimitados (gratuito: 2) e o player web sem anúncios com a mesma chave; Multi-View, gravação, catch-up pela EPG, legendas externas e sincronização aparecem como "em breve". Os benefícios vêm do plano dentro da chave assinada (`f`); chaves antigas valem como Premium completo. Tela "Seja Premium" com QR code da loja (já com o ID do aparelho) ao tocar num recurso com cadeado; Configurações → Premium lista o que o plano inclui.
+- **Anúncios da casa** (#34): sem anunciante configurado, a versão gratuita mostra um banner e um cartão de 5 s (pulável) promovendo o Premium, com QR code. Desligável no painel.
+- **Formato de áudio no player** (#41): Opções → Formato de áudio — Automático, cada codec presente no conteúdo (Dolby Atmos, Dolby Digital, DTS…) ou PCM decodificado no aparelho; troca na hora, sem reiniciar o vídeo.
+- **Tutorial na Início vazia** (#33): "Tudo pronto! Assista seu primeiro canal ou filme", atalhos (foco no Ao Vivo) e dicas do controle, no lugar do esqueleto de carregamento que ficava para sempre.
+- **Logo animado** no menu superior (#37) e nas telas de boas-vindas e login (#42).
+
+### Changed
+
+- **Primeiro carregamento rápido** (#32): libera o app depois das categorias e dos canais ao vivo (antes esperava o catálogo inteiro — ~3 min na TV); filmes e séries carregam em segundo plano com um selo de progresso no topo; a tela de carregamento mostra a fase e uma barra de progresso. O login não dispara mais um download completo paralelo.
+- **Configurações reorganizadas** (#39): na TV/tablet, menu lateral compacto por seção e só a seção escolhida à direita; campos com largura confortável. ← no conteúdo volta para a seção atual.
+- **Painel de opções do player** em duas colunas compactas, sem rolagem (#40).
+
+### Fixed
+
+- **Standby em picture-in-picture** (#38): a tela fica ligada enquanto o vídeo toca, inclusive no PiP e no miniplayer (wake lock de tela; em TVs TCL a flag da janela era ignorada). Sair do player não desliga mais o "manter tela ligada" do app inteiro.
+- **Foco no player**: o primeiro ↑ às vezes não levava o foco à barra superior e o → seguinte avançava o vídeo em vez de ir para Opções.
+
 ## [4.0.1] — 2026-10-26
 
 ### Added

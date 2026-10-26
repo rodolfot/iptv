@@ -47,7 +47,14 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.iptv.app.R
+import com.iptv.app.ui.common.BrandBackground
+import com.iptv.app.ui.common.TartaLogoMark
 import com.iptv.app.ui.common.TouchableButton
+import com.iptv.app.ui.premium.PremiumBenefitsList
+import com.iptv.app.ui.premium.PremiumGateViewModel
+import com.iptv.app.ui.premium.PremiumQrCode
+import com.iptv.app.ui.premium.portalBaseUrl
+import com.iptv.app.ui.premium.premiumBuyUrl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import javax.inject.Inject
@@ -67,6 +74,10 @@ class AdsViewModel @Inject constructor(
 fun AdBanner(placement: AdPlacement, modifier: Modifier = Modifier, vm: AdsViewModel = hiltViewModel()) {
     val spec by remember(placement) { vm.ads.banner(placement) }.collectAsState(initial = null)
     val banner = spec ?: return
+    if (banner.house) {
+        HousePremiumBanner(modifier)
+        return
+    }
     val context = LocalContext.current
     Row(
         modifier = modifier
@@ -243,5 +254,119 @@ fun AdBreak(
                 }
             }
         }
+    }
+}
+
+/**
+ * Banner da casa (#34): ocupa o lugar do anunciante e convida para o Premium.
+ * Mesmo tamanho e mesma regra do banner comum (não focável); no toque abre a
+ * loja com o ID do aparelho.
+ */
+@Composable
+private fun HousePremiumBanner(modifier: Modifier, vm: PremiumGateViewModel = hiltViewModel()) {
+    val state by vm.license.state.collectAsState()
+    val context = LocalContext.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = 56.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .focusProperties { canFocus = false }
+            .clickable {
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(premiumBuyUrl(state.deviceId)))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        TartaLogoMark(size = 28.dp)
+        Text(
+            stringResource(R.string.ad_house_banner),
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            portalBaseUrl().removePrefix("https://") + "/comprar",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+/**
+ * Cartão pré-conteúdo da casa (#34): "Assista sem anúncios" com os benefícios
+ * e o QR da loja. Some sozinho em [durationMs]; "Continuar" já vem focado,
+ * então um OK pula na hora.
+ */
+@Composable
+fun HousePremiumBreak(
+    ads: AdsManager,
+    onFinished: () -> Unit,
+    durationMs: Long = 5_000L,
+    vm: PremiumGateViewModel = hiltViewModel()
+) {
+    val state by vm.license.state.collectAsState()
+    var remaining by remember { mutableLongStateOf(durationMs) }
+    var done by remember { mutableStateOf(false) }
+    val finish = { if (!done) { done = true; onFinished() } }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        ads.markShown()
+        runCatching { focus.requestFocus() }
+        while (remaining > 0 && !done) {
+            delay(250)
+            remaining -= 250
+        }
+        finish()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BrandBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(40.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f, fill = false)) {
+                TartaLogoMark(size = 48.dp)
+                Text(
+                    stringResource(R.string.ad_house_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White
+                )
+                PremiumBenefitsList(included = { it.available })
+                TouchableButton(onClick = { finish() }, modifier = Modifier.focusRequester(focus)) {
+                    Text(stringResource(R.string.ad_house_continue, (remaining + 999) / 1000))
+                }
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                PremiumQrCode(premiumBuyUrl(state.deviceId), size = 180.dp)
+                Text(
+                    portalBaseUrl().removePrefix("https://") + "/comprar",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White
+                )
+            }
+        }
+        Text(
+            stringResource(R.string.ad_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.7f),
+            modifier = Modifier.align(Alignment.TopStart).padding(24.dp)
+        )
     }
 }

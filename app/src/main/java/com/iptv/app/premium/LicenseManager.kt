@@ -8,9 +8,12 @@ import androidx.security.crypto.MasterKey
 import com.iptv.app.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -27,8 +30,14 @@ data class LicenseState(
     /** Chave ativa formatada (`ABCD-1234-…`), quando premium. */
     val key: String? = null,
     /** Validade em epoch segundos; 0 = vitalícia. */
-    val expiresAt: Long = 0L
-)
+    val expiresAt: Long = 0L,
+    /** Benefícios do plano; null = todos (token anterior à lista). */
+    val features: Set<String>? = null
+) {
+    /** Benefício liberado? Único ponto de decisão do Premium (#35). */
+    fun has(feature: PremiumFeature): Boolean =
+        premium && (features == null || feature.key in features)
+}
 
 /** Resultado de [LicenseManager.activate]. */
 sealed interface ActivationResult {
@@ -99,6 +108,13 @@ class LicenseManager @Inject constructor(
 
     fun isPremium(): Boolean = _state.value.premium
 
+    /** Ver [LicenseState.has]. */
+    fun has(feature: PremiumFeature): Boolean = _state.value.has(feature)
+
+    /** Liga/desliga na hora em que a licença é ativada ou removida. */
+    fun observe(feature: PremiumFeature): Flow<Boolean> =
+        state.map { it.has(feature) }.distinctUntilChanged()
+
     /** Ativa [rawKey] neste aparelho no servidor de licenças. */
     suspend fun activate(rawKey: String): ActivationResult = withContext(Dispatchers.IO) {
         val key = LicenseToken.normalizeKey(rawKey)
@@ -165,7 +181,8 @@ class LicenseManager @Inject constructor(
             deviceId = deviceId,
             premium = true,
             key = LicenseToken.formatKey(payload.key),
-            expiresAt = payload.expiresAt
+            expiresAt = payload.expiresAt,
+            features = payload.features
         )
     }
 

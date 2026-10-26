@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,15 +22,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.iptv.app.R
+import com.iptv.app.data.cache.CatalogCacheRepository
 import kotlinx.coroutines.delay
 
 /**
- * Loader exibido durante o primeiro download/refresh do catálogo, com a
- * identidade 4.0 (#30): marca no anel luminoso girando; debaixo, um contador
- * de segundos mostra que o app não travou.
+ * Loader exibido durante o primeiro download do catálogo, com a identidade
+ * 4.0 (#30): marca no anel luminoso girando; debaixo, a fase atual com barra
+ * de progresso (#32) e o contador de segundos — nunca só o spinner.
  */
 @Composable
-fun CatalogLoadingScreen() {
+fun CatalogLoadingScreen(progress: CatalogCacheRepository.BootstrapProgress? = null) {
     var seconds by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         val started = System.currentTimeMillis()
@@ -50,9 +53,30 @@ fun CatalogLoadingScreen() {
         ) {
             BrandLoader()
             Text(
-                stringResource(R.string.catalog_loading_subtitle),
+                when (progress?.phase) {
+                    "categories" -> stringResource(
+                        R.string.catalog_phase_categories,
+                        (progress.current + 1).coerceAtMost(progress.total),
+                        progress.total
+                    )
+                    "live" -> stringResource(R.string.catalog_phase_live)
+                    else -> stringResource(R.string.catalog_loading_subtitle)
+                },
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.75f)
+                color = Color.White.copy(alpha = 0.85f)
+            )
+            // 3 passos de categorias + 1 de canais = 4 etapas; a de canais é
+            // a mais demorada, então a barra fica em 75% enquanto ela roda.
+            val step = when (progress?.phase) {
+                "categories" -> progress.current
+                "live" -> 3 + progress.current
+                else -> 0
+            }
+            LinearProgressIndicator(
+                progress = { step / 4f },
+                modifier = Modifier.width(260.dp),
+                color = Brand.Sky,
+                trackColor = Color.White.copy(alpha = 0.15f)
             )
             Text(
                 stringResource(R.string.catalog_loading_seconds, seconds),

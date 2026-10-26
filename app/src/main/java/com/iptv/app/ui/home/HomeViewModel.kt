@@ -229,6 +229,24 @@ class HomeViewModel @Inject constructor(
     private val _initialLoading = MutableStateFlow(false)
     val initialLoading = _initialLoading.asStateFlow()
 
+    /** Fase atual da tela de carregamento do primeiro acesso (#32). */
+    private val _bootstrapProgress = MutableStateFlow<CatalogCacheRepository.BootstrapProgress?>(null)
+    val bootstrapProgress = _bootstrapProgress.asStateFlow()
+
+    /** Filmes/séries chegando em segundo plano depois de liberar o app (null = nada rodando). */
+    private val _backgroundProgress = MutableStateFlow<CatalogCacheRepository.BootstrapProgress?>(null)
+    val backgroundProgress = _backgroundProgress.asStateFlow()
+
+    private suspend fun loadVodInBackground() {
+        try {
+            _backgroundProgress.value = CatalogCacheRepository.BootstrapProgress("vod", 0, 1)
+            runCatching { cache.refreshVodByCategory { _backgroundProgress.value = it } }
+            _lastUpdatedAt.value = cache.lastUpdatedAt()
+        } finally {
+            _backgroundProgress.value = null
+        }
+    }
+
     /** A Home chama [bootstrapCatalog] toda vez que volta à composição (ex.:
      *  ao sair do player) — a checagem só precisa rodar uma vez por sessão. */
     private var bootstrapped = false
@@ -247,10 +265,14 @@ class HomeViewModel @Inject constructor(
             val liveCount = liveDao.observeAll().firstOrEmpty().size
             val empty = movieCount == 0 && seriesCount == 0 && liveCount == 0
             if (empty || force) {
+                // #32: a tela de carregamento espera só categorias + canais ao
+                // vivo; filmes e séries seguem em segundo plano com o selo no topo.
                 _initialLoading.value = true
-                cache.refreshAll()
+                cache.bootstrapEssentials { _bootstrapProgress.value = it }
                 _initialLoading.value = false
+                _bootstrapProgress.value = null
                 _lastUpdatedAt.value = cache.lastUpdatedAt()
+                loadVodInBackground()
                 return@launch
             }
             // Não está vazio: verifica se já passou do TTL do intervalo
@@ -595,7 +617,11 @@ class HomeViewModel @Inject constructor(
      */
     fun refreshAllInBackground(onDone: () -> Unit = {}) {
         viewModelScope.launch {
-            runCatching { cache.refreshAll() }
+            // Por categoria, com o mesmo selo de progresso no topo (#32).
+            runCatching {
+                cache.refreshAllByCategory { p -> if (p.phase == "vod") _backgroundProgress.value = p }
+            }
+            _backgroundProgress.value = null
             _lastUpdatedAt.value = cache.lastUpdatedAt()
             onDone()
         }

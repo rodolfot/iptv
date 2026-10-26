@@ -103,25 +103,32 @@ class ContinueWatchingViewModel @Inject constructor(
         showAdult
     ) { adult, show -> if (show) emptySet() else adult }
 
-    val movies = combine(
+    private val moviesSource = combine(
         profileIdFlow.flatMapLatest { movieProgressDao.observeInProgress(it) },
         hiddenCategoryIds(ContentType.MOVIE)
     ) { list, hidden -> list.filterNot { it.categoryId != null && it.categoryId in hidden } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val series = combine(
+    val movies = moviesSource.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val seriesSource = combine(
         profileIdFlow.flatMapLatest { seriesProgressDao.observeRecent(it) },
         hiddenCategoryIds(ContentType.SERIES)
     ) { list, hidden ->
         if (hidden.isEmpty()) list
         else list.filterNot { seriesCache.categoryIdOf(it.seriesId)?.let { cat -> cat in hidden } == true }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val recentChannels = combine(
+    }
+    val series = seriesSource.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val recentSource = combine(
         // Busca a mais que 10 porque o filtro abaixo pode remover alguns.
         profileIdFlow.flatMapLatest { liveHistoryDao.observeRecent(it, limit = 30) },
         hiddenCategoryIds(ContentType.LIVE)
     ) { list, hidden ->
         list.filterNot { it.categoryId != null && it.categoryId in hidden }.take(10)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    }
+    val recentChannels = recentSource.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** As três consultas já responderam pelo menos uma vez: listas vazias a
+     *  partir daqui são "nada assistido ainda", não "carregando" (#33). */
+    val loaded = combine(moviesSource, seriesSource, recentSource) { _, _, _ -> true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     // Recomendações removidas a pedido do usuário — o Recommender fazia
     // queries pesadas no banco ao abrir a Início e dava travadinhas ao
@@ -204,8 +211,11 @@ fun ContinueWatchingScreen(
     // tocar direto como Continue Watching, abre a tela de detalhe com sinopse
     // — o usuário ainda não decidiu se quer ver.
     onOpenMovie: (PlayerArgs) -> Unit = onPlay,
+    // Atalhos do tutorial da Início vazia: chave da aba ("live", "movies"…).
+    onNavigate: (String) -> Unit = { },
     vm: ContinueWatchingViewModel = hiltViewModel()
 ) {
+    val loaded by vm.loaded.collectAsState()
     val movies by vm.movies.collectAsState()
     val series by vm.series.collectAsState()
     val recentChannels by vm.recentChannels.collectAsState()
@@ -219,12 +229,16 @@ fun ContinueWatchingScreen(
     ) {
         val nothingToContinue = movies.isEmpty() && series.isEmpty() && recentChannels.isEmpty()
         if (nothingToContinue) {
-            // Skeleton placeholder enquanto o cache populado dispara as
-            // listas — dá a sensação de tela respondendo em vez de
-            // "Nada por aqui" na primeira vez.
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                com.iptv.app.ui.common.SkeletonSection(label = "")
-                com.iptv.app.ui.common.SkeletonSection(label = "")
+            if (!loaded) {
+                // Skeleton só enquanto as consultas ainda não responderam.
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    com.iptv.app.ui.common.SkeletonSection(label = "")
+                    com.iptv.app.ui.common.SkeletonSection(label = "")
+                }
+            } else {
+                // Nada assistido ainda: antes o skeleton ficava para sempre e
+                // a Início parecia travada (#33). Agora vira um tutorial.
+                HomeEmptyTutorial(onNavigate)
             }
             return
         }

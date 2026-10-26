@@ -482,7 +482,7 @@ fun PlayerScreen(
     val resumedSession = remember { holder?.args?.value == args && holder.player != null }
     // Intervalo comercial em exibição (#29) e o "portão" que segura a
     // preparação do conteúdo até o pre-roll terminar.
-    var adBreak by remember { mutableStateOf<com.iptv.app.ads.VastAd?>(null) }
+    var adBreak by remember { mutableStateOf<com.iptv.app.ads.AdBreakItem?>(null) }
     val adGate = remember { arrayOfNulls<kotlinx.coroutines.CompletableDeferred<Unit>>(1) }
     val adScope = androidx.compose.runtime.rememberCoroutineScope()
     val inPip by ((context as? com.iptv.app.MainActivity)?.inPictureInPicture
@@ -580,9 +580,9 @@ fun PlayerScreen(
     DisposableEffect(Unit) {
         val activity = context as? android.app.Activity
         activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose {
-            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
+        // Não limpa ao sair: a MainActivity liga o flag para o app inteiro, e
+        // o miniplayer/PiP continuam tocando (ver ScreenAwakeLock).
+        onDispose { }
     }
 
     // Avoid re-preparing when returning from a minimized session: we'd lose position.
@@ -904,9 +904,15 @@ fun PlayerScreen(
     LaunchedEffect(focusOverlayRequest) {
         if (focusOverlayRequest == 0) return@LaunchedEffect
         backVisible = true
-        // Espera a barra compor antes de pedir o foco.
-        kotlinx.coroutines.delay(50)
-        runCatching { overlayFirstButton.requestFocus() }
+        // A barra pode estar entrando na composição agora (estava oculta): um
+        // pedido único em 50ms se perdia e o 1º ↑ não levava o foco a lugar
+        // nenhum — o → seguinte avançava o vídeo em vez de ir para Opções.
+        // Tenta a cada quadro até o foco chegar (no máximo ~0,5 s).
+        repeat(30) {
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { overlayFirstButton.requestFocus() }
+            if (overlayHasFocus) return@LaunchedEffect
+        }
     }
     LaunchedEffect(interactionTick) {
         backVisible = true
@@ -985,6 +991,7 @@ fun PlayerScreen(
 
     // --- Controles avançados (aspect ratio, velocidade, sleep timer, opções) ---
     var showOptions by remember { mutableStateOf(false) }
+    var showAudioFormat by remember { mutableStateOf(false) }
     val resizeModes = remember {
         listOf(
             androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT,
@@ -1288,7 +1295,24 @@ fun PlayerScreen(
                     showOptions = false
                     showTracks = true
                 },
+                audioFormat = audioFormatLabel(AudioFormatSelector.current(tracks, exo)),
+                onOpenAudioFormat = {
+                    showOptions = false
+                    showAudioFormat = true
+                },
                 onDismiss = { showOptions = false }
+            )
+        }
+        // Formato de áudio (Atmos, Dolby Digital, DTS, PCM…) escolhido na hora.
+        if (showAudioFormat) {
+            AudioFormatDialog(
+                choices = AudioFormatSelector.choices(tracks),
+                current = AudioFormatSelector.current(tracks, exo),
+                onSelect = {
+                    AudioFormatSelector.apply(exo, it)
+                    showAudioFormat = false
+                },
+                onDismiss = { showAudioFormat = false }
             )
         }
         if (showTracks) {
@@ -1500,18 +1524,27 @@ fun PlayerScreen(
                 }
             }
         }
-        // Intervalo comercial por cima de tudo (#29).
-        adBreak?.let { ad ->
-            com.iptv.app.ads.AdBreak(
-                ad = ad,
-                ads = vm.ads,
-                onFinished = {
-                    adBreak = null
-                    adGate[0]?.complete(Unit)
-                    adGate[0] = null
-                    runCatching { focusRequester.requestFocus() }
-                }
-            )
+        // Intervalo comercial por cima de tudo (#29): anunciante ou o
+        // cartão do Premium da casa (#34).
+        adBreak?.let { item ->
+            val onAdFinished = {
+                adBreak = null
+                adGate[0]?.complete(Unit)
+                adGate[0] = null
+                runCatching { focusRequester.requestFocus() }
+                Unit
+            }
+            when (item) {
+                is com.iptv.app.ads.AdBreakItem.Video -> com.iptv.app.ads.AdBreak(
+                    ad = item.ad,
+                    ads = vm.ads,
+                    onFinished = onAdFinished
+                )
+                com.iptv.app.ads.AdBreakItem.HousePremium -> com.iptv.app.ads.HousePremiumBreak(
+                    ads = vm.ads,
+                    onFinished = onAdFinished
+                )
+            }
         }
     }
 }
@@ -1639,91 +1672,114 @@ private fun PlayerOptionsDialog(
     onOpenExternal: () -> Unit,
     tracks: Tracks,
     onOpenTracks: () -> Unit,
+    audioFormat: String,
+    onOpenAudioFormat: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    val onTxt = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.on_label)
+    val offTxt = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.off_label)
+    val aspectLabel = when (resizeModeIndex) {
+        1 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_zoom)
+        2 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_fill)
+        else -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_fit)
+    }
+    // Linhas do painel. Antes era uma coluna de 11–12 botões cheios numa
+    // caixa de 460dp, que passava da altura da tela e rolava durante o
+    // vídeo; agora são duas colunas compactas que cabem sem rolagem.
+    val rows = buildList {
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio),
+            selectedTrackLabel(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) ?: "—",
+            onOpenTracks
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.audio_format_title),
+            audioFormat,
+            onOpenAudioFormat
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle),
+            selectedTrackLabel(tracks, androidx.media3.common.C.TRACK_TYPE_TEXT) ?: offTxt,
+            onOpenTracks
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect),
+            aspectLabel, onCycleResizeMode
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_speed),
+            "${speed}x", onCycleSpeed
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio_only),
+            if (settings.audioOnly) onTxt else offTxt, onToggleAudioOnly
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle_style),
+            settings.subtitleStyle.name, onCycleSubtitleStyle
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle_size),
+            "${settings.subtitleScalePercent}%"
+        ) {
+            val steps = listOf(75, 100, 125, 150, 175, 200)
+            val next = steps[(steps.indexOf(settings.subtitleScalePercent)
+                .coerceAtLeast(0) + 1) % steps.size]
+            onSubtitleScale(next)
+        })
+        if (state.isLive) {
+            val fmt = settings.streamFormatOverrides[state.liveStreamId] ?: settings.streamFormat
+            add(OptionSpec(
+                androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_stream_format),
+                fmt.name, onToggleLiveFormat
+            ))
+        }
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_sleep_timer),
+            if (sleepMinutes == 0) offTxt else "$sleepMinutes min", onCycleSleep
+        ))
+        add(OptionSpec(
+            androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_external),
+            "▶", onOpenExternal
+        ))
+    }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         androidx.compose.material3.Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
-                    .width(460.dp)
-                    .verticalScroll(androidx.compose.foundation.rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+                    .width(720.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_options),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
-                // Seleção de faixa de áudio (idioma) e legenda — abre o
-                // seletor com todas as faixas do conteúdo atual.
-                val offLabel = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.off_label)
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio),
-                    selectedTrackLabel(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) ?: "—",
-                    onOpenTracks
-                )
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle),
-                    selectedTrackLabel(tracks, androidx.media3.common.C.TRACK_TYPE_TEXT) ?: offLabel,
-                    onOpenTracks
-                )
-                val aspectLabel = when (resizeModeIndex) {
-                    1 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_zoom)
-                    2 -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_fill)
-                    else -> androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect_fit)
-                }
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_aspect),
-                    aspectLabel, onCycleResizeMode
-                )
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_speed),
-                    "${speed}x", onCycleSpeed
-                )
-                val onTxt = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.on_label)
-                val offTxt = androidx.compose.ui.res.stringResource(com.iptv.app.R.string.off_label)
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_audio_only),
-                    if (settings.audioOnly) onTxt else offTxt, onToggleAudioOnly
-                )
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle_style),
-                    settings.subtitleStyle.name, onCycleSubtitleStyle
-                )
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_subtitle_size),
-                    "${settings.subtitleScalePercent}%"
-                ) {
-                    val steps = listOf(75, 100, 125, 150, 175, 200)
-                    val next = steps[(steps.indexOf(settings.subtitleScalePercent)
-                        .coerceAtLeast(0) + 1) % steps.size]
-                    onSubtitleScale(next)
-                }
-                if (state.isLive) {
-                    val fmt = settings.streamFormatOverrides[state.liveStreamId] ?: settings.streamFormat
-                    OptionRow(
-                        androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_stream_format),
-                        fmt.name, onToggleLiveFormat
-                    )
-                }
-                val sleepLabel = if (sleepMinutes == 0) offTxt else "$sleepMinutes min"
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_sleep_timer),
-                    sleepLabel, onCycleSleep
-                )
-                OptionRow(
-                    androidx.compose.ui.res.stringResource(com.iptv.app.R.string.player_external),
-                    "▶", onOpenExternal
-                )
+                val half = (rows.size + 1) / 2
                 androidx.compose.foundation.layout.Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+                ) {
+                    listOf(rows.take(half), rows.drop(half)).forEach { column ->
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
+                        ) {
+                            column.forEach { OptionRow(it.label, it.value, it.onClick) }
+                        }
+                    }
+                }
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End
                 ) {
-                    TouchableButton(onClick = onDismiss) {
+                    TouchableButton(onClick = onDismiss, compact = true) {
                         Text(androidx.compose.ui.res.stringResource(com.iptv.app.R.string.ok))
                     }
                 }
@@ -1732,19 +1788,24 @@ private fun PlayerOptionsDialog(
     }
 }
 
+private data class OptionSpec(val label: String, val value: String, val onClick: () -> Unit)
+
 @androidx.compose.runtime.Composable
 private fun OptionRow(label: String, value: String, onClick: () -> Unit) {
-    TouchableButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    TouchableButton(onClick = onClick, compact = true, modifier = Modifier.fillMaxWidth()) {
         androidx.compose.foundation.layout.Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
             Box(modifier = Modifier.weight(1f))
             Text(
                 value,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 8.dp)
             )
         }
     }

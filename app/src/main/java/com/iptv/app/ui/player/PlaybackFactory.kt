@@ -10,7 +10,10 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.AudioCapabilities
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
@@ -63,7 +66,20 @@ fun buildRenderersFactory(
                 @Suppress("DEPRECATION")
                 builder.setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
             }
-            return builder.build()
+            // "PCM" escolhido no player (Formato de áudio): recusa formatos
+            // codificados e o renderer passa a decodificar no aparelho — sem
+            // recriar o player (ver AudioOutputOverride).
+            return object : ForwardingAudioSink(builder.build()) {
+                override fun getFormatSupport(format: Format): Int =
+                    if (AudioOutputOverride.forcePcm && format.sampleMimeType != MimeTypes.AUDIO_RAW) {
+                        AudioSink.SINK_FORMAT_UNSUPPORTED
+                    } else {
+                        super.getFormatSupport(format)
+                    }
+
+                override fun supportsFormat(format: Format): Boolean =
+                    getFormatSupport(format) != AudioSink.SINK_FORMAT_UNSUPPORTED
+            }
         }
     }.apply {
         // Ordem dos renderers de áudio: decoder do aparelho/passthrough primeiro

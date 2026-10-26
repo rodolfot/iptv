@@ -3,8 +3,10 @@
 package com.iptv.app.ui.player
 
 import android.content.Context
+import android.os.PowerManager
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.RenderersFactory
 
@@ -42,17 +44,54 @@ class ActivePlaybackHolder {
         val existing = player
         if (existing != null) return existing
         val created = newStreamingPlayer(context, renderersFactory).apply { playWhenReady = true }
+        screenAwake = ScreenAwakeLock(context).also(created::addListener)
         player = created
         decoderSignature = signature
         return created
     }
 
+    private var screenAwake: ScreenAwakeLock? = null
+
     fun release() {
+        screenAwake?.release()
+        screenAwake = null
+        AudioOutputOverride.forcePcm = false
         player?.release()
         player = null
         decoderSignature = null
         args.value = null
         minimized.value = false
+    }
+}
+
+/**
+ * Mantém a tela ligada enquanto o vídeo toca — em tela cheia, no miniplayer
+ * e no PiP. FLAG_KEEP_SCREEN_ON na janela não basta: em TVs TCL/Google TV a
+ * janela do app fica "encoberta" por uma camada do sistema (mHoldScreenWindow
+ * nulo) e, no PiP, a Activity está pausada — a TV contava como inatividade e
+ * abria o aviso de desligamento. O wake lock de tela vale enquanto
+ * isPlaying for true e é solto na pausa, no fim ou ao liberar o player.
+ */
+@Suppress("DEPRECATION") // SCREEN_BRIGHT_WAKE_LOCK: único jeito sem janela em foco
+private class ScreenAwakeLock(context: Context) : Player.Listener {
+    private val lock = (context.applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager)
+        .newWakeLock(
+            PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE,
+            "tartatv:playback-screen"
+        )
+        .apply { setReferenceCounted(false) }
+
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
+        // Timeout de segurança: um vazamento nunca deixa a TV acesa para sempre.
+        if (isPlaying) lock.acquire(MAX_HOLD_MS) else release()
+    }
+
+    fun release() {
+        if (lock.isHeld) lock.release()
+    }
+
+    private companion object {
+        const val MAX_HOLD_MS = 6 * 60 * 60 * 1000L
     }
 }
 

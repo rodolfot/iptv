@@ -182,6 +182,9 @@ dependencies {
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // QR code da tela "Seja Premium" (#35) — Java puro, sem serviços Google.
+    implementation("com.google.zxing:core:3.5.3")
+
     // Room
     val room = "2.6.1"
     implementation("androidx.room:room-runtime:$room")

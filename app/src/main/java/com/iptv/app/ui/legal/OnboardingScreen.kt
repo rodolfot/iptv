@@ -120,11 +120,17 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                stringResource(R.string.onboarding_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                com.iptv.app.ui.common.AnimatedTartaLogo(size = 48.dp)
+                Text(
+                    stringResource(R.string.onboarding_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
             Text(
                 stringResource(R.string.onboarding_message),
                 style = MaterialTheme.typography.bodySmall,

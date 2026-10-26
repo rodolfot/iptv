@@ -31,6 +31,9 @@ import com.iptv.app.premium.LicenseToken
 import com.iptv.app.ui.common.LocalSnackbar
 import com.iptv.app.ui.common.TouchableButton
 import com.iptv.app.ui.common.TvSafeTextField
+import com.iptv.app.ui.premium.PremiumBenefitsList
+import com.iptv.app.ui.premium.PremiumQrCode
+import com.iptv.app.ui.premium.premiumBuyUrl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,7 +79,12 @@ class PremiumViewModel @Inject constructor(
  * caracteres. Ativou, os anúncios somem na hora — sem reiniciar.
  */
 @Composable
-fun PremiumSettingsContent(vm: PremiumViewModel = hiltViewModel()) {
+fun PremiumSettingsContent(
+    vm: PremiumViewModel = hiltViewModel(),
+    // Benefícios + QR da loja na versão gratuita; o diálogo "Seja Premium"
+    // já mostra os dele e passa false.
+    showOffer: Boolean = true
+) {
     val state by vm.state.collectAsState()
     val busy by vm.busy.collectAsState()
     val result by vm.result.collectAsState()
@@ -123,6 +131,9 @@ fun PremiumSettingsContent(vm: PremiumViewModel = hiltViewModel()) {
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+            // O que este plano inclui (#35).
+            Text(stringResource(R.string.premium_included), style = MaterialTheme.typography.titleSmall)
+            PremiumBenefitsList(included = { state.has(it) })
             return@Column
         }
         Text(
@@ -130,6 +141,24 @@ fun PremiumSettingsContent(vm: PremiumViewModel = hiltViewModel()) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (showOffer) {
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
+                    PremiumBenefitsList()
+                }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    PremiumQrCode(premiumBuyUrl(state.deviceId), size = 120.dp)
+                    Text(
+                        stringResource(R.string.premium_paywall_scan),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
         if (!vm.isConfigured) {
             Text(
                 stringResource(R.string.premium_error_not_configured),

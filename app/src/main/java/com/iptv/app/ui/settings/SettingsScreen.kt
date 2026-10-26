@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -352,20 +357,20 @@ fun SettingsScreen(
                     value = editHost,
                     onValueChange = { editHost = it },
                     label = stringResource(R.string.login_host),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
                 TvSafeTextField(
                     value = editUser,
                     onValueChange = { editUser = it },
                     label = stringResource(R.string.login_user),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
                 TvSafeTextField(
                     value = editPass,
                     onValueChange = { editPass = it },
                     label = stringResource(R.string.login_pass),
                     isPassword = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
                 testResult?.let { r ->
                     if (r.ok) {
@@ -420,7 +425,7 @@ fun SettingsScreen(
                         if (currentPinError) currentPinError = false
                     },
                     placeholder = stringResource(R.string.settings_pin_current_label),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
                 if (currentPinError) {
                     Text(
@@ -436,7 +441,7 @@ fun SettingsScreen(
                 placeholder = stringResource(
                     if (s.isPinSet) R.string.settings_pin_label_set else R.string.settings_pin_label_unset
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = SettingsField
             )
             val canSavePin = pin.length >= 4 && (!s.isPinSet || currentPin.isNotEmpty())
             TouchableButton(
@@ -506,7 +511,7 @@ fun SettingsScreen(
                         pendingLocaleTag = tag
                         localeDialogOpen = true
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
             }
             if (localeDialogOpen) {
@@ -579,7 +584,7 @@ fun SettingsScreen(
                             val profile = if (it.id == "__auto__") null else DeviceProfile.valueOf(it.id)
                             settingsVm.setDeviceProfile(profile)
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = SettingsField
                     )
                 }
             }
@@ -605,7 +610,7 @@ fun SettingsScreen(
                         selected = overscanOptions.firstOrNull { it.id == s.overscanPercent },
                         options = overscanOptions,
                         onSelect = { settingsVm.setOverscanPercent(it.id) },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = SettingsField
                     )
                 }
                 Text(
@@ -660,7 +665,7 @@ fun SettingsScreen(
                             settingsVm.setRefreshInterval(it.id)
                             snackbar?.show(refreshIntervalSavedMsg)
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = SettingsField
                     )
                 }
             }
@@ -741,7 +746,7 @@ fun SettingsScreen(
                     selected = decoderOptions.firstOrNull { it.id == s.decoderMode },
                     options = decoderOptions,
                     onSelect = { settingsVm.setDecoderMode(it.id) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
             }
             // Player externo preferido.
@@ -755,7 +760,7 @@ fun SettingsScreen(
                         ?: internalOpt,
                     options = playerOptions,
                     onSelect = { settingsVm.setExternalPlayer(it.id.ifBlank { null }) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
             }
             // Dolby Atmos / DTS: bitstream para o receiver ou PCM no aparelho.
@@ -783,7 +788,7 @@ fun SettingsScreen(
                     selected = formatOptions.firstOrNull { it.id == s.streamFormat },
                     options = formatOptions,
                     onSelect = { settingsVm.setStreamFormat(it.id) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
             }
             // Layout de navegação do Ao Vivo (grade, lista com categorias, lista com preview).
@@ -803,7 +808,7 @@ fun SettingsScreen(
                     selected = liveViewModeOptions.firstOrNull { it.id == s.liveViewMode },
                     options = liveViewModeOptions,
                     onSelect = { settingsVm.setLiveViewMode(it.id) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
             }
             var epgUrl by remember(s.epgUrlOverride) { mutableStateOf(s.epgUrlOverride ?: "") }
@@ -814,7 +819,7 @@ fun SettingsScreen(
                     settingsVm.setEpgUrlOverride(it.ifBlank { null })
                 },
                 label = stringResource(R.string.settings_epg_url),
-                modifier = Modifier.fillMaxWidth()
+                modifier = SettingsField
             )
             Text(
                 stringResource(R.string.settings_epg_url_hint),
@@ -831,7 +836,7 @@ fun SettingsScreen(
                         ?: offsetOptions.first { it.id == 0 },
                     options = offsetOptions,
                     onSelect = { settingsVm.setEpgOffsetMinutes(it.id) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = SettingsField
                 )
             }
         }
@@ -893,30 +898,72 @@ fun SettingsScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        if (isPhone) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                leftColumn()
-                rightColumn()
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
+    if (isPhone) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = dim.ScreenPadding, vertical = 12.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            leftColumn()
+            rightColumn()
+        }
+    } else {
+        // TV/tablet: menu de seções à esquerda e só a seção escolhida à
+        // direita. Antes eram dois blocos de cards enormes, com rolagem longa
+        // e listas de seleção ocupando a largura toda.
+        val sectionTitles = SETTINGS_SECTIONS.map { stringResource(it) }
+        var selectedSection by rememberSaveable { mutableStateOf(0) }
+        val navRequesters = remember { List(SETTINGS_SECTIONS.size) { FocusRequester() } }
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+        var contentHasFocus by remember { mutableStateOf(false) }
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = dim.ScreenPadding, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(200.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) { leftColumn() }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) { rightColumn() }
+                sectionTitles.forEachIndexed { i, title ->
+                    SettingsNavItem(title, selected = i == selectedSection, modifier = Modifier.focusRequester(navRequesters[i])) {
+                        selectedSection = i
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .widthIn(max = 640.dp)
+                    .onFocusChanged { contentHasFocus = it.hasFocus }
+                    // ← saindo do conteúdo volta para a seção atual do menu, e
+                    // não para o item que estiver na mesma altura (que trocaria
+                    // a seção ao receber o foco).
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown ||
+                            e.key != androidx.compose.ui.input.key.Key.DirectionLeft
+                        ) return@onPreviewKeyEvent false
+                        val current = selectedSection
+                        focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Left)
+                        if (!contentHasFocus) {
+                            selectedSection = current
+                            runCatching { navRequesters[current].requestFocus() }
+                        }
+                        true
+                    }
+                    .verticalScroll(rememberScrollState())
+            ) {
+                CompositionLocalProvider(LocalSettingsFilter provides sectionTitles[selectedSection]) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        leftColumn()
+                        rightColumn()
+                    }
+                }
             }
         }
     }
@@ -971,12 +1018,71 @@ private fun SettingsSwitchRow(
     }
 }
 
+/**
+ * Item do menu lateral: linha compacta (não um botão de 40dp+) para as dez
+ * seções caberem sem rolar. Selecionar ao focar — navegar com ↑/↓ já troca
+ * o conteúdo, sem precisar de OK em cada item.
+ */
+@Composable
+private fun SettingsNavItem(title: String, selected: Boolean, modifier: Modifier = Modifier, onSelect: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge,
+        maxLines = 1,
+        color = when {
+            focused -> MaterialTheme.colorScheme.onPrimary
+            selected -> MaterialTheme.colorScheme.primary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                when {
+                    focused -> MaterialTheme.colorScheme.primary
+                    selected -> MaterialTheme.colorScheme.surfaceVariant
+                    else -> androidx.compose.ui.graphics.Color.Transparent
+                }
+            )
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onSelect()
+            }
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    )
+}
+
+/** Largura dos campos (listas de seleção, textos): confortável, sem esticar
+ *  pela tela inteira da TV. */
+private val SettingsField = Modifier.widthIn(max = 420.dp).fillMaxWidth()
+
+/** Seções na ordem do menu lateral (TV/tablet). */
+private val SETTINGS_SECTIONS = listOf(
+    R.string.settings_server,
+    R.string.settings_parental_title,
+    R.string.settings_display,
+    R.string.settings_player_advanced,
+    R.string.settings_catalog,
+    R.string.settings_epg,
+    R.string.premium_title,
+    R.string.settings_history,
+    R.string.settings_session,
+    R.string.settings_about
+)
+
+/** Título da seção a mostrar (menu lateral); null = todas (celular). */
+private val LocalSettingsFilter = compositionLocalOf<String?> { null }
+
 @Composable
 private fun SettingsSection(
     title: String,
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val filter = LocalSettingsFilter.current
+    if (filter != null && filter != title) return
     Column(
         modifier = modifier
             .fillMaxWidth()

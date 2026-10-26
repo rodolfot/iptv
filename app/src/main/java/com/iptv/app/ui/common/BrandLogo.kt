@@ -17,8 +17,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -105,6 +107,68 @@ fun DrawScope.drawTartaMark(topLeft: Offset, side: Float) {
 fun TartaLogoMark(size: Dp, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.size(size)) {
         drawTartaMark(Offset.Zero, this.size.minDimension)
+    }
+}
+
+/** Animações desligadas nas opções do Android ("Remover animações"). */
+@Composable
+private fun animationsDisabled(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        android.provider.Settings.Global.getFloat(
+            context.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        ) == 0f
+    }
+}
+
+/**
+ * Logo do menu superior (#37): a marca dentro do anel, girando devagar — bem
+ * mais lento que o [BrandLoader] para não parecer carregamento. Só o Canvas
+ * redesenha (o ângulo é lido na fase de desenho), sem recompor o menu. Com
+ * "Remover animações" ligado no sistema, fica parado.
+ */
+@Composable
+fun AnimatedTartaLogo(size: Dp, modifier: Modifier = Modifier) {
+    val still = animationsDisabled()
+    val transition = rememberInfiniteTransition(label = "top-logo")
+    val rotation = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Restart),
+        label = "top-logo-rotation"
+    )
+    val hue = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(6000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "top-logo-hue"
+    )
+    Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val ringColor = lerp(Brand.Sky, Brand.Violet, if (still) 0f else hue.value)
+            val strokePx = this.size.minDimension * 0.06f
+            val inset = strokePx
+            val arcSize = Size(this.size.width - inset * 2, this.size.height - inset * 2)
+            drawCircle(
+                color = ringColor.copy(alpha = 0.2f),
+                radius = arcSize.minDimension / 2,
+                style = Stroke(width = strokePx * 0.6f)
+            )
+            rotate(if (still) 0f else rotation.value) {
+                drawArc(
+                    brush = Brush.sweepGradient(listOf(Color.Transparent, ringColor, Color.White)),
+                    startAngle = 0f,
+                    sweepAngle = 300f,
+                    useCenter = false,
+                    topLeft = Offset(inset, inset),
+                    size = arcSize,
+                    style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                )
+            }
+        }
+        TartaLogoMark(size = size * 0.52f, modifier = Modifier.padding(bottom = size * 0.02f))
     }
 }
 
