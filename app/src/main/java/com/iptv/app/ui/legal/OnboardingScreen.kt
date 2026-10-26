@@ -29,6 +29,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -269,14 +270,17 @@ private fun FullWidthButton(
     primary: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    // Sem o estado "selected": ele pintava o "Concordo" de azul antes de o
+    // foco chegar nele, parecendo já escolhido. O azul fica só para o foco; o
+    // botão principal se destaca pelo texto em negrito.
     TouchableButton(
         onClick = onClick,
-        selected = primary,
         modifier = Modifier.fillMaxWidth().then(modifier)
     ) {
         Text(
             label,
             style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (primary) FontWeight.Bold else FontWeight.Normal,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )

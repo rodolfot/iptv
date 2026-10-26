@@ -6,6 +6,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.3] — 2026-10-26
+
+### Fixed
+
+- **Boas-vindas**: o botão "Concordo e quero continuar" já aparecia azul ao abrir, parecendo selecionado antes de o foco chegar nele. Agora o azul indica só o foco; o botão principal se destaca pelo texto em negrito.
+- Primeira versão publicada com a **chave de assinatura permanente**: a partir da 4.0.2, as atualizações instalam por cima pela própria atualização do app.
+
 ## [4.0.2] — 2026-10-26
 
 ### Added
