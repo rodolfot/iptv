@@ -50,11 +50,18 @@ jobs:
       - name: Strip Windows-only JBR override
         run: sed -i '/^org.gradle.java.home=/d' gradle.properties
 
+      # Sem a chave permanente o Gradle assinaria com a chave de debug do
+      # runner, gerada do zero a cada execução — cada release sairia com uma
+      # assinatura diferente e nenhuma instalaria por cima da anterior. (O
+      # `if: env.X` antigo nunca enxergava o secret e o passo era pulado.)
       - name: Decode release keystore
-        if: ${{ env.RELEASE_KEYSTORE_BASE64 != '' }}
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::Secret RELEASE_KEYSTORE_BASE64 ausente: a release precisa da chave permanente."
+            exit 1
+          fi
           echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.jks"
           echo "RELEASE_KEYSTORE_FILE=$GITHUB_WORKSPACE/release.jks" >> "$GITHUB_ENV"
 
@@ -96,6 +103,17 @@ jobs:
             ARGS="$ARGS -PRELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
           fi
           ./gradlew :app:assembleRelease $ARGS --stacktrace
+
+      # Confere que o APK saiu com a chave permanente (SHA-256 do certificado).
+      - name: Verify signing certificate
+        run: |
+          EXPECTED="72FB7FA4E4B312D34988A28F23E826CE18E166AE6505E474A805907954EA99BD"
+          unzip -o -q app/build/outputs/apk/release/app-release.apk 'META-INF/*.RSA' -d /tmp/apkcert
+          ACTUAL=$(keytool -printcert -file /tmp/apkcert/META-INF/*.RSA             | sed -n 's/.*SHA256: //p' | head -1 | tr -d ':' | tr 'a-f' 'A-F')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK assinado com certificado inesperado ($ACTUAL)."
+            exit 1
+          fi
 
       - name: Rename APK
         run: |
