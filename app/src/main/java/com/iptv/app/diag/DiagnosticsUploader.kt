@@ -88,8 +88,10 @@ class DiagnosticsUploader @Inject constructor(
         val proc = ProcessBuilder(
             "logcat", "-d", "-v", "threadtime", "-t", "4000", "--pid=${Process.myPid()}"
         ).redirectErrorStream(true).start()
+        // `logcat -d` termina sozinho ao chegar ao fim do buffer; ler até o
+        // EOF já espera o processo (waitFor com timeout é só API 26+).
         val out = proc.inputStream.bufferedReader().readText()
-        proc.waitFor(5, TimeUnit.SECONDS)
+        proc.destroy()
         out
     }.getOrElse { "(logcat indisponível: ${it.message})" }
 

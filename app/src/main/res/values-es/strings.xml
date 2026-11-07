@@ -474,4 +474,8 @@
     <string name="diag_sending">Enviando…</string>
     <string name="diag_sent">Registro enviado. Código para soporte: %1$s</string>
     <string name="diag_send_failed">No se pudo enviar el registro: %1$s</string>
+    <string name="settings_ui_scale">Tamaño de la interfaz</string>
+    <string name="settings_ui_scale_auto">Automático</string>
+    <string name="settings_ui_scale_percent">%1$d%%</string>
+    <string name="settings_ui_scale_hint">Agranda o reduce textos, botones y tarjetas. En automático la central multimedia ya se amplía.</string>
 </resources>

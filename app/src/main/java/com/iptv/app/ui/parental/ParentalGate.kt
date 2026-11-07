@@ -27,7 +27,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import com.iptv.app.ui.common.Dialog
 import com.iptv.app.R
 import com.iptv.app.ui.common.TouchableButton
 import androidx.compose.material3.Icon

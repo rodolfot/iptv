@@ -474,4 +474,8 @@
     <string name="diag_sending">Invio…</string>
     <string name="diag_sent">Log inviato. Codice per l\'assistenza: %1$s</string>
     <string name="diag_send_failed">Impossibile inviare il log: %1$s</string>
+    <string name="settings_ui_scale">Dimensione dell\'interfaccia</string>
+    <string name="settings_ui_scale_auto">Automatica</string>
+    <string name="settings_ui_scale_percent">%1$d%%</string>
+    <string name="settings_ui_scale_hint">Ingrandisce o riduce testi, pulsanti e schede. In automatico l\'autoradio è già ingrandita.</string>
 </resources>

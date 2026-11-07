@@ -148,7 +148,7 @@ fun rememberTvDim(): TvDimensions {
             DeviceProfile.TV -> TvDefaults
             DeviceProfile.TABLET -> TabletDefaults
             DeviceProfile.PHONE -> PhoneDefaults
-            DeviceProfile.CAR -> carDims(LocalConfiguration.current.smallestScreenWidthDp)
+            DeviceProfile.CAR -> carDims(LocalConfiguration.current)
         }
     }
     val configuration = LocalConfiguration.current
@@ -163,7 +163,7 @@ fun rememberTvDim(): TvDimensions {
     return when {
         // Multimídia de carro: touch puro. Mapeamos pra Tablet (layout médio)
         // em vez de Phone pra aproveitar a tela maior.
-        isCar -> carDims(sw)
+        isCar -> carDims(configuration)
         isLeanback -> TvDefaults
         sw < 600 -> PhoneDefaults
         sw < 840 -> TabletDefaults
@@ -171,9 +171,15 @@ fun rememberTvDim(): TvDimensions {
     }
 }
 
-/** Central multimídia: touch, medidas de celular/tablet conforme a tela. */
-private fun carDims(sw: Int): TvDimensions =
-    (if (sw < 600) PhoneDefaults else TabletDefaults).copy(deviceClass = DeviceClass.AUTOMOTIVE)
+/**
+ * Central multimídia: touch, medidas de celular/tablet conforme a tela. Tela
+ * larga (paisagem ≥ 720dp, o normal no painel) usa as de tablet mesmo com a
+ * altura baixa depois da ampliação — as de celular são para retrato.
+ */
+private fun carDims(config: Configuration): TvDimensions {
+    val wide = config.smallestScreenWidthDp >= 600 || config.screenWidthDp >= 720
+    return (if (wide) TabletDefaults else PhoneDefaults).copy(deviceClass = DeviceClass.AUTOMOTIVE)
+}
 
 /**
  * Static defaults (TV-sized) — kept for non-Composable contexts only.

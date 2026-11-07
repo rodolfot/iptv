@@ -474,4 +474,8 @@
     <string name="diag_sending">Sending…</string>
     <string name="diag_sent">Log sent. Support code: %1$s</string>
     <string name="diag_send_failed">Could not send the log: %1$s</string>
+    <string name="settings_ui_scale">Interface size</string>
+    <string name="settings_ui_scale_auto">Automatic</string>
+    <string name="settings_ui_scale_percent">%1$d%%</string>
+    <string name="settings_ui_scale_hint">Makes text, buttons and cards bigger or smaller. Automatic already enlarges it on car head units.</string>
 </resources>

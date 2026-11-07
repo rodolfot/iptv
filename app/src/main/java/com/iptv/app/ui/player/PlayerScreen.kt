@@ -1756,7 +1756,7 @@ private fun PlayerOptionsDialog(
             "▶", onOpenExternal
         ))
     }
-    androidx.compose.ui.window.Dialog(
+    com.iptv.app.ui.common.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {

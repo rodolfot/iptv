@@ -474,4 +474,8 @@
     <string name="diag_sending">Wird gesendet…</string>
     <string name="diag_sent">Protokoll gesendet. Support-Code: %1$s</string>
     <string name="diag_send_failed">Protokoll konnte nicht gesendet werden: %1$s</string>
+    <string name="settings_ui_scale">Größe der Oberfläche</string>
+    <string name="settings_ui_scale_auto">Automatisch</string>
+    <string name="settings_ui_scale_percent">%1$d%%</string>
+    <string name="settings_ui_scale_hint">Vergrößert oder verkleinert Texte, Schaltflächen und Kacheln. Automatisch vergrößert bereits auf Autoradios.</string>
 </resources>

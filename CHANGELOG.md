@@ -6,6 +6,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.5] — 2026-11-07
+
+### Added
+
+- **Tamanho da interface** (Configurações → Exibição): Automático, 85%, 100%, 115%, 130% ou 150% — aumenta ou diminui textos, botões e cards em qualquer aparelho. No automático a **central multimídia já abre 35% maior** (telas de 1024×600/1280×720 em densidade baixa deixavam tudo miúdo); TV e celular seguem como antes.
+
+### Fixed
+
+- Diálogos e listas de opções (pop-ups) acompanham a escala da interface — na TV com densidade normalizada eles abriam no tamanho original do aparelho.
+- "Enviar log" em Android 6 e 7: a leitura do log do sistema usava uma chamada só disponível a partir do Android 8.
+
 ## [4.0.4] — 2026-11-07
 
 ### Fixed

@@ -476,4 +476,8 @@
     <string name="diag_sending">Enviando…</string>
     <string name="diag_sent">Log enviado. Código para o suporte: %1$s</string>
     <string name="diag_send_failed">Não foi possível enviar o log: %1$s</string>
+    <string name="settings_ui_scale">Tamanho da interface</string>
+    <string name="settings_ui_scale_auto">Automático</string>
+    <string name="settings_ui_scale_percent">%1$d%%</string>
+    <string name="settings_ui_scale_hint">Aumenta ou diminui textos, botões e cards. No automático a central multimídia já abre ampliada.</string>
 </resources>

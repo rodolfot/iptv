@@ -86,10 +86,15 @@ data class AppSettings(
     val audioPassthrough: Boolean = true,
     /** Central multimídia: com o veículo em movimento o player passa a tocar
      *  só o áudio (vídeo desligado). Opt-in — depende da localização. */
-    val drivingAudioOnly: Boolean = false
+    val drivingAudioOnly: Boolean = false,
+    /** Tamanho da interface em % (85–150); 0 = automático (central
+     *  multimídia ampliada, demais aparelhos 100%). */
+    val uiScalePercent: Int = 0
 )
 
 const val DEFAULT_OVERSCAN_PERCENT = 5
+const val UI_SCALE_MIN = 85
+const val UI_SCALE_MAX = 150
 
 enum class StreamFormat { TS, HLS }
 
@@ -169,6 +174,7 @@ class SettingsStore @Inject constructor(
         val EPG_OFFSET_MIN = stringPreferencesKey("epg_offset_min")
         val LIVE_VIEW_MODE = stringPreferencesKey("live_view_mode")
         val OVERSCAN_PERCENT = stringPreferencesKey("overscan_percent")
+        val UI_SCALE_PERCENT = stringPreferencesKey("ui_scale_percent")
         val SHOW_ADULT_IN_RECENTS = booleanPreferencesKey("show_adult_in_recents")
         val AUDIO_PASSTHROUGH = booleanPreferencesKey("audio_passthrough")
         val DRIVING_AUDIO_ONLY = booleanPreferencesKey("driving_audio_only")
@@ -219,7 +225,9 @@ class SettingsStore @Inject constructor(
                 ?: DEFAULT_OVERSCAN_PERCENT,
             showAdultInRecents = p[Keys.SHOW_ADULT_IN_RECENTS] == true,
             audioPassthrough = p[Keys.AUDIO_PASSTHROUGH] != false,
-            drivingAudioOnly = p[Keys.DRIVING_AUDIO_ONLY] == true
+            drivingAudioOnly = p[Keys.DRIVING_AUDIO_ONLY] == true,
+            uiScalePercent = p[Keys.UI_SCALE_PERCENT]?.toIntOrNull()
+                ?.let { if (it == 0) 0 else it.coerceIn(UI_SCALE_MIN, UI_SCALE_MAX) } ?: 0
         )
     }
 
@@ -291,6 +299,11 @@ class SettingsStore @Inject constructor(
 
     suspend fun setLiveViewMode(mode: LiveViewMode) {
         context.dataStore.edit { it[Keys.LIVE_VIEW_MODE] = mode.name }
+    }
+
+    suspend fun setUiScalePercent(percent: Int) {
+        val v = if (percent == 0) 0 else percent.coerceIn(UI_SCALE_MIN, UI_SCALE_MAX)
+        context.dataStore.edit { it[Keys.UI_SCALE_PERCENT] = v.toString() }
     }
 
     suspend fun setOverscanPercent(percent: Int) {

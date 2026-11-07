@@ -934,7 +934,7 @@ private fun EpisodesDialog(
     onDismiss: () -> Unit,
     onPick: (Episode) -> Unit
 ) {
-    androidx.compose.ui.window.Dialog(
+    com.iptv.app.ui.common.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {

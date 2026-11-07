@@ -50,7 +50,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.activity.compose.BackHandler
-import androidx.compose.material3.AlertDialog
+import com.iptv.app.ui.common.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
 import android.app.Activity

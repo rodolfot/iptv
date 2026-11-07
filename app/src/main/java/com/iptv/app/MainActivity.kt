@@ -249,6 +249,8 @@ data class RootState(
     val showHourlyClock: Boolean = false,
     /** Margem contra overscan na TV (Configurações → Tela). */
     val overscanPercent: Int = com.iptv.app.data.prefs.DEFAULT_OVERSCAN_PERCENT,
+    /** Tamanho da interface (Configurações → Tela); 0 = automático. */
+    val uiScalePercent: Int = 0,
     /** Falso até o primeiro emit do DataStore. Sem isso, o NavHost arranca em
      *  "onboarding" com base no estado default e dá um flash da tela de
      *  boas-vindas antes do estado real chegar (termos já aceitos). */
@@ -267,6 +269,7 @@ class RootViewModel @Inject constructor(
                 deviceProfile = it.deviceProfile,
                 showHourlyClock = it.showHourlyClock,
                 overscanPercent = it.overscanPercent,
+                uiScalePercent = it.uiScalePercent,
                 loaded = true
             )
         }
@@ -285,7 +288,7 @@ fun AppNav(
         com.iptv.app.ui.common.LocalDeviceProfile provides state.deviceProfile
     ) {
     // Densidade normalizada + margem de overscan na TV (32" a 100").
-    com.iptv.app.ui.common.TvScreenAdapter(overscanPercent = state.overscanPercent) {
+    com.iptv.app.ui.common.TvScreenAdapter(overscanPercent = state.overscanPercent, uiScalePercent = state.uiScalePercent) {
         // Espera o primeiro emit do DataStore + mínimo de 2 segundos antes
         // de montar o NavHost. Sem o mínimo, em TVs rápidas o splash piscava
         // (200ms); com 2s o usuário tem tempo de ver a animação e os

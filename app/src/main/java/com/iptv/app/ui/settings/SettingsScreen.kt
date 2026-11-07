@@ -21,7 +21,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import com.iptv.app.ui.common.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Switch
@@ -145,6 +145,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setShowHourlyClock(enabled: Boolean) {
         viewModelScope.launch { settings.setShowHourlyClock(enabled) }
+    }
+
+    fun setUiScalePercent(percent: Int) {
+        viewModelScope.launch { settings.setUiScalePercent(percent) }
     }
 
     fun setOverscanPercent(percent: Int) {
@@ -594,6 +598,29 @@ fun SettingsScreen(
                 title = stringResource(R.string.settings_hourly_clock),
                 hint = stringResource(R.string.settings_hourly_clock_hint),
                 onToggle = { settingsVm.setShowHourlyClock(it) }
+            )
+
+            // Tamanho da interface: vale para qualquer aparelho (na central
+            // multimídia o automático já amplia).
+            val scaleOptions = listOf(0, 85, 100, 115, 130, 150).map { pct ->
+                ComboOption(
+                    pct,
+                    if (pct == 0) stringResource(R.string.settings_ui_scale_auto)
+                    else stringResource(R.string.settings_ui_scale_percent, pct)
+                )
+            }
+            ComboColumn(label = stringResource(R.string.settings_ui_scale)) {
+                ComboBox(
+                    selected = scaleOptions.firstOrNull { it.id == s.uiScalePercent },
+                    options = scaleOptions,
+                    onSelect = { settingsVm.setUiScalePercent(it.id) },
+                    modifier = SettingsField
+                )
+            }
+            Text(
+                stringResource(R.string.settings_ui_scale_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             // Margem contra overscan — só faz sentido em TV.
