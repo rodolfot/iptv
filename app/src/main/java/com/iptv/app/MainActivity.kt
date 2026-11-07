@@ -66,6 +66,12 @@ class MainActivity : ComponentActivity() {
     /** When true, leaving the app while playing puts the player into PiP. */
     var pipEnabled: Boolean = false
 
+    /**
+     * Central multimídia com o player aberto: ao ir para segundo plano (câmera
+     * de ré, GPS) o áudio continua, como no Spotify, em vez de pausar.
+     */
+    var keepAudioInBackground: Boolean = false
+
     /** Em Picture-in-Picture agora — o player esconde a própria interface. */
     val inPictureInPicture = mutableStateOf(false)
 
@@ -125,8 +131,32 @@ class MainActivity : ComponentActivity() {
         return super.dispatchKeyEvent(mapped)
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.iptv.app.diag.DiagLog.i("Tela: onStart")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.iptv.app.diag.DiagLog.i("Tela: onResume")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        com.iptv.app.diag.DiagLog.i("Tela: onPause")
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        com.iptv.app.diag.DiagLog.i("Tela: foco da janela=$hasFocus")
+    }
+
     override fun onStop() {
         super.onStop()
+        com.iptv.app.diag.DiagLog.i(
+            "Tela: onStop (finishing=$isFinishing, áudio em 2º plano=$keepAudioInBackground, " +
+                "tocando=${playbackHolder.player?.isPlaying})"
+        )
         // On TV there's no PiP and no mini-player overlay to host playback
         // when the app goes to background. Pausing wasn't enough — when the
         // process is kept alive by the system, the ExoPlayer occasionally
@@ -136,7 +166,7 @@ class MainActivity : ComponentActivity() {
         if (!inPip) {
             if (isFinishing) {
                 playbackHolder.release()
-            } else {
+            } else if (!keepAudioInBackground) {
                 playbackHolder.player?.pause()
             }
         }

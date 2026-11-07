@@ -45,6 +45,7 @@ class ActivePlaybackHolder {
         if (existing != null) return existing
         val created = newStreamingPlayer(context, renderersFactory).apply { playWhenReady = true }
         screenAwake = ScreenAwakeLock(context).also(created::addListener)
+        created.addListener(PlaybackDiagListener)
         player = created
         decoderSignature = signature
         return created
@@ -92,6 +93,49 @@ private class ScreenAwakeLock(context: Context) : Player.Listener {
 
     private companion object {
         const val MAX_HOLD_MS = 6 * 60 * 60 * 1000L
+    }
+}
+
+/**
+ * Registra no diário de diagnóstico por que o player pausou ou parou — foco
+ * de áudio tomado por outro app (câmera de ré, GPS, chamada), saída de áudio
+ * desconectada, fim da mídia, erro — para o "Enviar log" (#diag).
+ */
+private object PlaybackDiagListener : Player.Listener {
+    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+        val why = when (reason) {
+            Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST -> "app/usuário"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS -> "perdeu foco de áudio"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> "saída de áudio desconectada"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE -> "remoto"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> "fim da mídia"
+            else -> "motivo $reason"
+        }
+        com.iptv.app.diag.DiagLog.i("Player playWhenReady=$playWhenReady ($why)")
+    }
+
+    override fun onPlaybackSuppressionReasonChanged(reason: Int) {
+        val why = when (reason) {
+            Player.PLAYBACK_SUPPRESSION_REASON_NONE -> "nenhuma"
+            Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS -> "foco de áudio perdido temporariamente"
+            else -> "motivo $reason"
+        }
+        com.iptv.app.diag.DiagLog.i("Player supressão: $why")
+    }
+
+    override fun onPlaybackStateChanged(playbackState: Int) {
+        val name = when (playbackState) {
+            Player.STATE_IDLE -> "IDLE"
+            Player.STATE_BUFFERING -> "BUFFERING"
+            Player.STATE_READY -> "READY"
+            Player.STATE_ENDED -> "ENDED"
+            else -> "$playbackState"
+        }
+        com.iptv.app.diag.DiagLog.i("Player estado=$name")
+    }
+
+    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+        com.iptv.app.diag.DiagLog.e("Player erro ${error.errorCodeName}", error)
     }
 }
 

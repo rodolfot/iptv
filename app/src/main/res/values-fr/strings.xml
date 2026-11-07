@@ -470,4 +470,8 @@
     <string name="audio_format_auto">Automatique</string>
     <string name="audio_format_pcm">PCM (décodage sur l\'appareil)</string>
     <string name="audio_format_hint">Dolby et DTS passent directement à l\'ampli/barre de son s\'il les accepte (passthrough). PCM décode sur l\'appareil : utilisez-le s\'il n\'y a pas de son.</string>
+    <string name="diag_send_log">Envoyer le journal</string>
+    <string name="diag_sending">Envoi…</string>
+    <string name="diag_sent">Journal envoyé. Code pour le support : %1$s</string>
+    <string name="diag_send_failed">Impossible d\'envoyer le journal : %1$s</string>
 </resources>

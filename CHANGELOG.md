@@ -6,6 +6,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.4] — 2026-11-07
+
+### Fixed
+
+- **Central multimídia**: engatar a ré (câmera de ré abrindo por cima do app) não pausa mais o canal, filme ou série — o áudio continua, como no Spotify, e o vídeo volta sozinho quando a câmera fecha. Vale também para GPS ou outra tela do sistema por cima do player. Na TV, celular e tablet nada muda.
+
+### Added
+
+- **Enviar log** (Configurações → Sobre): manda ao suporte o diário do app — tela entrando/saindo, motivo de cada pausa do player (foco de áudio, saída desconectada…), erros e falhas — com usuário, senha e servidor da lista removidos. A tela mostra um código curto para informar ao suporte.
+
 ## [4.0.3] — 2026-10-26
 
 ### Fixed

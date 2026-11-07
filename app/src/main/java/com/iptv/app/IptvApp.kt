@@ -100,6 +100,8 @@ class IptvApp : Application(), Configuration.Provider, coil.ImageLoaderFactory {
             .getString(LOCALE_KEY, null)
         com.iptv.app.ui.common.LocaleManager.apply(localeTag)
         CrashLog.install(this)
+        com.iptv.app.diag.DiagLog.init(this)
+        com.iptv.app.diag.DiagLog.i("App iniciado ${BuildConfig.VERSION_NAME}")
         Notifications.ensureChannels(this)
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             // Revalida a licença Premium offline logo no boot (#29).

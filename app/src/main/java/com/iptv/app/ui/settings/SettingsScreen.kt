@@ -883,6 +883,7 @@ fun SettingsScreen(
                         com.iptv.app.BuildConfig.VERSION_NAME
                     ))
                 }
+                SendLogButton()
             }
             // Log de crash local — só visível quando há registros. Sem
             // dependência externa (Firebase/Sentry); o usuário pode copiar e

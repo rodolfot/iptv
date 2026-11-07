@@ -470,4 +470,8 @@
     <string name="audio_format_auto">Automatic</string>
     <string name="audio_format_pcm">PCM (decode on device)</string>
     <string name="audio_format_hint">Dolby and DTS go straight to the receiver/soundbar when it supports them (passthrough). PCM decodes on the device — use it if there is no sound.</string>
+    <string name="diag_send_log">Send log</string>
+    <string name="diag_sending">Sending…</string>
+    <string name="diag_sent">Log sent. Support code: %1$s</string>
+    <string name="diag_send_failed">Could not send the log: %1$s</string>
 </resources>

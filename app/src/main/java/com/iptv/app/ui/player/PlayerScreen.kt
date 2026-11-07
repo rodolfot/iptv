@@ -519,6 +519,18 @@ fun PlayerScreen(
         onDispose { activity?.pipEnabled = previous ?: false }
     }
 
+    // Central multimídia: a câmera de ré (e o GPS, ou qualquer tela do
+    // sistema) abre por cima do app e a Activity vai para onStop. Como no
+    // Spotify, o áudio continua tocando por baixo — o vídeo volta sozinho
+    // quando a tela do player reaparece.
+    val keepAudioInBackground =
+        com.iptv.app.ui.common.rememberTvDim().deviceClass == com.iptv.app.ui.common.DeviceClass.AUTOMOTIVE
+    DisposableEffect(keepAudioInBackground) {
+        val activity = context as? com.iptv.app.MainActivity
+        activity?.keepAudioInBackground = keepAudioInBackground
+        onDispose { activity?.keepAudioInBackground = false }
+    }
+
     // Decoder escolhido nas Configurações — aplicado na construção do player.
     // Se o modo mudar com um player já ativo no holder, vale no próximo cold start.
     val decoderMode = settings.decoderMode
@@ -806,14 +818,15 @@ fun PlayerScreen(
     // Agora o Ao Vivo solta a conexão ao parar e volta sintonizado na borda
     // ao vivo; filme/episódio salva a posição e retoma de onde estava.
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(exo, lifecycleOwner) {
+    DisposableEffect(exo, lifecycleOwner, keepAudioInBackground) {
         var resumeOnStart = false
         val observer = LifecycleEventObserver { _, event ->
             val activity = context as? android.app.Activity
             val inPip = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N &&
                 activity?.isInPictureInPictureMode == true
             when (event) {
-                Lifecycle.Event.ON_STOP -> if (!inPip) {
+                // Central multimídia: segue tocando por baixo da câmera de ré.
+                Lifecycle.Event.ON_STOP -> if (!inPip && !keepAudioInBackground) {
                     resumeOnStart = exo.playWhenReady || isInitialBuffering || isReconnecting
                     retryJob[0]?.cancel()
                     state.items.getOrNull(exo.currentMediaItemIndex)?.let {
