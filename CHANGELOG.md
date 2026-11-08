@@ -6,6 +6,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+## [4.0.7] — 2026-11-08
+
 ### Changed
 
 - **Atualização automática pelo portal**: o app procura e baixa as versões novas em tv.muchila.com.br (o GitHub fica de reserva). Preparação para o repositório do código ficar particular sem cortar as atualizações das TVs e centrais.
