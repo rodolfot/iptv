@@ -602,18 +602,36 @@ fun SettingsScreen(
 
             // Tamanho da interface: vale para qualquer aparelho (na central
             // multimídia o automático já amplia).
-            val scaleOptions = listOf(0, 85, 100, 115, 130, 150).map { pct ->
-                ComboOption(
-                    pct,
-                    if (pct == 0) stringResource(R.string.settings_ui_scale_auto)
-                    else stringResource(R.string.settings_ui_scale_percent, pct)
+            // Premium: 85%–150%; gratuito: automático ou 85%.
+            val scalePremium = com.iptv.app.ui.premium.rememberHasPremium(
+                com.iptv.app.premium.PremiumFeature.UI_SCALE
+            )
+            var scalePaywall by remember { mutableStateOf(false) }
+            if (scalePaywall) {
+                com.iptv.app.ui.premium.PremiumPaywallDialog(
+                    com.iptv.app.premium.PremiumFeature.UI_SCALE,
+                    onDismiss = { scalePaywall = false }
                 )
             }
+            val freeScales = com.iptv.app.premium.PremiumFeature.FREE_UI_SCALES
+            val scaleOptions = listOf(0, 85, 100, 115, 130, 150).map { pct ->
+                val label = if (pct == 0) stringResource(R.string.settings_ui_scale_auto)
+                else stringResource(R.string.settings_ui_scale_percent, pct)
+                ComboOption(
+                    pct,
+                    if (scalePremium || pct in freeScales) label
+                    else stringResource(R.string.settings_ui_scale_locked, label)
+                )
+            }
+            val currentScale = s.uiScalePercent.takeIf { scalePremium || it in freeScales } ?: 0
             ComboColumn(label = stringResource(R.string.settings_ui_scale)) {
                 ComboBox(
-                    selected = scaleOptions.firstOrNull { it.id == s.uiScalePercent },
+                    selected = scaleOptions.firstOrNull { it.id == currentScale },
                     options = scaleOptions,
-                    onSelect = { settingsVm.setUiScalePercent(it.id) },
+                    onSelect = {
+                        if (scalePremium || it.id in freeScales) settingsVm.setUiScalePercent(it.id)
+                        else scalePaywall = true
+                    },
                     modifier = SettingsField
                 )
             }

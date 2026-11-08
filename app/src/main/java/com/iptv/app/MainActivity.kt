@@ -259,17 +259,24 @@ data class RootState(
 
 @HiltViewModel
 class RootViewModel @Inject constructor(
-    settings: SettingsStore
+    settings: SettingsStore,
+    license: com.iptv.app.premium.LicenseManager
 ) : ViewModel() {
-    val state = settings.flow
-        .map {
+    val state = kotlinx.coroutines.flow.combine(settings.flow, license.state) { it, lic -> it to lic }
+        .map { (it, lic) ->
             RootState(
                 termsAccepted = it.termsAccepted,
                 loggedIn = it.isLoggedIn && it.host.isNotBlank(),
                 deviceProfile = it.deviceProfile,
                 showHourlyClock = it.showHourlyClock,
                 overscanPercent = it.overscanPercent,
-                uiScalePercent = it.uiScalePercent,
+                // Tamanho escolhido vale só no Premium; no gratuito, além do
+                // automático, só o 85% (#premium) — um valor salvo antes cai
+                // no automático.
+                uiScalePercent = it.uiScalePercent.takeIf { v ->
+                    v in com.iptv.app.premium.PremiumFeature.FREE_UI_SCALES ||
+                        lic.has(com.iptv.app.premium.PremiumFeature.UI_SCALE)
+                } ?: 0,
                 loaded = true
             )
         }

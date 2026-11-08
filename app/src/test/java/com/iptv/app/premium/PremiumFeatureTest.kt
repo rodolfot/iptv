@@ -45,6 +45,8 @@ class PremiumFeatureTest {
         assertTrue(state.has(PremiumFeature.NO_ADS))
         assertTrue(state.has(PremiumFeature.WEB_PLAYER))
         assertFalse(state.has(PremiumFeature.UNLIMITED_PROFILES))
+        // Benefício de todos os planos, mesmo fora da lista do token.
+        assertTrue(state.has(PremiumFeature.UI_SCALE))
     }
 
     @Test

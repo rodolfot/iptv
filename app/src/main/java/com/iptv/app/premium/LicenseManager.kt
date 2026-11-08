@@ -36,7 +36,7 @@ data class LicenseState(
 ) {
     /** Benefício liberado? Único ponto de decisão do Premium (#35). */
     fun has(feature: PremiumFeature): Boolean =
-        premium && (features == null || feature.key in features)
+        premium && (features == null || feature.inAllPlans || feature.key in features)
 }
 
 /** Resultado de [LicenseManager.activate]. */

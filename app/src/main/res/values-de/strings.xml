@@ -478,4 +478,6 @@
     <string name="settings_ui_scale_auto">Automatisch</string>
     <string name="settings_ui_scale_percent">%1$d%%</string>
     <string name="settings_ui_scale_hint">Vergrößert oder verkleinert Texte, Schaltflächen und Kacheln. Automatisch vergrößert bereits auf Autoradios.</string>
+    <string name="premium_benefit_uiscale">Anpassbare Größe der Oberfläche (kostenlos: automatisch oder 85 %)</string>
+    <string name="settings_ui_scale_locked">%1$s 🔒 Premium</string>
 </resources>

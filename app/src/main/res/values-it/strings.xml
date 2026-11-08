@@ -478,4 +478,6 @@
     <string name="settings_ui_scale_auto">Automatica</string>
     <string name="settings_ui_scale_percent">%1$d%%</string>
     <string name="settings_ui_scale_hint">Ingrandisce o riduce testi, pulsanti e schede. In automatico l\'autoradio è già ingrandita.</string>
+    <string name="premium_benefit_uiscale">Dimensione dell\'interfaccia regolabile (gratis: automatica o 85%)</string>
+    <string name="settings_ui_scale_locked">%1$s 🔒 Premium</string>
 </resources>

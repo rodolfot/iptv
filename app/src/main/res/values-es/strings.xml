@@ -478,4 +478,6 @@
     <string name="settings_ui_scale_auto">Automático</string>
     <string name="settings_ui_scale_percent">%1$d%%</string>
     <string name="settings_ui_scale_hint">Agranda o reduce textos, botones y tarjetas. En automático la central multimedia ya se amplía.</string>
+    <string name="premium_benefit_uiscale">Tamaño de la interfaz ajustable (gratis: automático u 85%)</string>
+    <string name="settings_ui_scale_locked">%1$s 🔒 Premium</string>
 </resources>

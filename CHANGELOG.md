@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+### Changed
+
+- **Tamanho da interface vira benefício Premium**: no gratuito ficam o Automático (que já amplia a central multimídia) e 85%; 100% a 150% abrem a tela "Seja Premium". Vale para qualquer plano Premium, inclusive chaves já vendidas. Um tamanho escolhido antes no gratuito volta para o Automático.
+
 ## [4.0.5] — 2026-11-07
 
 ### Added
