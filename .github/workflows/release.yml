@@ -120,6 +120,34 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk \
              tartatv-${{ steps.ver.outputs.name }}.apk
 
+      # Atualização automática: os aparelhos buscam a versão nova no portal
+      # (o repositório é particular). Notas = seção da versão no CHANGELOG.
+      - name: Publish APK to portal
+        env:
+          APP_RELEASE_TOKEN: ${{ secrets.APP_RELEASE_TOKEN }}
+          PORTAL_URL: ${{ secrets.PORTAL_URL }}
+        run: |
+          if [ -z "$APP_RELEASE_TOKEN" ]; then
+            echo "::error::Secret APP_RELEASE_TOKEN ausente: os aparelhos não receberiam esta versão."
+            exit 1
+          fi
+          VERSION="${{ steps.ver.outputs.name }}"
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { on=1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          BASE="${PORTAL_URL:-https://tv.muchila.com.br}"
+          curl --fail-with-body -sS --retry 3 --retry-all-errors --max-time 300 \
+            -H "Authorization: Bearer $APP_RELEASE_TOKEN" \
+            -F "version=$VERSION" \
+            -F "notes=<notes.md" \
+            -F "apk=@tartatv-$VERSION.apk;type=application/vnd.android.package-archive" \
+            "$BASE/api/app/v1/releases"
+          echo
+          curl -sS --fail "$BASE/api/app/v1/update/latest" | grep -q "\"v$VERSION\"" \
+            || { echo "::error::Portal não lista a versão $VERSION como a mais recente."; exit 1; }
+
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:

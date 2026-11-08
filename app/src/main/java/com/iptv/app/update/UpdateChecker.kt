@@ -34,7 +34,7 @@ class UpdateChecker @Inject constructor(
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val adapter = moshi.adapter(GhRelease::class.java)
 
-    /** Versão mais nova publicada no GitHub, ou `null` quando já está na última
+    /** Versão mais nova publicada (portal; GitHub de reserva), ou `null` quando já está na última
      *  (ou quando a checagem falhou — use [checkDetailed] para distinguir). */
     suspend fun check(): UpdateInfo? = (checkDetailed() as? UpdateCheckResult.Available)?.info
 
@@ -47,38 +47,54 @@ class UpdateChecker @Inject constructor(
      * o aviso de nova versão nunca aparecia dentro do app.
      */
     suspend fun checkDetailed(): UpdateCheckResult = withContext(Dispatchers.IO) {
-        val owner = BuildConfig.UPDATE_REPO_OWNER
-        val repo = BuildConfig.UPDATE_REPO_NAME
-        if (owner.isBlank() || repo.isBlank()) {
-            return@withContext UpdateCheckResult.Failed("repositório de update não configurado")
+        // Fonte principal: o portal (tv.muchila.com.br), que guarda cada APK
+        // assinado enviado pelo CI — o repositório do app é particular e os
+        // aparelhos não conseguem mais ler os Releases do GitHub sem login.
+        // O GitHub fica só de reserva, para o caso de o portal estar fora.
+        val sources = buildList {
+            add(com.iptv.app.ui.premium.portalBaseUrl() + "/api/app/v1/update/latest")
+            val owner = BuildConfig.UPDATE_REPO_OWNER
+            val repo = BuildConfig.UPDATE_REPO_NAME
+            if (owner.isNotBlank() && repo.isNotBlank()) {
+                add("https://api.github.com/repos/$owner/$repo/releases/latest")
+            }
         }
+        var last: UpdateCheckResult = UpdateCheckResult.Failed("sem fonte de atualização")
+        for (url in sources) {
+            last = checkSource(url)
+            if (last !is UpdateCheckResult.Failed) return@withContext last
+        }
+        last
+    }
+
+    private fun checkSource(url: String): UpdateCheckResult {
         try {
             val req = Request.Builder()
-                .url("https://api.github.com/repos/$owner/$repo/releases/latest")
+                .url(url)
                 .header("Accept", "application/vnd.github+json")
                 .build()
             http.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) {
-                    Log.w(TAG, "GitHub respondeu HTTP ${resp.code}")
-                    return@withContext UpdateCheckResult.Failed("HTTP ${resp.code}")
+                    Log.w(TAG, "$url respondeu HTTP ${resp.code}")
+                    return UpdateCheckResult.Failed("HTTP ${resp.code}")
                 }
                 val body = resp.body?.string()
-                    ?: return@withContext UpdateCheckResult.Failed("resposta vazia")
+                    ?: return UpdateCheckResult.Failed("resposta vazia")
                 val release = adapter.fromJson(body)
-                    ?: return@withContext UpdateCheckResult.Failed("JSON inválido")
-                if (release.draft || release.prerelease) return@withContext UpdateCheckResult.UpToDate
+                    ?: return UpdateCheckResult.Failed("JSON inválido")
+                if (release.draft || release.prerelease) return UpdateCheckResult.UpToDate
                 val remote = release.tag_name?.removePrefix("v")?.trim()
-                    ?: return@withContext UpdateCheckResult.Failed("release sem tag")
+                    ?: return UpdateCheckResult.Failed("release sem tag")
                 // Compara pelo versionName (SemVer da tag). Antes comparava um
                 // código derivado da tag (3.1.0 → 30100) com o versionCode, que no
                 // CI é o número de commits — as duas escalas não têm relação.
                 if (!AppVersion.isNewer(remote, BuildConfig.VERSION_NAME)) {
-                    return@withContext UpdateCheckResult.UpToDate
+                    return UpdateCheckResult.UpToDate
                 }
                 val apk = release.assets?.firstOrNull { it.name?.endsWith(".apk") == true }
                     ?.browser_download_url
-                    ?: return@withContext UpdateCheckResult.Failed("release sem APK")
-                UpdateCheckResult.Available(
+                    ?: return UpdateCheckResult.Failed("release sem APK")
+                return UpdateCheckResult.Available(
                     UpdateInfo(
                         versionName = AppVersion.core(remote),
                         notes = release.body.orEmpty(),
@@ -90,7 +106,7 @@ class UpdateChecker @Inject constructor(
         } catch (e: Exception) {
             // Rede fora, DNS, certificado inválido (TVs com relógio errado)…
             Log.w(TAG, "Falha ao checar atualização", e)
-            UpdateCheckResult.Failed(e.javaClass.simpleName + (e.message?.let { ": $it" } ?: ""))
+            return UpdateCheckResult.Failed(e.javaClass.simpleName + (e.message?.let { ": $it" } ?: ""))
         }
     }
 

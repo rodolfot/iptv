@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+### Changed
+
+- **Atualização automática pelo portal**: o app procura e baixa as versões novas em tv.muchila.com.br (o GitHub fica de reserva). Preparação para o repositório do código ficar particular sem cortar as atualizações das TVs e centrais.
+
 ### Fixed
 
 - **Séries com temporadas vazias** (#51): tocar numa temporada que o provedor não devolveu episódios agora abre o aviso "Esta temporada não retornou episódios do servidor" — antes o botão não reagia e parecia travado. Em séries muito grandes (ex.: A Fazenda, ~1.600 episódios) alguns provedores só enviam as temporadas mais recentes; o app mostra todas as temporadas declaradas, mas não tem como exibir episódios que o servidor não manda.
