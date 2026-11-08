@@ -6,6 +6,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Séries com temporadas vazias** (#51): tocar numa temporada que o provedor não devolveu episódios agora abre o aviso "Esta temporada não retornou episódios do servidor" — antes o botão não reagia e parecia travado. Em séries muito grandes (ex.: A Fazenda, ~1.600 episódios) alguns provedores só enviam as temporadas mais recentes; o app mostra todas as temporadas declaradas, mas não tem como exibir episódios que o servidor não manda.
+
 ## [4.0.6] — 2026-11-08
 
 ### Changed

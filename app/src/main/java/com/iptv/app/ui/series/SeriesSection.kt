@@ -879,8 +879,12 @@ fun SeriesDetailScreen(
                             compact = true,
                             modifier = Modifier.focusRequester(req),
                             onClick = {
+                                // Temporada sem episódios também abre o diálogo:
+                                // ele mostra a mensagem explicando que o provedor
+                                // não enviou os episódios (antes o toque não fazia
+                                // nada e parecia travado — #51).
                                 selectedSeason = s.seasonNumber
-                                if (count > 0) seasonDialogOpen = true
+                                seasonDialogOpen = true
                             }
                         ) {
                             Text("T${s.seasonNumber}" + if (count > 0) " ($count)" else "")
